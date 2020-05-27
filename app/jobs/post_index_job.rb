@@ -78,7 +78,7 @@ class PostIndexJob < ApplicationJob
               author = op.value.required_posting_auths[0]
               # next if Account.where(name: author).none?
               
-              payload = JSON[op.value.json]
+              payload = JSON[op.value.json] rescue []
               next unless payload[0] == 'follow'
               next unless [payload[1]['what']].flatten.include? 'ignore'
               
