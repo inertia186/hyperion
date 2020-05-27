@@ -84,7 +84,7 @@ private
     if async
       Post.active.unread(by: current_account).tagged_any(tag).count
     elsif tag.to_s == ''
-      all_tag_unread.values.sum
+      Post.active.unread(by: current_account).count
     else
       all_tag_unread[tag] || 0
     end
