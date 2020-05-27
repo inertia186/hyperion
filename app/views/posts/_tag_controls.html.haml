@@ -1,0 +1,98 @@
+.row.d-flex
+  .m-auto
+    = pagy_bootstrap_combo_nav_js(@pagy).html_safe
+  
+  - if @posts.none?
+    .btn.btn-primary.m-2.disabled Mark all as read
+  - else
+    = form_tag mark_all_as_read_posts_path, method: :patch, class: 'form-inline', data: {confirm: 'Are you sure?'} do
+      - @posts.each do |post|
+        = hidden_field_tag :'post_ids[]', post.id, id: nil
+      = hidden_field_tag :sort, @sort, id: nil
+      = hidden_field_tag :limit, @limit, id: nil
+      = hidden_field_tag :tag, @tag, id: nil
+      = submit_tag 'Mark all as read', class: 'btn btn-primary m-2'
+    
+  - if @tag == '' || ignored_tags.include?(@tag)
+    - if @tag == ''
+      .btn.btn-outline-primary.m-2.hidden.disabled= 25.times.map{'&nbsp;'}.join.html_safe
+    - else
+      = link_to "Stop Ignoring #{best_tag_name @tag}", clear_ignored_tags_posts_path(allow_tag: @tag, sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-secondary m-2'
+  - else
+    = form_tag ignore_all_posts_path, method: :patch, class: 'form-inline', data: {confirm: 'Are you sure?'} do
+      = hidden_field_tag :'ignore_tag', @tag, id: nil
+      = hidden_field_tag :sort, @sort, id: nil
+      = hidden_field_tag :limit, @limit, id: nil
+      = hidden_field_tag :tag, @tag, id: nil
+      = submit_tag "Ignore all #{best_tag_name @tag}", class: 'btn btn-primary m-2'
+  
+  - if @related_tags.any?
+    - word_list = []
+    - maximum_scale = 300.0
+    - scores = related_tag_post_count.values.first(@related_tags.size)
+    - average = scores.sum / scores.size
+    - base_score = 1.5
+    - @related_tags.shuffle.each do |name, tag|
+      - text_decoration = 'none'
+      - if ignored_tags.include? tag
+        - text_decoration = 'line-through'
+      
+      -# - weight = [(tag_unread_count(tag, true) / 2.0), 200.0].min
+      - weight = [((related_tag_post_count[tag].to_f / average) / base_score) * 50.0, maximum_scale].min
+      - word_list << [link_to(name, posts_path(sort: @sort, limit: @limit, tag: [@tag, tag].reject(&:empty?).join('+')), title: {related_tag_post_count: related_tag_post_count[tag], maximum_scale: maximum_scale, average: average, weight: weight}.to_json, style: "font-size: #{weight}%; overflow: hidden; position: relative; margin: 20px auto; padding: 0; text-decoration: #{text_decoration}"), weight]
+    
+    %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#related-tags'}}
+      Related Tags / Categories
+    
+    .modal.fade#related-tags
+      .modal-dialog.modal-lg
+        .modal-content
+          .modal-header
+            %h5.modal-title
+              - if @tag.present?
+                Tags / Categories Related to
+                = best_tag_name @tag
+              - else
+                Related Tags / Categories
+            %button.close{type: 'button', data: {dismiss: 'modal'}}
+              %span &times;
+          .modal-body{data: {word_list: word_list.to_json}}
+            - word_list.each do |link, weight|
+              = link.html_safe
+          .modal-footer
+            %small
+              Showing
+              = @related_tags.size
+              out of
+              = pluralize Tag.distinct.count(:tag), 'tag'
+  
+  - if session[:past_tags] && session[:past_tags].any?
+    %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#past-tags'}}
+      Past Tags / Categories
+    
+    .modal.fade#past-tags
+      .modal-dialog.modal-lg
+        .modal-content
+          .modal-header
+            %h5.modal-title
+              Past Tags / Categories
+            %button.close{type: 'button', data: {dismiss: 'modal'}}
+              %span &times;
+          .modal-body
+            - session[:past_tags].each do |tag|
+              - name = best_tag_name(tag)
+              - btn_class = if name.downcase == tag.downcase
+                - if ignored_tags.include? tag
+                  - 'btn btn-outline-secondary btn-sm m-1 strike'
+                - else
+                  - 'btn btn-outline-dark btn-sm m-1'
+              - else
+                - if ignored_tags.include? tag
+                  - 'btn btn-secondary btn-sm m-1 strike'
+                - else
+                  - 'btn btn-dark btn-sm m-1'
+              = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
+                = name
+                - unless ignored_tags.include? tag
+                  %span.badge.badge-light= tag_unread_count(tag)
+            = link_to 'Clear', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'

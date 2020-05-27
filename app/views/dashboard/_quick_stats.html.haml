@@ -1,0 +1,32 @@
+.card.text-right{style: 'max-width: 18rem;'}
+  .card-body
+    %ul.list-inline
+      %li.list-inline-item
+        %h6 Latest Block Seen:
+      %li.list-inline-item
+        %code{title: time_ago_in_words(Post.maximum(:created_at)) + ' ago'}= Post.maximum(:block_num)
+    %ul.list-inline
+      %li.list-inline-item
+        %h6 Posts Indexed:
+      %li.list-inline-item 
+        %code= Post.within_payout_window.count
+    %ul.list-inline
+      %li.list-inline-item
+        %h6 Unique Tags / Communities:
+      %li.list-inline-item 
+        %code
+          = Tag.community(false).distinct.count(:tag)
+          \/
+          = Tag.community.distinct.count(:tag)
+    - if !!current_account
+      .d-flex.flex-column
+        .btn-group.dropdown.show.p-2
+          .btn.btn-secondary.btn-sm.dropdown-toggle#top_active_tags_menu_link{data: {toggle: 'dropdown'}} Top Active Tags
+          .dropdown-menu
+            - Tag.community(false).limit(10).group_by_tag_count.each do |tag, count|
+              .dropdown-item= link_to tag, posts_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''
+        .btn-group.dropdown.show.p-2
+          .btn.btn-secondary.btn-sm.dropdown-toggle#top_active_communities_menu_link{data: {toggle: 'dropdown'}} Top Active Communities
+          .dropdown-menu
+            - Tag.community.limit(10).group_by_tag_count.each do |tag, count|
+              .dropdown-item= link_to best_tag_name(tag), posts_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''

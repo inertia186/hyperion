@@ -1,0 +1,176 @@
+.row.d-flex
+  .p-2.mr-auto
+    %form.form-inline{style: 'font-size: 0.88rem;'}
+      = hidden_field_tag :limit, @limit, id: nil
+      .form-group.mx-2
+        %label.mr-2{for: :tag} Tag/Category/Author:
+        - tag_search = @tag.to_s
+        - if @other_tags.any?
+          - tag_search += ' ' + @other_tags.join(' ')
+        - if @without_tags.any?
+          - tag_search += ' -' + @without_tags.join(' -')
+        - if @author.present?
+          - tag_search += " @#{@author}"
+        = text_field_tag :tag, tag_search.strip, class: 'form-control', id: nil
+      .form-group.mx-2
+        %label.mr-2{for: :sort} Sort:
+        = select_tag :sort, options_for_select([['Latest', 'latest'], ['Oldest', 'oldest'], ['Prolific', 'most_prolific'], ['Non-prolific', 'least_prolific'], ['Most Tags', 'most_tags'], ['Least Tags', 'least_tags']], @sort), class: 'form-control', id: nil
+      .form-group.mx-2
+        = submit_tag 'Query', class: 'btn btn-primary btn-search'
+  
+  .p-2
+    = link_to posts_path(sort: @sort, limit: @limit, tag: @tag, only_read: true) do
+      .btn.btn-primary.mx-2
+        Posts read:
+        %span.badge.badge-light#read-posts-count= current_account.read_posts.count
+    .btn.btn-outline-primary.mx-2
+      = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+    .btn.btn-primary.mx-2
+      Ignored tags:
+      %span.badge.badge-light#read-posts-count= ignored_tags.size
+    .btn.btn-outline-primary.mx-2
+      = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+
+.row.d-flex
+  .p-2.mr-auto
+    %h4
+      Results for
+      = link_to "https://hive.blog/trending/#{@tag}", target: '_new' do
+        = best_tag_name(@tag)
+        = icon('box-arrow-in-up', class: 'bi bi-alert-box-arrow-in-up')
+      = render partial: 'posts_count'
+  .p-2
+    - if ignored_tags.include? @tag
+      .alert.alert-secondary.m-auto.p-2
+        %em Note: this tag is ignored.
+    - if @only_deleted
+      .alert.alert-secondary.m-auto.p-2
+        %em Showing deleted posts.
+    - if @only_blacklisted
+      .alert.alert-secondary.m-auto.p-2
+        %em Showing blacklisted posts.
+
+= render partial: 'tag_controls'
+
+%p
+
+- if @posts.none?
+  = render partial: 'emptiness'
+
+.table-responsive-sm#posts
+  %table.table-sm
+    %tbody
+      - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
+        %tr.align-top{id: post_id = post.to_param}
+          %td.w-auto
+            .d-flex
+              - if post.readers.include? current_account
+                = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Unread', method: :patch, remote: true do
+                  = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-default')
+                  = icon('x-square', class: 'bi bi-alert-x-square text-info hover-stack hover-stack-hover')
+              - else
+                = link_to mark_as_read_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Read', method: :patch, remote: true, onclick: "$('##{post_id}').fadeOut('fast')" do
+                  = icon('square', class: 'bi bi-alert-square text-info hover-stack hover-stack-default')
+                  = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-hover')
+          %td.w-auto
+            .d-flex
+              .badge.badge-secondary.w-100{data: {what: 'pending-payout', author: post.author, permlink: post.permlink}}
+                .span{style: 'opacity: 0;'} 00.000 HBD
+          %td.w-75
+            .d-flex
+              = link_to '#', data: {toggle: 'modal', target: "#preview-#{post.to_param}" } do
+                .thumbnail-area.float-left
+                  - begin
+                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: post.thumbnail_url.starts_with?('data:') ? post.thumbnail_url : ('https://images.hive.blog/0x48/' + post.thumbnail_url)}
+                  - rescue Sprockets::Rails::Helper::AssetNotFound => e
+                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'img-thumbnail mw-100', style: 'width: 48px;'
+                  = post.title.truncate(70)
+          %td.w-auto
+            .d-flex
+              .float-left
+                = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload rounded-circle', style: 'width: 16px; height: 16px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
+              .pl-2
+                = link_to posts_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: 'width: 100%' do
+                  = post.author
+          %td.w-auto
+            .d-flex
+              .btn-group.btn-group-sm.ml-auto
+                - all_tags = (@tag.present? && @tag == post.category) ? post.tags_without_category.pluck(:tag) : post.tags.pluck(:tag)
+                - first_tags = all_tags.first(1)
+                - first_tags.each do |tag|
+                  - tag_class = 'btn btn-outline-dark btn-sm'
+                  - if ignored_tags.include? tag
+                    - tag_class += ' strike'
+                  - if @tag.present? && @tag == post.category
+                    = link_to tag, posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
+                  - else
+                    = link_to best_tag_name(tag, post), posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
+                - tags_more = all_tags - first_tags
+                .btn-group
+                  - if tags_more.any?
+                    %button.btn.btn-outline-dark.btn-sm.dropdown-toggle{data: {toggle: 'dropdown'}}
+                      .dropdown-menu
+                        - tags_more.each do |tag|
+                          - tag_class = 'dropdown-item'
+                          - if ignored_tags.include? tag
+                            - tag_class += ' strike'
+                          - name = @tag.present? && @tag == post.category ? tag : best_tag_name(tag, post)
+                          = link_to name, posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
+                  - else
+                    %button.btn.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
+            %td.w-auto
+              .d-flex
+                .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
+                  = time_ago_in_words(post.created_at)
+                  ago
+            %caption.modal.fade{id: "preview-#{post.to_param}", data: {what: 'post-preview'}}
+              .modal-dialog.modal-xl
+                .modal-content
+                  .modal-header
+                    %h5.modal-title
+                      = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
+                      = post.title
+                      %em
+                        by
+                        = post.author
+                    %button.close{type: 'button', data: {dismiss: 'modal'}}
+                      %span &times;
+                  .modal-body
+                    .embed-responsive.embed-responsive-16by9
+                      %iframe.embed-responsive-item.overflow-auto{src: 'about:blank', data: {src: content_sandbox_post_path(post_id, pp: :skip)}, sandbox: 'allow-same-origin allow-scripts', loading: :lazy}
+                  .modal-footer.d-flex
+                    .p-2
+                      .badge.badge-secondary{data: {what: 'vote-count', author: post.author, permlink: post.permlink}}
+                      .badge.badge-secondary{data: {what: 'reply-count', author: post.author, permlink: post.permlink}}
+                    .p-2.ml-auto
+                      View on:
+                      = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                        hive.blog
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hive.blog/favicon.ico'}
+                      = link_to "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                        peakd.com
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://peakd.com/assets/favicons/apple-touch-icon-57x57.png'}
+                      - hiveblocks_url = "https://hiveblocks.com/#{post.category}/@#{post.author}/#{post.permlink}"
+                      - if post.deleted?
+                        - hiveblocks_url = "https://hiveblocks.com/tx/#{post.trx_id}"
+                      = link_to hiveblocks_url, target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                        hiveblocks.com
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+                      = link_to "https://hive-db.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                        hive-db.com
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+                      = link_to "http://scribe.hivekings.com/?url=" + CGI.escape("http://hive.blog/@#{post.author}/#{post.permlink}"), target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                        scribe.hivekings.com
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+
+%hr
+
+- if @posts.any?
+  #bottom-tag-controls= render partial: 'tag_controls'
+
+%p
+%p
+%p
+%p
+%p
+%p

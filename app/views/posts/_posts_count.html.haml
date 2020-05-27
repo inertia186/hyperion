@@ -1,0 +1,10 @@
+%span#unread-posts
+  = surround '(', ')' do
+    = tag_unread_count(@tag, true)
+    unread#{@tag.to_s == '' ? ',' : ' in tag,'}
+    - ignored_posts_count = Post.active.tagged_any(@tag).where(id: Tag.where(tag: ignored_tags).select(:post_id)).count
+    = link_to "#{ignored_posts_count} ignored,", posts_path(sort: @sort, limit: @limit, tag: @tag, only_ignored: true)
+    - deleted_posts_count = Post.active.tagged_any(@tag).deleted.count
+    = link_to "#{deleted_posts_count} deleted,", posts_path(sort: @sort, limit: @limit, tag: @tag, only_deleted: true)
+    - blacklisted_posts_count = Post.active.tagged_any(@tag).blacklisted.count
+    = link_to "#{blacklisted_posts_count} blacklisted", posts_path(sort: @sort, limit: @limit, tag: @tag, only_blacklisted: true)

@@ -1,0 +1,135 @@
+!!!
+%html
+  %head
+    %base{href: 'https://hive.blog/'}/
+    %meta{content: "text/html; charset=UTF-8", "http-equiv" => "Content-Type"}/
+    %meta{charset: "UTF-8"}/
+    %meta{content: "width=device-width, height=device-height, user-scalable=no, initial-scale=1.0", name: "viewport"}/
+    %title #{@post.title}
+    :css
+      body {
+        padding: 0 3rem;
+        color: #444444;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.8;
+        text-shadow: 0 1px 0 #ffffff;
+        padding: 0.5rem;
+      }
+      #markdown-controls {
+        position: sticky;
+        left: 0;
+        bottom: 10px;
+      }
+      #source pre {
+        white-space: pre-wrap;
+        word-break: keep-all;
+      }
+      #input img {
+        max-width: 100%; vertical-align: middle;
+      }
+      #output code {
+        background: white;
+      }
+      #output a {
+        border-bottom: 1px solid #444444; color: #444444; text-decoration: none;
+      }
+      #output a:hover {
+        border-bottom: 0;
+      }
+      #output h1 {
+        font-size: 2.2em;
+      }
+      #output h2, h3, h4, h5 {
+        margin-bottom: 0;
+      }
+      #output header small {
+        color: #999;
+        font-size: 50%;
+      }
+      #output img {
+        max-width: 100%;
+      }
+  %body{onkeydown: "keyPressed(event)"}
+    %header
+      %script{crossorigin: "anonymous", integrity: "sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=", src: "https://code.jquery.com/jquery-3.5.1.slim.min.js"}
+      %script{src: "https://unpkg.com/steem-content-renderer"}
+
+    %div{style: 'max-width: 80%; display: flex; margin-left: auto; margin-right: auto;'}
+      #source{style: 'display: none;'}
+        %pre= @post.body
+
+      #input= post_body(@post)
+
+      #output{style: 'display: none;'}
+
+    :javascript
+      window.onload = function() {
+        $('#cycle-view').focus();
+      }
+      
+      function keyPressed(e) {
+        if (e.altKey) $('#cycle-view').trigger('click');
+      }  
+      
+      $.each($("iframe"), function (i, video) {
+        var frameContent = $(video).contents().find('body').html();
+        if (frameContent) {
+          $(video).contents().find('body').html(frameContent.replace("autoplay", ""));
+        }
+      });
+      
+      try {
+        const renderer = new SteemContentRenderer.DefaultRenderer({
+          baseUrl: "https://hive.blog/",
+          breaks: true,
+          skipSanitization: false,
+          allowInsecureScriptTags: false,
+          addNofollowToLinks: true,
+          doNotShowImages: false,
+          ipfsPrefix: "",
+          assetsWidth: 640,
+          assetsHeight: 480,
+          imageProxyFn: (url) => url,
+          usertagUrlFn: (account) => "/@#{@post.author}",
+          hashtagUrlFn: (hashtag) => "/#{@post.category}/#{@post.permlink}",
+          isLinkSafeFn: (url) => true,
+        });
+        
+        const inputElem = $("#source");
+        const outputElem = $("#output");
+        const outputMarkupElem = $("#output-markup");
+
+        const input = inputElem.text();
+        const output = renderer.render(input);
+        
+        outputElem.html(output);
+        outputMarkupElem.text(output);
+        
+        $('#input').hide();
+        $('#output').show();
+      } catch(e) {
+        console.log(e);
+      }
+      
+      var currentView = '#output';
+      
+      function cycleView ( ) {
+        $('#source').hide();
+        $('#input').hide();
+        $('#output').hide();
+        
+        if ( currentView == '#source' ) {
+          currentView = '#input'
+        } else if ( currentView == '#input' ) {
+          currentView = '#output';
+        } else {
+          currentView = '#source';
+        }
+        
+        $(currentView).show();
+      }
+    
+    %div#markdown-controls
+      %button#cycle-view{title: 'Toggle', onclick: "cycleView();"}
+        = icon('option')

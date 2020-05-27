@@ -1,0 +1,16 @@
+var id = '#<%= @id %>';
+var read_posts_count = <%= current_account.read_posts.count %>;
+var unread_count = <%= tag_unread_count(@tag, true) %>;
+var unread_posts = `<%= render(partial: 'posts_count') %>`;
+var posts = $('#posts');
+
+$(id).hide();
+$('#read-posts-count').text(read_posts_count);
+$('#unread-posts').html(unread_posts);
+
+if ( $('#posts tr:visible').length == 0 && unread_count == 0 ) {
+  posts.hide();
+  posts.html(`<%= render(partial: 'emptiness') %>`);
+  posts.show();
+  $('#bottom-tag-controls').hide();
+}

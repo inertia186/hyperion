@@ -1,0 +1,13 @@
+!!!
+%html
+  %head
+    %meta{content: 'text/html; charset=UTF-8', 'http-equiv' => 'Content-Type'}
+    %meta{content: 'width=device-width, initial-scale=0.80, maximum-scale=1.0, user-scalable=no', name: 'viewport'}
+    %title Hyperion
+    = csrf_meta_tags
+    = csp_meta_tag
+    = stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload'
+  %body
+    .row
+      .col-sm-12.m-auto
+        .card.card-block.w-100.h-100.spinner-grow
