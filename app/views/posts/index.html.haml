@@ -117,7 +117,7 @@
                           - name = @tag.present? && @tag == post.category ? tag : best_tag_name(tag, post)
                           = link_to name, posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
                   - else
-                    %button.btn.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
+                    %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
             %td.w-auto
               .d-flex
                 .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
