@@ -95,4 +95,6 @@
                 = name
                 - unless ignored_tags.include? tag
                   %span.badge.badge-light= tag_unread_count(tag)
-            = link_to 'Clear', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'
+            - if (session[:past_tags] & ignored_tags).any?
+              = link_to 'Clear Ignored Tags', clear_past_tags_posts_path(only_ignored: true, sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-success btn-sm'
+            = link_to 'Clear All Tags', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'

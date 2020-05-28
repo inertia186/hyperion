@@ -182,7 +182,15 @@ class PostsController < ApplicationController
   end
   
   def clear_past_tags
-    session[:past_tags] = nil
+    only_ignored = params[:only_ignored] == 'true'
+    
+    if only_ignored
+      session[:past_tags] = session[:past_tags].select do |tag|
+        !ignored_tags.include? tag
+      end
+    else
+      session[:past_tags] = nil
+    end
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
   end
