@@ -131,7 +131,10 @@ export default class extends Controller {
   
   // https://discourse.stimulusjs.org/t/add-and-remove-eventlisteners/710/2
   previewDismissKey(e) {
-    if ( e.keyCode == 27 ) { // esc
+    if ( e.keyCode == 27 // esc
+      || e.keyCode == 13 // enter
+    ) {
+      e.preventDefault();
       this.previewDismiss(e);
     }
   }
