@@ -38,8 +38,10 @@ class PostsController < ApplicationController
     
     @posts = @posts.where("body ILIKE ?", "%#{@query}%") if !!@query
     
-    unless !!@author
-      @posts = @posts.where.not(author: current_account.muted_authors) if !!session[:muted_authors_enabled]
+    unless @author
+      if !!session[:muted_authors_enabled]
+        @posts = @posts.where.not(author: current_account.muted_authors)
+      end
     end
     
     @pagy, @posts = pagy(@posts, items: @limit)

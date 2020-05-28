@@ -26,7 +26,7 @@
               = hidden_field_tag :tag, @tag, id: nil
               .custom-control.custom-switch
                 %input#toggle-mutes.custom-control-input{checked: !!session[:muted_authors_enabled], type: 'checkbox', onclick: '$("#toggle-mutes").prop("disabled", true); this.form.submit();'}
-                %label.custom-control-label{for: 'toggle-mutes'} Enable Mutes
+                %label.custom-control-label{for: 'toggle-mutes'} Enable Mute
 
         -# .p-4= render partial: 'dashboard/quick_stats'
 
