@@ -26,58 +26,6 @@ document.addEventListener("turbolinks:load", () => {
   // $('[data-what="post-preview"]').on('shown.bs.collapse', function () {
   //   alert('hello');
   // });
-  
-  $('[data-toggle="modal"]').click(function() {
-    modal_target = $(this).data('target')
-    iframe = $(modal_target + ' iframe');
-    iframe.attr('src', iframe.data('src'));
-    
-    $(modal_target + ' [data-what="vote-count"]').each(function() {
-      var elem = $(this);
-      
-      hive.api.getActiveVotes(elem.data('author'), elem.data('permlink'), function(err, response) {
-        if ( !!err ) console.log(elem, err);
-        
-        if ( !!response ) {
-          upvotes = 0
-          for ( i = 0 ; i < response.length; i++ ) {
-            if ( response[i].percent > 0 ) upvotes++;
-          }
-          
-          elem.text('Votes: ' + upvotes);
-        }
-      });
-    });
-    
-    $(modal_target + ' [data-what="reply-count"]').each(function() {
-      var elem = $(this);
-      
-      hive.api.getContentReplies(elem.data('author'), elem.data('permlink'), function(err, response) {
-        if ( !!err ) console.log(elem, err);
-        
-        if ( !!response ) {
-          elem.text('Replies: ' + response.length);
-        }
-      });
-    });
-  });
-  
-  $('[data-what="pending-payout"]').each(function() {
-    var elem = $(this);
-  
-    elem.html('<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>');
-  
-    hive.api.getContent(elem.data('author'), elem.data('permlink'), function(err, response) {
-      if ( !!err ) console.log(elem, err);
-  
-      if ( !!response ) {
-        if ( response.cashout_time == '1969-12-31T23:59:59' ) {
-          elem.text(response.total_payout_value);
-        } else {
-          elem.text(response.pending_payout_value);
-        }
-      }
-    });
-  });
 });
+
 import "controllers"
