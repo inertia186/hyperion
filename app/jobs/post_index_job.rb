@@ -14,7 +14,6 @@ class PostIndexJob < ApplicationJob
   
   def perform(*args)
     database_api = Hive::DatabaseApi.new(url: DEFAULT_NODE_URLS.sample)
-    stream = Hive::Stream.new(url: DEFAULT_NODE_URLS.sample)
     head_block_num, blockchain_time = database_api.get_dynamic_global_properties do |dgpo|
       [dgpo.head_block_number, Time.parse(dgpo.time + 'Z')]
     end
@@ -34,6 +33,8 @@ class PostIndexJob < ApplicationJob
     Rails.logger.info "Blacklist size: #{blacklist(true).size}" # reload blacklist
     
     catch :retry do
+      stream = Hive::Stream.new(url: DEFAULT_NODE_URLS.sample)
+      
       stream.blocks(at_block_num: start_block_num) do |block, block_num|
         if block.nil?
           puts "Retrying at block number: #{start_block_num} ..."
