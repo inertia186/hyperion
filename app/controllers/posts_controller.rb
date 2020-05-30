@@ -194,6 +194,21 @@ class PostsController < ApplicationController
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
   end
+  
+  def clear_past_tag
+    session[:past_tags] = session[:past_tags].select do |tag|
+      tag != params[:id]
+    end
+    
+    respond_to do |format|
+      format.html {
+        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+      }
+      format.js {
+        head :accepted
+      }
+    end
+  end
 private
   def read_params
     @sort = params[:sort] || 'latest'

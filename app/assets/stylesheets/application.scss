@@ -76,3 +76,17 @@ body {
   opacity: 1;
   left: 0;
 }
+
+.close-badge-button {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  padding: 2px;
+  background-color: white;
+  border-radius: 50%;
+}
+
+.close-badge-button img {
+  width: 16px;
+  height: 16px;
+}

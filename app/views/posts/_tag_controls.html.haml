@@ -83,18 +83,23 @@
               - name = best_tag_name(tag)
               - btn_class = if name.downcase == tag.downcase
                 - if ignored_tags.include? tag
-                  - 'btn btn-outline-secondary btn-sm m-1 strike'
+                  - 'btn-outline-secondary strike'
                 - else
-                  - 'btn btn-outline-dark btn-sm m-1'
+                  - 'btn-outline-dark'
               - else
                 - if ignored_tags.include? tag
-                  - 'btn btn-secondary btn-sm m-1 strike'
+                  - 'btn-secondary strike'
                 - else
-                  - 'btn btn-dark btn-sm m-1'
+                  - 'btn-dark'
+              .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag'}
               = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
                 = name
                 - unless ignored_tags.include? tag
-                  %span.badge.badge-light= tag_unread_count(tag)
+                  %span.badge.badge-light
+                    = tag_unread_count(tag)
+                    - unless tag == ''
+                      = link_to clear_past_tag_post_path(tag), method: :delete, remote: true, class: 'close-badge-button', 'data-action' => 'past-tags#removeTag' do
+                        = icon('x-circle', stroke: 'black')
             - if (session[:past_tags] & ignored_tags).any?
               = link_to 'Clear Ignored Tags', clear_past_tags_posts_path(only_ignored: true, sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-success btn-sm'
             = link_to 'Clear All Tags', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'

@@ -19,6 +19,7 @@ Rails.application.routes.draw do
     member do
       patch :mark_as_read
       patch :mark_as_unread
+      delete :clear_past_tag
       get :content_sandbox
     end
   end
