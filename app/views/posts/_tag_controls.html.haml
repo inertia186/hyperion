@@ -92,10 +92,10 @@
                   - 'btn-secondary strike'
                 - else
                   - 'btn-dark'
-              .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag'}
-                = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
-                  = name
-                - unless ignored_tags.include? tag
+              - unless ignored_tags.include? tag
+                .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag'}
+                  = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
+                    = name
                   %span.badge.badge-light
                     = tag_unread_count(tag)
                     - unless tag == ''
