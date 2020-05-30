@@ -7,6 +7,8 @@ module ApplicationHelper
     svg = icon.at_css 'svg'
     
     svg['class'] += " " + options[:class] if options[:class].present?
+    svg['fill'] = options[:fill] if options[:fill].present?
+    svg['stroke'] = options[:stroke] if options[:stroke].present?
     
     icon.to_html.html_safe
   end
