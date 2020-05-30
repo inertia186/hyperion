@@ -69,7 +69,7 @@
   %table.table-sm
     %tbody
       - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
-        %tr.align-top{id: post_id = post.to_param, data: {controller: :post, post: {id: {value: post.to_param}, author: {value: post.author}, permlink: {value: post.permlink}}}}
+        %tr.align-top{id: post_id = post.to_param, data: {controller: :post, post: {id: {value: post.to_param}, author: {value: post.author}, permlink: {value: post.permlink}}, action: 'focusin->post#focusRowIn focusout->post#focusRowOut'}}
           %td.w-auto
             .d-flex
               - if post.readers.include? current_account

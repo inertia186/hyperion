@@ -7,6 +7,8 @@ var bindingPreviewDismissKey;
 var bindingPreviewDismissOutsideModal;
 var bindingPreviewPreviousKey;
 var bindingPreviewNextKey;
+var bindingFocusPreviousKey;
+var bindingFocusNextKey;
 
 export default class extends Controller {
   static values = {
@@ -14,7 +16,7 @@ export default class extends Controller {
     author: String,
     permlink: String
   }
-  static targets = ['pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout']
+  static targets = ['row', 'pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout']
   
   connect() {
     var pendingPayout = this.pendingPayoutTarget;
@@ -35,6 +37,27 @@ export default class extends Controller {
       firstLink.blur();
       firstLink = null;
     }
+  }
+  
+  focusRowIn(e) {
+    var row = $(`#${this.idValue}`);
+    
+    row.addClass('table-secondary');
+    
+    bindingFocusPreviousKey = this.focusPreviousKey.bind(this);
+    document.addEventListener('keydown', bindingFocusPreviousKey);
+
+    bindingFocusNextKey = this.focusNextKey.bind(this);
+    document.addEventListener('keydown', bindingFocusNextKey);
+  }
+  
+  focusRowOut(e) {
+    var row = $(`#${this.idValue}`);
+    
+    row.removeClass('table-secondary');
+    
+    document.removeEventListener('keydown', bindingFocusPreviousKey);
+    document.removeEventListener('keydown', bindingFocusNextKey);
   }
   
   previewShow(e) {
@@ -115,6 +138,28 @@ export default class extends Controller {
     }
   }
   
+  focusPrevious(e) {
+    var element = $(this.element);
+    var previous_element = element.prev();
+    var previous_post_id = previous_element.data('post-id-value');
+    var previous_link = document.getElementById(`#show-${previous_post_id}`);
+    
+    if ( !!previous_link ) {
+      previous_link.focus();
+    }
+  }
+  
+  focusNext(e) {
+    var element = $(this.element);
+    var next_element = element.next();
+    var next_post_id = next_element.data('post-id-value');
+    var next_link = document.getElementById(`#show-${next_post_id}`);
+    
+    if ( !!next_link ) {
+      next_link.focus();
+    }
+  }
+  
   previewPreviousKey(e) {
     if ( e.keyCode == 37 // left
       || e.keyCode == 72 // h
@@ -130,6 +175,22 @@ export default class extends Controller {
     ) {
       this.previewDismiss(e);
       this.previewNext(e);
+    }
+  }
+  
+  focusPreviousKey(e) {
+    if ( e.keyCode == 38 // up
+      || e.keyCode == 75 // k
+    ) {
+      this.focusPrevious(e);
+    }
+  }
+  
+  focusNextKey(e) {
+    if ( e.keyCode == 74 // j
+      || e.keyCode == 40 // down
+    ) {
+      this.focusNext(e);
     }
   }
   
