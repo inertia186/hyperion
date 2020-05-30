@@ -37,9 +37,10 @@
       - if ignored_tags.include? tag
         - text_decoration = 'line-through'
       
-      -# - weight = [(tag_unread_count(tag, true) / 2.0), 200.0].min
       - weight = [((related_tag_post_count[tag].to_f / average) / base_score) * 50.0, maximum_scale].min
-      - word_list << [link_to(name, posts_path(sort: @sort, limit: @limit, tag: [@tag, tag].reject(&:empty?).join('+')), title: {related_tag_post_count: related_tag_post_count[tag], maximum_scale: maximum_scale, average: average, weight: weight}.to_json, style: "font-size: #{weight}%; overflow: hidden; position: relative; margin: 20px auto; padding: 0; text-decoration: #{text_decoration}"), weight]
+      -# - title = {related_tag_post_count: related_tag_post_count[tag], maximum_scale: maximum_scale, average: average, weight: weight}.to_json
+      - title = nil
+      - word_list << [link_to(name, posts_path(sort: @sort, limit: @limit, tag: [@tag, tag].reject(&:empty?).join('+')), title: title, style: "font-size: #{'%.1f' % weight}%; overflow: hidden; position: relative; margin: 20px auto; padding: 0; text-decoration: #{text_decoration}"), weight]
     
     %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#related-tags'}}
       Related Tags / Categories
@@ -56,7 +57,7 @@
                 Related Tags / Categories
             %button.close{type: 'button', data: {dismiss: 'modal'}}
               %span &times;
-          .modal-body{data: {word_list: word_list.to_json}}
+          .modal-body
             - word_list.each do |link, weight|
               = link.html_safe
           .modal-footer
@@ -92,8 +93,8 @@
                 - else
                   - 'btn-dark'
               .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag'}
-              = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
-                = name
+                = link_to posts_path(sort: @sort, limit: @limit, tag: tag), class: btn_class do
+                  = name
                 - unless ignored_tags.include? tag
                   %span.badge.badge-light
                     = tag_unread_count(tag)
