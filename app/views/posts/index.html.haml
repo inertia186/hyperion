@@ -61,7 +61,7 @@
   %table.table-sm
     %tbody
       - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
-        %tr.align-top{id: post_id = post.to_param, data: {controller: 'post', post: {id: post.to_param, author: post.author, permlink: post.permlink}}}
+        %tr.align-top{id: post_id = post.to_param, data: {controller: :post, post: {id: {value: post.to_param}, author: {value: post.author}, permlink: {value: post.permlink}}}}
           %td.w-auto
             .d-flex
               - if post.readers.include? current_account
@@ -74,11 +74,11 @@
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-hover')
           %td.w-auto
             .d-flex
-              .badge.badge-secondary.w-100{data: {target: 'post.pendingPayout'}}
+              .badge.badge-secondary.w-100{data: {post: {target: 'pendingPayout'}}}
                 .span{style: 'opacity: 0;'} 00.000 HBD
           %td.w-75
             .d-flex
-              = link_to '#', id: "#show-#{post.to_param}", data: {action: 'click->post#previewShow', toggle: 'modal', target: "#preview-#{post.to_param}.modal-body", 'modal-target' => '.modal-body'} do
+              = link_to '#', id: "#show-#{post.to_param}", data: {toggle: 'modal@delegated->action', target: "#preview-#{post.to_param}", action: 'post#previewShow'} do
                 .thumbnail-area.float-left
                   - begin
                     = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: post.thumbnail_url.starts_with?('data:') ? post.thumbnail_url : ('https://images.hive.blog/0x48/' + post.thumbnail_url)}
@@ -123,7 +123,7 @@
               .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
                 = time_ago_in_words(post.created_at)
                 ago
-            .modal.fade{id: "preview-#{post.to_param}", data: {target: 'post.preview'}}
+            .modal.fade{id: "preview-#{post.to_param}", data: {post: {target: 'preview'}}}
               .modal-dialog.modal-xl
                 .modal-content
                   .modal-header
@@ -133,16 +133,16 @@
                       %em
                         by
                         = post.author
-                    %button.close{type: 'button', data: {action: 'click->post#previewDismiss'}}
+                    %button.close{type: 'button', data: {action: 'post#previewDismiss'}}
                       %span &times;
                   .modal-body
                     .embed-responsive.embed-responsive-16by9
                       %iframe.embed-responsive-item.overflow-auto{src: 'about:blank', data: {src: content_sandbox_post_path(post_id, pp: :skip)}, sandbox: 'allow-same-origin allow-scripts', loading: :lazy}
                   .modal-footer.d-flex
                     .p-2
-                      .badge.badge-secondary{data: {target: 'post.previewVoteCount'}}
-                      .badge.badge-secondary{data: {target: 'post.previewReplyCount'}}
-                      .badge.badge-secondary{data: {target: 'post.previewPendingPayout'}}
+                      .badge.badge-secondary{data: {post: {target: 'previewVoteCount'}}}
+                      .badge.badge-secondary{data: {post: {target: 'previewReplyCount'}}}
+                      .badge.badge-secondary{data: {post: {target: 'previewPendingPayout'}}}
                     .p-2.ml-auto
                       View on:
                       = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
@@ -164,7 +164,7 @@
                         scribe.hivekings.com
                         = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
                     .p-2
-                      %button.btn.btn-primary{type: 'button', data: {action: 'click->post#previewDismiss'}}
+                      %button.btn.btn-primary{type: 'button', data: {action: 'post#previewDismiss'}}
                         Close
 
 %hr

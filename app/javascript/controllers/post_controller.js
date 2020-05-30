@@ -7,22 +7,31 @@ var bindingPreviewPreviousKey;
 var bindingPreviewNextKey;
 
 export default class extends Controller {
+  static values = {
+    id: String,
+    author: String,
+    permlink: String
+  }
   static targets = ['pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout']
   
   connect() {
     var pendingPayout = this.pendingPayoutTarget;
-    var author = this.data.get('author');
-    var permlink = this.data.get('permlink');
     
-    updatePendingPayout(pendingPayout, author, permlink);
+    updatePendingPayout(pendingPayout, this.authorValue, this.permlinkValue);
     
     var element = $(this.element);
-    var post_id = element.data('post-id');
-    var link = document.getElementById(`#show-${post_id}`);
+    var link = document.getElementById(`#show-${this.idValue}`);
     
     if ( !!link && !firstLink ) {
       firstLink = link
       firstLink.focus();
+    }
+  }
+  
+  disconnect() {
+    if ( !!firstLink ) {
+      firstLink.blur();
+      firstLink = null;
     }
   }
   
@@ -33,11 +42,8 @@ export default class extends Controller {
   }
   
   previewShowModal() {
-    var post_id = this.data.get('id')
-    var author = this.data.get('author')
-    var permlink = this.data.get('permlink')
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${post_id} iframe`);
+    var iframe = $(`#preview-${this.idValue} iframe`);
     
     iframe.attr('src', iframe.data('src'));
     
@@ -48,7 +54,7 @@ export default class extends Controller {
     preview.classList.add('show');
     
     var voteCount = this.previewVoteCountTarget;
-    hive.api.getActiveVotes(author, permlink, function(err, response) {
+    hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
       if ( !!err ) console.log(preview, err);
   
       if ( !!response ) {
@@ -63,7 +69,7 @@ export default class extends Controller {
     });
     
     var replyCount = this.previewReplyCountTarget;
-    hive.api.getContentReplies(author, permlink, function(err, response) {
+    hive.api.getContentReplies(this.authorValue, this.permlinkValue, function(err, response) {
       if ( !!err ) console.log(preview, err);
   
       if ( !!response ) {
@@ -72,7 +78,7 @@ export default class extends Controller {
     });
     
     var pendingPayout = this.previewPendingPayoutTarget;
-    updatePendingPayout(pendingPayout, author, permlink);
+    updatePendingPayout(pendingPayout, this.authorValue, this.permlinkValue);
     
     bindingPreviewDismissKey = this.previewDismissKey.bind(this);
     document.addEventListener('keydown', bindingPreviewDismissKey);
@@ -90,7 +96,7 @@ export default class extends Controller {
   previewPrevious(e) {
     var element = $(this.element);
     var previous_element = element.prev();
-    var previous_post_id = previous_element.data('post-id');
+    var previous_post_id = previous_element.data('post-id-value');
     var previous_link = document.getElementById(`#show-${previous_post_id}`);
     
     if ( !!previous_link ) {
@@ -102,7 +108,7 @@ export default class extends Controller {
   previewNext(e) {
     var element = $(this.element);
     var next_element = element.next();
-    var next_post_id = next_element.data('post-id');
+    var next_post_id = next_element.data('post-id-value');
     var next_link = document.getElementById(`#show-${next_post_id}`);
     
     if ( !!next_link ) {
@@ -141,9 +147,6 @@ export default class extends Controller {
   
   // https://discourse.stimulusjs.org/t/hide-a-popup-on-clicking-outside-the-popup-area/67/5
   previewDismissOutsideModal(e) {
-    var id = this.data.get('id');
-    console.log(e.target.id);
-    
     // Clicked outside the modal (how you'd expect it to work, but bs gets in
     // the way.).
     // if (!this.element.contains(e.target)) {
@@ -152,16 +155,15 @@ export default class extends Controller {
     // }
     
     // Clicked directly on the related div.modal (thanks, bs).
-    if (e.target.id == `preview-${id}`) {
+    if (e.target.id == `preview-${this.idValue}`) {
       e.preventDefault();
       this.previewDismiss(e);
     }
   }
     
   previewDismiss(e) {
-    var id = this.data.get('id');
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${id} iframe`);
+    var iframe = $(`#preview-${this.idValue} iframe`);
     
     iframe.attr('src', 'about:blank');
     

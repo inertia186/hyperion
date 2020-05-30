@@ -10,7 +10,7 @@
     "jquery": "^3.5.1",
     "lazyload": "^2.0.0-rc.2",
     "popper.js": "^1.16.0",
-    "stimulus": "^1.1.1",
+    "stimulus": "https://github.com/stimulusjs/dev-builds/archive/b8cc8c4/stimulus.tar.gz",
     "turbolinks": "^5.2.0"
   },
   "version": "0.1.0",
