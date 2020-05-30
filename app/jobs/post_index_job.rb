@@ -170,7 +170,7 @@ class PostIndexJob < ApplicationJob
     mutes.each do |mute|
       account = Account.find_by(name: mute['follower'])
       
-      AccountRefreshJob.perform_later(account.id) if !!account
+      AccountRefreshJob.perform_later(account.to_param) if !!account
     end
   end
   
