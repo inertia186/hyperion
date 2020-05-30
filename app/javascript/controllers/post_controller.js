@@ -1,5 +1,7 @@
 import { Controller } from 'stimulus'
 
+import $ from 'jquery';
+
 var firstLink;
 var bindingPreviewDismissKey;
 var bindingPreviewDismissOutsideModal;
@@ -47,11 +49,7 @@ export default class extends Controller {
     
     iframe.attr('src', iframe.data('src'));
     
-    // simulate bs preview.modal('show')
-    document.body.classList.add('modal-open');
-    document.body.classList.add('modal-backdrop');
-    preview.style.display = 'block';
-    preview.classList.add('show');
+    $(preview).modal('show');
     
     var voteCount = this.previewVoteCountTarget;
     hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
@@ -167,10 +165,7 @@ export default class extends Controller {
     
     iframe.attr('src', 'about:blank');
     
-    document.body.classList.remove('modal-open');
-    document.body.classList.remove('modal-backdrop');
-    preview.style.display = 'none';
-    preview.classList.remove('show');
+    $(preview).modal('hide');
     
     document.removeEventListener('keydown', bindingPreviewDismissKey);
     document.removeEventListener('keydown', bindingPreviewPreviousKey);
