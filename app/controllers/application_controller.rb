@@ -63,7 +63,7 @@ private
   end
   
   def best_tag_name(tag, post = nil)
-    return '&lt;No Tag&gt;'.html_safe unless tag.present?
+    return '&lt;Any Tag&gt;'.html_safe unless tag.present?
     
     @best_tag_name ||= {}
     
