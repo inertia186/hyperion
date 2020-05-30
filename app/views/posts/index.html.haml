@@ -11,7 +11,15 @@
           - tag_search += ' -' + @without_tags.join(' -')
         - if @author.present?
           - tag_search += " @#{@author}"
-        = text_field_tag :tag, tag_search.strip, class: 'form-control', id: nil
+        -# = text_field_tag :tag, tag_search.strip, class: 'form-control', id: nil
+        .select2{'data-controller' => 'search-tags'}
+          - tag_searches = tag_search.strip.split(' ')
+          - tags_for_select = tag_searches.map{|t| [best_tag_name(t), t]}
+          - tags_for_select += session[:past_tags].map{|t| [best_tag_name(t), t]}
+          - tags_for_select += @related_tags.map{|t| [t[0], t[1]]}.sort_by{|v| v[0].downcase}
+          - tags_for_select += @related_authors.map{|a| ["@#{a}", "@#{a}"]}
+          - tags_for_select = tags_for_select.select{|t| t[1].to_s.present?}.uniq
+          = select_tag :tag, options_for_select(tags_for_select, tag_searches), class: 'form-control search-tags', size: 1, multiple: 'multiple', 'data-action' => 'change->search-tags#updateToTagOptions'
       .form-group.mx-2
         %label.mr-2{for: :sort} Sort:
         = select_tag :sort, options_for_select([['Latest', 'latest'], ['Oldest', 'oldest'], ['Prolific', 'most_prolific'], ['Non-prolific', 'least_prolific'], ['Most Tags', 'most_tags'], ['Least Tags', 'least_tags']], @sort), class: 'form-control', id: nil
