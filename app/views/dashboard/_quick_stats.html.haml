@@ -24,9 +24,9 @@
           .btn.btn-secondary.btn-sm.dropdown-toggle#top_active_tags_menu_link{data: {toggle: 'dropdown'}} Top Active Tags
           .dropdown-menu
             - Tag.community(false).limit(10).group_by_tag_count.each do |tag, count|
-              .dropdown-item= link_to tag, posts_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''
+              .dropdown-item= link_to tag, posts_tagged_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''
         .btn-group.dropdown.show.p-2
           .btn.btn-secondary.btn-sm.dropdown-toggle#top_active_communities_menu_link{data: {toggle: 'dropdown'}} Top Active Communities
           .dropdown-menu
             - Tag.community.limit(10).group_by_tag_count.each do |tag, count|
-              .dropdown-item= link_to best_tag_name(tag), posts_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''
+              .dropdown-item= link_to best_tag_name(tag), posts_tagged_path(tag: tag), class: ignored_tags.include?(tag) ? 'strike' : ''

@@ -232,6 +232,8 @@ private
     @tag = @tag.gsub('+', ' ')
     @tag, *@other_tags = @tag.split(' ') if @tag.include?(' ')
     
+    @tag = '' if @tag == '-'
+    
     @without_tags = []
     
     @other_tags.each do |tag|

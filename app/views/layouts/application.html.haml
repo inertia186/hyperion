@@ -16,7 +16,7 @@
       .ml-auto.p-2
         - if !!current_account
           .float-right
-            = link_to posts_path author: current_account.name do
+            = link_to posts_authored_path author: current_account.name do
               = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
             = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark' do
               Log Out

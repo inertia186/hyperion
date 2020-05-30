@@ -1,6 +1,6 @@
 .row.d-flex
   .p-2.mr-auto
-    %form.form-inline{style: 'font-size: 0.88rem;'}
+    = form_tag posts_path, method: :get, class: 'form-inline', style: 'font-size: 0.88rem;' do
       = hidden_field_tag :limit, @limit, id: nil
       .form-group.mx-2
         %label.mr-2{for: :tag} Tag/Category/Author:
@@ -27,7 +27,7 @@
         = submit_tag 'Query', class: 'btn btn-primary btn-search'
   
   .p-2
-    = link_to posts_path(sort: @sort, limit: @limit, tag: @tag, only_read: true) do
+    = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: (@tag.present? ? @tag : '-'), only_read: true) do
       .btn.btn-primary.mx-2
         Posts read:
         %span.badge.badge-light#read-posts-count= current_account.read_posts.count
@@ -98,7 +98,7 @@
               .float-left
                 = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload rounded-circle', style: 'width: 16px; height: 16px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
               .pl-2
-                = link_to posts_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: 'width: 100%' do
+                = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: 'width: 100%' do
                   = post.author
           %td.w-auto
             .d-flex
@@ -110,9 +110,9 @@
                   - if ignored_tags.include? tag
                     - tag_class += ' strike'
                   - if @tag.present? && @tag == post.category
-                    = link_to tag, posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
+                    = link_to tag, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
                   - else
-                    = link_to best_tag_name(tag, post), posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
+                    = link_to best_tag_name(tag, post), posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
                 - tags_more = all_tags - first_tags
                 .btn-group
                   - if tags_more.any?
@@ -123,7 +123,7 @@
                           - if ignored_tags.include? tag
                             - tag_class += ' strike'
                           - name = @tag.present? && @tag == post.category ? tag : best_tag_name(tag, post)
-                          = link_to name, posts_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
+                          = link_to name, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
                   - else
                     %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
           %td.w-auto
