@@ -81,6 +81,10 @@ class Post < ApplicationRecord
     ignored_tags = account.ignored_tags
     r = r.tagged_any(ignored_tags.pluck(:tag) - allow_tag, false)
     
+    unless !!options[:include_muted]
+      r = r.where.not(author: account.muted_authors)
+    end
+    
     # TODO Don't want these to become a black-hole.  Need UI to check for
     # authors who have taken the poisoned pills.  Also, these results don't seem
     # any less spammy than when the normal ignored tag rules are applied.

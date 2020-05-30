@@ -82,9 +82,9 @@ private
   
   def tag_unread_count(tag, async = false)
     if async
-      Post.active.unread(by: current_account).tagged_any(tag).count
+      Post.active.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).tagged_any(tag).count
     elsif tag.to_s == ''
-      Post.active.unread(by: current_account).count
+      Post.active.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).count
     else
       all_tag_unread[tag] || 0
     end
@@ -96,13 +96,13 @@ private
   
   def all_tag_unread
     @all_tag_unread ||= if @only_blacklisted
-      Post.active.blacklisted.joins(:tags).unread(by: current_account).group('tags.tag').count
+      Post.active.blacklisted.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     elsif @only_deleted
-      Post.deleted.joins(:tags).unread(by: current_account).group('tags.tag').count
+      Post.deleted.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     elsif @only_ignored
-      Post.active.joins(:tags).unread(by: current_account, allow_tag: ignored_tags).group('tags.tag').count
+      Post.active.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled], allow_tag: ignored_tags).group('tags.tag').count
     else
-      Post.active.joins(:tags).unread(by: current_account).group('tags.tag').count
+      Post.active.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     end
   end
   
