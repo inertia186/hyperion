@@ -9,6 +9,10 @@ class Account < ApplicationRecord
   
   validates_uniqueness_of :name
   
+  def to_param
+    [id, name].join('-').parameterize
+  end
+  
   def mark_post_as_read!(id)
     read_posts.find_or_create_by(post_id: id)
   end
