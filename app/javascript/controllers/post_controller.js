@@ -49,6 +49,10 @@ export default class extends Controller {
 
     bindingFocusNextKey = this.focusNextKey.bind(this);
     document.addEventListener('keydown', bindingFocusNextKey);
+    
+    if ( e.target.title == 'Mark as Read' ) {
+      this.focusCurrent(e);
+    }
   }
   
   focusRowOut(e) {
@@ -146,6 +150,16 @@ export default class extends Controller {
     
     if ( !!previous_link ) {
       previous_link.focus();
+    }
+  }
+  
+  focusCurrent(e) {
+    var element = $(this.element);
+    var post_id = element.data('post-id-value');
+    var link = document.getElementById(`#show-${post_id}`);
+    
+    if ( !!link ) {
+      link.focus();
     }
   }
   
