@@ -131,7 +131,7 @@
               .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
                 = time_ago_in_words(post.created_at)
                 ago
-            .modal.fade{id: "preview-#{post.to_param}", data: {post: {target: 'preview'}}}
+            .modal{id: "preview-#{post.to_param}", data: {post: {target: 'preview'}}}
               .modal-dialog.modal-xl
                 .modal-content
                   .modal-header
