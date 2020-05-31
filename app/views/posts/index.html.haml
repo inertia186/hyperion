@@ -34,9 +34,9 @@
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
     = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
-    .btn.btn-primary.mx-2
-      Ignored tags:
-      %span.badge.badge-light#read-posts-count= ignored_tags.size
+      .btn.btn-primary.mx-2
+        Ignored tags:
+        %span.badge.badge-light#read-posts-count= ignored_tags.size
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
 
@@ -74,11 +74,11 @@
           %td.w-auto
             .d-flex
               - if post.readers.include? current_account
-                = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Unread', method: :patch, remote: true do
+                = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Unread', method: :patch, remote: true, 'data-action' => 'ajax:success->post#successMarkAsUnread' do
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-default')
                   = icon('x-square', class: 'bi bi-alert-x-square text-info hover-stack hover-stack-hover')
               - else
-                = link_to mark_as_read_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Read', method: :patch, remote: true, onclick: "$('##{post_id}').fadeOut('fast')" do
+                = link_to mark_as_read_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Read', method: :patch, remote: true, 'data-action' => 'ajax:success->post#successMarkAsRead' do
                   = icon('square', class: 'bi bi-alert-square text-info hover-stack hover-stack-default')
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-hover')
           %td.w-auto

@@ -247,6 +247,20 @@ export default class extends Controller {
     document.removeEventListener('keydown', bindingPreviewNextKey);
     document.removeEventListener('click', bindingPreviewDismissOutsideModal);
   }
+  
+  // Also see posts#mark_as_read.js.erb
+  successMarkAsRead(e) {
+    var row = $(`#${this.idValue}`);
+    
+    row.fadeOut();
+  }
+  
+  // Also see posts#mark_as_read.js.erb
+  successMarkAsUnread(e) {
+    var row = $(`#${this.idValue}`);
+    
+    row.fadeTo(100, 0.3, function() { $(this).fadeTo(500, 1.0); });
+  }
 }
 
 function updatePendingPayout(pendingPayout, author, permlink) {
