@@ -10,7 +10,8 @@ class ApplicationController < ActionController::Base
   helper_method :bridge
   helper_method :post_body
   helper_method :read_posts, :mark_post_as_read, :post_read?
-  helper_method :best_tag_name, :tag_unread_count, :related_tag_post_count, :ignored_tags
+  helper_method :best_tag_name, :tag_unread_count, :related_tag_post_count
+  helper_method :favorite_tags, :ignored_tags, :past_tags, :poisoned_pill_tags
   helper_method :random_oneliner
   
   before_action :sign_in
@@ -106,8 +107,20 @@ private
     end
   end
   
+  def favorite_tags
+    @favorite_tags ||= current_account.favorite_tags.pluck(:tag)
+  end
+  
   def ignored_tags
     @ignored_tags ||= current_account.ignored_tags.pluck(:tag)
+  end
+  
+  def past_tags
+    @past_tags ||= current_account.past_tags.pluck(:tag)
+  end
+  
+  def poisoned_pill_tags
+    @poisoned_pill_tags ||= current_account.poisoned_pill_tags.pluck(:tag)
   end
   
   def cycle_node_url

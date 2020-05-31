@@ -1,0 +1,30 @@
+.row.d-flex
+  .p-2.mr-auto
+    = form_tag tags_path, method: :get, class: 'form-inline', style: 'font-size: 0.88rem;' do
+      = hidden_field_tag :limit, @limit, id: nil
+      .form-group.mx-2
+        %label.mr-2{for: :type} Type
+        .select2{'data-controller' => 'search-tags'}
+          = select_tag :type, options_for_select([['All', '']] + AccountTag.select(:type).distinct.pluck(:type).map{|t| [t.split('::')[1].underscore.humanize, t]}, params[:type]), class: 'form-control'
+      .form-group.mx-2
+        %label.mr-2{for: :sort} Sort:
+        = select_tag :sort, options_for_select([['Name A-Z', 'name_asc'], ['Name Z-A', 'name_desc'], ['Tag A-Z', 'tag_asc'], ['Tag Z-A', 'tag_desc'], ['Latest', 'latest'], ['Oldest', 'oldest'], ['Most Posts', 'most_posts'], ['Least Posts', 'least_posts']], @sort), class: 'form-control', id: nil
+      .form-group.mx-2
+        = submit_tag 'Query', class: 'btn btn-primary btn-search'
+  
+.table-responsive-sm#tags
+  %table.table-sm
+    %tbody
+      - @tags.each do |tag|
+        %tr.align-top{id: tag_id = tag.to_param}
+          %td
+            - if @type == :all
+              = tag.type.split('::')[1]
+          %td= tag.best_tag_name
+          %td
+            = link_to posts_tagged_path(sort: 'latest', limit: 30, tag: tag.tag) do
+              %code ##{tag.tag}
+          %td= tag.posts.count
+          %td
+            - if (also = current_account.account_tags.where.not(id: tag).where(tag: tag.tag)).any?
+              Also: #{also.pluck(:type).map{|t| t.split('::')[1]}.join(', ')}

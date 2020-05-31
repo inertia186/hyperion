@@ -15,10 +15,18 @@ ActiveRecord::Schema.define(version: 2020_05_20_045555) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
+  create_table "account_tags", force: :cascade do |t|
+    t.string "type", null: false
+    t.integer "account_id", null: false
+    t.string "tag", null: false
+    t.datetime "created_at", null: false
+    t.index ["type", "account_id", "tag"], name: "index_type_account_id_tag_on_account_tags", unique: true
+  end
+
   create_table "accounts", force: :cascade do |t|
     t.string "name", null: false
     t.integer "read_posts_count", default: 0, null: false
-    t.integer "ignored_tags_count", default: 0, null: false
+    t.integer "account_tags_count", default: 0, null: false
     t.json "muted_authors", default: [], null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
@@ -45,14 +53,6 @@ ActiveRecord::Schema.define(version: 2020_05_20_045555) do
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
     t.index ["name"], name: "index_name_on_communities", unique: true
-  end
-
-  create_table "ignored_tags", force: :cascade do |t|
-    t.integer "account_id", null: false
-    t.string "tag", null: false
-    t.boolean "poisoned_pill", default: false, null: false
-    t.datetime "created_at", null: false
-    t.index ["account_id", "tag"], name: "index_account_id_tag_on_ignored_tags", unique: true
   end
 
   create_table "posts", force: :cascade do |t|

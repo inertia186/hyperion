@@ -15,7 +15,7 @@
         .select2{'data-controller' => 'search-tags'}
           - tag_searches = tag_search.strip.split(' ')
           - tags_for_select = tag_searches.map{|t| [best_tag_name(t), t]}
-          - tags_for_select += session[:past_tags].map{|t| [best_tag_name(t), t]}
+          - tags_for_select += current_account.past_tags.pluck(:tag).map{|t| [best_tag_name(t), t]}
           - tags_for_select += @related_tags.map{|t| [t[0], t[1]]}.sort_by{|v| v[0].downcase}
           - tags_for_select += @related_authors.map{|a| ["@#{a}", "@#{a}"]}
           - tags_for_select = tags_for_select.select{|t| t[1].to_s.present?}.uniq
@@ -33,6 +33,7 @@
         %span.badge.badge-light#read-posts-count= current_account.read_posts.count
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+    = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
     .btn.btn-primary.mx-2
       Ignored tags:
       %span.badge.badge-light#read-posts-count= ignored_tags.size

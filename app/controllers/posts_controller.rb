@@ -186,20 +186,16 @@ class PostsController < ApplicationController
     only_ignored = params[:only_ignored] == 'true'
     
     if only_ignored
-      session[:past_tags] = session[:past_tags].select do |tag|
-        !ignored_tags.include? tag
-      end
+      current_account.past_tags.where(tag: current_account.ignored_tags.select(:tag)).destroy_all
     else
-      session[:past_tags] = nil
+      current_account.past_tags.destroy_all
     end
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
   end
   
   def clear_past_tag
-    session[:past_tags] = session[:past_tags].select do |tag|
-      tag != params[:id]
-    end
+    current_account.past_tags.where(tag: params[:id]).destroy_all
     
     respond_to do |format|
       format.html {
@@ -244,8 +240,8 @@ private
       !tag.starts_with?('-')
     end
     
-    session[:past_tags] ||= []
-    session[:past_tags] += [@tag].flatten.map(&:downcase) if !!@tag
-    session[:past_tags] = session[:past_tags].uniq
+    [@tag].flatten.reject(&:empty?).map(&:downcase).each do |tag|
+      current_account.past_tags.find_or_create_by(tag: tag)
+    end
   end
 end

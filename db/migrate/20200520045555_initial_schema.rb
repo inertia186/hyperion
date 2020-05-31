@@ -1,9 +1,9 @@
-class CreateAccounts < ActiveRecord::Migration[6.0]
+class InitialSchema < ActiveRecord::Migration[6.0]
   def change
     create_table :accounts do |t|
       t.string :name, null: false
       t.integer :read_posts_count, null: false, default: 0
-      t.integer :ignored_tags_count, null: false, default: 0
+      t.integer :account_tags_count, null: false, default: 0
       t.json :muted_authors, null: false, default: []
       t.timestamps null: false
     end
@@ -65,13 +65,13 @@ class CreateAccounts < ActiveRecord::Migration[6.0]
       t.timestamp :created_at, null: false
     end
     
-    create_table :ignored_tags do |t|
+    create_table :account_tags do |t|
+      t.string :type, null: false
       t.integer :account_id, null: false
       t.string :tag, null: false
-      t.boolean :poisoned_pill, null: false, default: '0'
       t.timestamp :created_at, null: false
     end
     
-    add_index :ignored_tags, [:account_id, :tag], name: 'index_account_id_tag_on_ignored_tags', unique: true
+    add_index :account_tags, [:type, :account_id, :tag], name: 'index_type_account_id_tag_on_account_tags', unique: true
   end
 end

@@ -2,8 +2,11 @@ class Account < ApplicationRecord
   extend Memoist
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
-  has_many :ignored_tags, dependent: :destroy, counter_cache: :ignored_tags_count
-  has_many :poisoned_pills, -> { poisoned_pill }, class_name: 'IgnoredTag'
+  has_many :account_tags, dependent: :destroy, counter_cache: :account_tags_count
+  has_many :past_tags, -> { past }, class_name: 'AccountTag::Past'
+  has_many :ignored_tags, -> { ignored }, class_name: 'AccountTag::Ignored'
+  has_many :poisoned_pill_tags, -> { poisoned_pill }, class_name: 'AccountTag::PoisonedPill'
+  has_many :favorite_tags, -> { favorite }, class_name: 'AccountTag::Favorite'
   
   validates_presence_of :name
   
@@ -27,11 +30,7 @@ class Account < ApplicationRecord
   end
   
   def poisoned_posts(invert = true)
-    if invert
-      Post.where(id: Tag.where(tag: poisoned_pills.select(:tag)).select(:post_id))
-    else
-      Post.where.not(id: Tag.where(tag: poisoned_pills.select(:tag)).select(:post_id))
-    end
+    Post.where(id: Tag.where(tag: poisoned_pill_tags(invert).select(:tag)).select(:post_id))
   end
   
   def refresh_muted_authors

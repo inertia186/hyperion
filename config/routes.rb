@@ -24,8 +24,17 @@ Rails.application.routes.draw do
     end
   end
   
+  resources :tags do
+    member do
+      post :create_favorite
+      delete :delete_favorite
+    end
+  end
+  
   get '/posts/:tag(/:sort)(/:limit)', to: 'posts#index', as: :posts_tagged
   get '/posts/@:author(/:sort)(/:limit)', to: 'posts#index', as: :posts_authored, constraints: { account: /([^\/])+/ }
+  
+  get '/tags/:type(/:sort)(/:limit)', to: 'tags#index', as: :tags_by_type
   
   root to: 'posts#index'
 end
