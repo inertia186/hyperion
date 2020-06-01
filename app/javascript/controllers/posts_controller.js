@@ -9,6 +9,7 @@ var bindingPreviewPreviousKey;
 var bindingPreviewNextKey;
 var bindingFocusPreviousKey;
 var bindingFocusNextKey;
+var bindingScrollKey;
 
 export default class extends Controller {
   static values = {
@@ -105,6 +106,9 @@ export default class extends Controller {
     var pendingPayout = this.previewPendingPayoutTarget;
     updatePendingPayout(pendingPayout, this.authorValue, this.permlinkValue);
     
+    bindingScrollKey = this.scrollKey.bind(this);
+    document.addEventListener('keydown', bindingScrollKey);
+    
     bindingPreviewDismissKey = this.previewDismissKey.bind(this);
     document.addEventListener('keydown', bindingPreviewDismissKey);
     
@@ -121,7 +125,7 @@ export default class extends Controller {
   previewPrevious(e) {
     var element = $(this.element);
     var previous_element = element.prev();
-    var previous_post_id = previous_element.data('post-id-value');
+    var previous_post_id = previous_element.data('posts-id-value');
     var previous_link = document.getElementById(`#show-${previous_post_id}`);
     
     if ( !!previous_link ) {
@@ -133,7 +137,7 @@ export default class extends Controller {
   previewNext(e) {
     var element = $(this.element);
     var next_element = element.next();
-    var next_post_id = next_element.data('post-id-value');
+    var next_post_id = next_element.data('posts-id-value');
     var next_link = document.getElementById(`#show-${next_post_id}`);
     
     if ( !!next_link ) {
@@ -145,7 +149,7 @@ export default class extends Controller {
   focusPrevious(e) {
     var element = $(this.element);
     var previous_element = element.prev();
-    var previous_post_id = previous_element.data('post-id-value');
+    var previous_post_id = previous_element.data('posts-id-value');
     var previous_link = document.getElementById(`#show-${previous_post_id}`);
     
     if ( !!previous_link ) {
@@ -155,7 +159,7 @@ export default class extends Controller {
   
   focusCurrent(e) {
     var element = $(this.element);
-    var post_id = element.data('post-id-value');
+    var post_id = element.data('posts-id-value');
     var link = document.getElementById(`#show-${post_id}`);
     
     if ( !!link ) {
@@ -166,7 +170,7 @@ export default class extends Controller {
   focusNext(e) {
     var element = $(this.element);
     var next_element = element.next();
-    var next_post_id = next_element.data('post-id-value');
+    var next_post_id = next_element.data('posts-id-value');
     var next_link = document.getElementById(`#show-${next_post_id}`);
     
     if ( !!next_link ) {
@@ -177,6 +181,8 @@ export default class extends Controller {
   previewPreviousKey(e) {
     if ( e.keyCode == 37 // left
       || e.keyCode == 72 // h
+      || e.keyCode == 74 // j
+      || e.keyCode == 38 // uo
     ) {
       this.previewDismiss(e);
       this.previewPrevious(e);
@@ -186,6 +192,8 @@ export default class extends Controller {
   previewNextKey(e) {
     if ( e.keyCode == 76 // l
       || e.keyCode == 39 // right
+      || e.keyCode == 40 // down
+      || e.keyCode == 74 // j
     ) {
       this.previewDismiss(e);
       this.previewNext(e);
@@ -218,6 +226,39 @@ export default class extends Controller {
     }
   }
   
+  scrollKey(e) {
+    if ( e.keyCode == 32 // space
+      || e.keyCode == 33 // page-up
+      || e.keyCode == 34 // page-down
+    ) {
+      var iframe = $(`#preview-${this.idValue} iframe`);
+      
+      // Paging down.
+      if ( ( e.keyCode == 32 && !e.shiftKey ) || e.keyCode == 34 ) {
+        var top = iframe.contents().scrollTop();
+        iframe.contents().scrollTop(top + 150);
+        
+        if ( top == iframe.contents().scrollTop() ) {
+          // at the bottom
+          this.previewDismiss();
+          this.previewNext();
+        }
+      }
+      
+      // Paging up.
+      if ( ( e.keyCode == 32 && e.shiftKey ) || e.keyCode == 33 ) {
+        var top = iframe.contents().scrollTop();
+        iframe.contents().scrollTop(top - 150);
+        
+        if ( top == iframe.contents().scrollTop() ) {
+          // at the top
+          this.previewDismiss();
+          this.previewPrevious();
+        }
+      }
+    }
+  }
+  
   // https://discourse.stimulusjs.org/t/hide-a-popup-on-clicking-outside-the-popup-area/67/5
   previewDismissOutsideModal(e) {
     // Clicked outside the modal (how you'd expect it to work, but bs gets in
@@ -242,6 +283,7 @@ export default class extends Controller {
     
     $(preview).modal('hide');
     
+    document.removeEventListener('keydown', bindingScrollKey);
     document.removeEventListener('keydown', bindingPreviewDismissKey);
     document.removeEventListener('keydown', bindingPreviewPreviousKey);
     document.removeEventListener('keydown', bindingPreviewNextKey);
@@ -251,8 +293,6 @@ export default class extends Controller {
   // Also see posts#mark_as_read.js.erb
   successMarkAsRead(e) {
     var row = $(`#${this.idValue}`);
-    
-    row.fadeOut();
   }
   
   // Also see posts#mark_as_read.js.erb
