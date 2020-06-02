@@ -1,4 +1,6 @@
 class Post < ApplicationRecord
+  extend Immutable
+  
   DIFF_MATCH_PATCH_PATTERN = /@@ -[0-9]+,[0-9]+ \+[0-9]+,[0-9]+ @@/
   IMAGE_URL_PATTERN = /(http(s?):\/\/.*\.(jpeg|jpg|gif|png))/
   YOUTUBE_SHORT_URL_PATTERN = /http(s?):\/\/youtu.be\/(.*)/
@@ -151,10 +153,8 @@ class Post < ApplicationRecord
   end
   
   def fetch_latest
-    database_api = Hive::DatabaseApi.new
-    
-    catch :fetch do; begin
-      database_api.list_comments(start: [author, permlink], limit: 1, order: 'by_permlink') do |result|
+    Post::with_simple_failover do
+      Post::database_api.list_comments(start: [author, permlink], limit: 1, order: 'by_permlink') do |result|
         if result.nil?
           Rails.logger.warn 'Invalid response from list_comments, retrying ...'
           
@@ -176,9 +176,7 @@ class Post < ApplicationRecord
           self.created_at = Time.parse(comment.created + 'Z')
         end
       end
-    rescue => e
-      Rails.logger.error "Unable to fetch latest comment: #{e}"
-    end; end
+    end
   end
   
   # Checks if this post is in the latest blog (with roughly the same timestamp).
@@ -187,9 +185,7 @@ class Post < ApplicationRecord
   # body of zero.
   def in_blog?(limit = 100)
     begin
-      api = Hive::Api.new(url: 'http://anyx.io')
-      
-      api.get_discussions_by_blog(tag: author, limit: limit, truncate_body: 0) do |blog|
+      Post::api.get_discussions_by_blog(tag: author, limit: limit, truncate_body: 0) do |blog|
         blog.each do |comment|
           comment_created = Time.parse(comment.created + 'Z')
           

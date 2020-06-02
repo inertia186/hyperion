@@ -1,20 +1,22 @@
 require 'open-uri'
 
 class PostIndexJob < ApplicationJob
+  extend Immutable
   extend Memoist
   
   DEPLORABLES = %w(crystalliu anfeng)
   
   queue_as :default
   
-  DEFAULT_NODE_URLS = %w(https://api.openhive.network)
+  DEFAULT_NODE_URLS = %w(https://api.openhive.network https://api.hive.blog
+    http://anyx.io https://api.hivekings.com https://hived.privex.io
+    https://rpc.ausbit.dev)
   BLOCK_INTERVAL_SEC = 3
   BLOCK_INTERVAL_7_DAYS = (Time.now.utc - 7.days.ago) / BLOCK_INTERVAL_SEC
   MAX_TAGS = 50
   
   def perform(*args)
-    database_api = Hive::DatabaseApi.new(url: DEFAULT_NODE_URLS.sample)
-    head_block_num, blockchain_time = database_api.get_dynamic_global_properties do |dgpo|
+    head_block_num, blockchain_time = PostIndexJob::database_api.get_dynamic_global_properties do |dgpo|
       [dgpo.head_block_number, Time.parse(dgpo.time + 'Z')]
     end
     start_block_num = (head_block_num - BLOCK_INTERVAL_7_DAYS).to_i
@@ -33,13 +35,12 @@ class PostIndexJob < ApplicationJob
     Rails.logger.info "Blacklist size: #{blacklist(true).size}" # reload blacklist
     
     catch :retry do
-      stream = Hive::Stream.new(url: DEFAULT_NODE_URLS.sample)
-      
-      stream.blocks(at_block_num: start_block_num) do |block, block_num|
+      PostIndexJob::stream.blocks(at_block_num: start_block_num) do |block, block_num|
         if block.nil?
           puts "Retrying at block number: #{start_block_num} ..."
           sleep 3
           
+          PostIndexJob::api_reset
           throw :retry
         end
         

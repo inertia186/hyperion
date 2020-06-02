@@ -1,4 +1,5 @@
 class Account < ApplicationRecord
+  extend Immutable
   extend Memoist
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
@@ -29,22 +30,32 @@ class Account < ApplicationRecord
     read_posts.where(post_id: id).exists?
   end
   
-  def poisoned_posts(invert = true)
-    Post.where(id: Tag.where(tag: poisoned_pill_tags(invert).select(:tag)).select(:post_id))
+  def poisoned_posts(poisoned_posts = true)
+    if poisoned_posts
+      Post.where(id: Tag.where(tag: poisoned_pill_tags.select(:tag)).select(:post_id))
+    else
+      Post.where.not(id: Tag.where(tag: poisoned_pill_tags.select(:tag)).select(:post_id))
+    end
   end
   
+  # TODO make this into "refresh_follows" and track both 'ignore' and 'blog'
+  # which also requires a new DB field called 'followed_authors'
   def refresh_muted_authors
     self.muted_authors = []
     count = -1
-    follow_api = Hive::Api.new
     
+    Account::with_simple_failover do
     until count == muted_authors.size
       count = muted_authors.size
-      follow_api.get_following(name, muted_authors.last, 'ignore', 1000) do |result|
+        Account::api.get_following(name, muted_authors.last, 'ignore', 1000) do |result|
         self.muted_authors += result.map &:following
         self.muted_authors = muted_authors.uniq
+          
         sleep 0.1
       end
     end
+  end
+    
+    return muted_authors
   end
 end
