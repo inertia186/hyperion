@@ -5,13 +5,13 @@
 .row
   .col-4
   .col-4
-    = form_tag sessions_path, remote: true do
+    = form_tag sessions_path, remote: true, 'data-controller' => 'sessions' do
       .form-group
         = label_tag :account_name, 'Account Name', class: 'col-form-label'
         = text_field_tag :account_name, @account_name, class: 'form-control'
       .form-group
-        = submit_tag 'Login with Hive Keychain', class: 'form-control btn btn-primary'
-
+        = submit_tag 'Login with Hive Keychain', class: 'form-control btn btn-lg btn-primary'
+    
     #success-alert.alert.alert-primary{style: 'display: none;'}
     #error-alert.alert.alert-danger{style: 'display: none;'}
   .col-4

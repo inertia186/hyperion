@@ -1,9 +1,12 @@
 var account_name = '<%= @account_name %>';
 var login_fields = $('input');
+var random_oneliner = '<%= @random_oneliner %>';
+var digest = '<%= Digest::SHA256.digest(@random_oneliner).unpack('H*')[0] %>';
+var authorized_session_path = '<%= authorized_session_path(@account_name) %>';
 
 login_fields.prop('readonly', true);
 
-hive_keychain.requestSignBuffer(account_name, '<%= @random_oneliner %>', 'Posting', function (response) {
+hive_keychain.requestSignBuffer(account_name, random_oneliner, 'Posting', function (response) {
   success_alert = $('#success-alert');
   error_alert = $('#error-alert');
   
@@ -14,8 +17,7 @@ hive_keychain.requestSignBuffer(account_name, '<%= @random_oneliner %>', 'Postin
     success_alert.html('<div class="d-flex align-items-center"><strong>Logging in as ' + response.data.username + '</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>');
     success_alert.show();
     
-    authorized_session_path = '<%= authorized_session_path(@account_name) %>';
-    window.location.assign(authorized_session_path + '?public_key=' + response.publicKey + '&result=' + response.result);
+    window.location.assign(authorized_session_path + '?public_key=' + response.publicKey + '&signature=' + response.result + '&digest=' + digest);
   } else {
     success_alert.text('');
     success_alert.hide();

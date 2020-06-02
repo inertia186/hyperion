@@ -15,21 +15,30 @@ class SessionsController < ApplicationController
   end
   
   def authorized
-    @account_name = params[:id]
-    @public_key = params[:public_key]
-    @response = params[:response]
+    account_name = params[:id]
+    public_key = params[:public_key]
     
-    # TODO Actually check this
+    raise 'public key does not match account' unless Account.public_keys(account_name).include? public_key
     
-    @account = Account.find_or_create_by(name: @account_name)
+    pub = Bitcoin.decode_base58(public_key[3..-1])[0..65]
+    digest = params[:digest].split.pack('H*')
+    signature = params[:signature].split.pack('H*')
     
-    if @account.persisted?
-      session[:current_account] = @account
-      
-      redirect_to posts_path
-    else
-      redirect_to new_session_url(account_name: @account_name)
+    account = if pub == Bitcoin::OpenSSL_EC.recover_compact(digest, signature)
+      Account.find_or_create_by(name: account_name)
     end
+      
+    if !!account && account.persisted?
+      session[:current_account] = account
+      return_to = session[:return_to]
+      session[:return_to] = nil
+      
+      redirect_to return_to || posts_path
+      
+      return
+    end
+    
+    redirect_to new_session_url(account_name: account_name)
   end
   
   def destroy

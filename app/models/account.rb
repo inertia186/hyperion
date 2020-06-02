@@ -13,6 +13,24 @@ class Account < ApplicationRecord
   
   validates_uniqueness_of :name
   
+  def self.public_keys(names)
+    names = [names].flatten
+    public_keys = []
+    
+    with_simple_failover do
+      database_api.find_accounts(accounts: names) do |result|
+        result.accounts.each do |account|
+          public_keys += account.owner.key_auths.map{|k| k[0]}
+          public_keys += account.active.key_auths.map{|k| k[0]}
+          public_keys += account.posting.key_auths.map{|k| k[0]}
+          public_keys << account.memo_key
+        end
+      end
+    end
+    
+    public_keys
+  end
+  
   def to_param
     [id, name].join('-').parameterize
   end

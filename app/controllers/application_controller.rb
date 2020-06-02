@@ -17,7 +17,11 @@ class ApplicationController < ActionController::Base
   before_action :sign_in
 private
   def sign_in
-    redirect_to new_session_url unless !!current_account
+    unless !!current_account
+      session[:return_to] ||= request.original_url
+      
+      redirect_to new_session_url 
+    end
   end
   
   def current_account
