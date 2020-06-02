@@ -5,7 +5,7 @@
 .row
   .col-4
   .col-4
-    = form_tag sessions_path, remote: true, 'data-controller' => 'sessions' do
+    = form_tag sessions_path, remote: true, 'data-controller' => 'sessions', 'data-action' => 'ajax:success->sessions#beginLogin' do
       .form-group
         = label_tag :account_name, 'Account Name', class: 'col-form-label'
         = text_field_tag :account_name, @account_name, class: 'form-control'

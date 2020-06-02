@@ -1,12 +1,10 @@
 var account_name = '<%= @account_name %>';
-var login_fields = $('input');
 var random_oneliner = '<%= @random_oneliner %>';
-var digest = '<%= Digest::SHA256.digest(@random_oneliner).unpack('H*')[0] %>';
-var authorized_session_path = '<%= authorized_session_path(@account_name) %>';
-
-login_fields.prop('readonly', true);
 
 hive_keychain.requestSignBuffer(account_name, random_oneliner, 'Posting', function (response) {
+  let digest = '<%= Digest::SHA256.digest(@random_oneliner).unpack('H*')[0] %>';
+  let authorized_session_path = '<%= authorized_session_path(@account_name) %>';
+  
   success_alert = $('#success-alert');
   error_alert = $('#error-alert');
   
@@ -23,6 +21,7 @@ hive_keychain.requestSignBuffer(account_name, random_oneliner, 'Posting', functi
     success_alert.hide();
     error_alert.text(response.message);
     error_alert.show();
-    login_fields.prop('readonly', false);
+    
+    $('input').prop('readonly', false);
   }
 });
