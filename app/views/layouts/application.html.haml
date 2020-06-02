@@ -30,6 +30,14 @@
                 %input#toggle-mutes.custom-control-input{checked: !!session[:muted_authors_enabled], type: 'checkbox', onclick: '$("#toggle-mutes").prop("disabled", true); this.form.submit();'}
                 %label.custom-control-label{for: 'toggle-mutes'} Enable Mute
 
+            = form_tag toggle_only_favorite_tags_posts_path, method: :patch, class: 'form-inline' do
+              = hidden_field_tag :sort, @sort, id: nil
+              = hidden_field_tag :limit, @limit, id: nil
+              = hidden_field_tag :tag, @tag, id: nil
+              .custom-control.custom-switch
+                %input#toggle-only-favorite-tags.custom-control-input{checked: !!session[:only_favorite_tags], type: 'checkbox', onclick: '$("#toggle-only-favorite-tags").prop("disabled", true); this.form.submit();'}
+                %label.custom-control-label{for: 'toggle-only-favorite-tags'} Only Favorite Tags
+
         -# .p-4= render partial: 'dashboard/quick_stats'
 
     .container

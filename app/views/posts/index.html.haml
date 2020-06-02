@@ -99,7 +99,9 @@
               .float-left
                 = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload rounded-circle', style: 'width: 16px; height: 16px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
               .pl-2
-                = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: 'width: 100%' do
+                - author_text_style = 'width: 100%;'
+                - author_text_style += ' text-decoration: line-through;' if current_account.muted_authors.include? post.author
+                = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: author_text_style do
                   = post.author
           %td.w-auto
             .d-flex

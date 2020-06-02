@@ -13,6 +13,7 @@ Rails.application.routes.draw do
       patch :ignore_all
       patch :clear_ignored_tags
       patch :toggle_mutes
+      patch :toggle_only_favorite_tags
       get :content_loading
     end
     
