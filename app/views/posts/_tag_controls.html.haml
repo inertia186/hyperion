@@ -96,7 +96,7 @@
               .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag', 'data-past-tags-tag-value' => tag}
                 = link_to create_favorite_tag_path(tag), method: :post, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: none;' : 'display: inline-block;' do
                   = icon('star', stroke: 'black')
-                = link_to delete_favorite_tag_path(tag), method: :delete, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: inline-block;' : 'display: none;' do
+                = link_to destroy_favorite_tag_path(tag), method: :delete, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: inline-block;' : 'display: none;' do
                   = icon('star-fill', stroke: 'black')
                 = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: tag.present? ? tag : '-'), class: btn_class do
                   = name

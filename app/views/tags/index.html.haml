@@ -5,7 +5,7 @@
       .form-group.mx-2
         %label.mr-2{for: :type} Type
         .select2{'data-controller' => 'search-tags'}
-          = select_tag :type, options_for_select([['All', '']] + AccountTag.select(:type).distinct.pluck(:type).map{|t| [t.split('::')[1].underscore.humanize, t]}, params[:type]), class: 'form-control'
+          = select_tag :type, options_for_select([['All', '']] + AccountTag.select(:type).distinct.pluck(:type).map{|t| [t.split('::')[1].underscore.humanize, t.split('::')[1].underscore.to_sym]}, @type), class: 'form-control'
       .form-group.mx-2
         %label.mr-2{for: :sort} Sort:
         = select_tag :sort, options_for_select([['Name A-Z', 'name_asc'], ['Name Z-A', 'name_desc'], ['Tag A-Z', 'tag_asc'], ['Tag Z-A', 'tag_desc'], ['Latest', 'latest'], ['Oldest', 'oldest'], ['Most Posts', 'most_posts'], ['Least Posts', 'least_posts']], @sort), class: 'form-control', id: nil
@@ -16,6 +16,7 @@
   %table.table-sm
     %tbody
       - @tags.each do |tag|
+        - also = current_account.account_tags.where.not(id: tag).where(tag: tag.tag)
         %tr.align-top{id: tag_id = tag.to_param}
           %td
             - if @type == :all
@@ -26,5 +27,11 @@
               %code ##{tag.tag}
           %td= tag.posts.count
           %td
-            - if (also = current_account.account_tags.where.not(id: tag).where(tag: tag.tag)).any?
+            - if also.any?
               Also: #{also.pluck(:type).map{|t| t.split('::')[1]}.join(', ')}
+          %td
+            = link_to 'Clear', tag_path(tag, sort: @sort, limit: @limit, type: @type), method: :delete, data: {confirm: 'Are you sure?'}
+            - if tag.type == AccountTag::IGNORED_TYPE && also.where(type: AccountTag::POISONED_PILL_TYPE).none?
+              = link_to 'Add Poistoned Pill', create_poisoned_pill_tag_path(tag.tag, sort: @sort, limit: @limit, type: @type), method: :post
+            - if tag.type == AccountTag::PAST_TYPE && also.where(type: AccountTag::FAVORITE_TYPE).none?
+              = link_to 'Add Favorite', create_favorite_tag_path(tag.tag, sort: @sort, limit: @limit, type: @type), method: :post

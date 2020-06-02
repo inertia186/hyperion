@@ -27,7 +27,13 @@ Rails.application.routes.draw do
   resources :tags do
     member do
       post :create_favorite
-      delete :delete_favorite
+      post :create_ignored
+      post :create_past
+      post :create_poisoned_pill
+      delete :destroy_favorite
+      delete :destroy_ignored
+      delete :destroy_past
+      delete :destroy_poisoned_pill
     end
   end
   

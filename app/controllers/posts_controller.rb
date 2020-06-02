@@ -175,6 +175,7 @@ class PostsController < ApplicationController
     
     if allow_tag.any?
       current_account.ignored_tags.where(tag: allow_tag).destroy_all
+      current_account.poisoned_pill_tags.where(tag: allow_tag).destroy_all
     else
       current_account.ignored_tags.destroy_all
     end
