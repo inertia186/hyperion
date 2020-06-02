@@ -14,7 +14,7 @@
           %span &times;
       .modal-body
         .embed-responsive.embed-responsive-16by9
-          %iframe.embed-responsive-item.overflow-auto{src: 'about:blank', data: {src: content_sandbox_post_path(post_id, pp: :skip)}, sandbox: 'allow-same-origin allow-scripts', loading: :lazy}
+          %iframe.embed-responsive-item.overflow-auto{src: 'about:blank', data: {src: content_sandbox_post_path(post_id, pp: :skip)}, sandbox: 'allow-same-origin allow-scripts allow-popups', loading: :lazy}
       .modal-footer.d-flex
         .p-2
           .badge.badge-secondary{data: {posts: {target: 'previewVoteCount'}}}
