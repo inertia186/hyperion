@@ -87,9 +87,9 @@ private
   
   def tag_unread_count(tag, async = false)
     if async
-      Post.active.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).tagged_any(tag).count
+      @all_posts.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).tagged_any(tag).count
     elsif tag.to_s == ''
-      Post.active.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).count
+      @all_posts.unread(by: current_account, include_muted: !session[:muted_authors_enabled]).count
     else
       all_tag_unread[tag] || 0
     end

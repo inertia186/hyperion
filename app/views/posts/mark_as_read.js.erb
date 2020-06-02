@@ -4,7 +4,7 @@ var unread_count = <%= tag_unread_count(@tag, true) %>;
 var unread_posts = `<%= render(partial: 'posts_count') %>`;
 var posts = $('#posts');
 
-$(id).fadeOut();
+$(id).hide();
 
 $('#read-posts-count').text(read_posts_count);
 $('#unread-posts').html(unread_posts);

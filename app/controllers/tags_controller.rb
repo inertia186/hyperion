@@ -28,6 +28,22 @@ class TagsController < ApplicationController
     end
   end
   
+  def unread_count
+    tag = params[:id]
+    
+    posts = Post.active.unread(by: current_account).tagged_any(tag)
+    
+    if !!session[:muted_authors_enabled]
+      posts = posts.where.not(author: current_account.muted_authors)
+    end
+    
+    respond_to do |format|
+      format.json {
+        render json: {tag: tag, count: posts.count}
+      }
+    end
+  end
+  
   def create_favorite
     create_type_by_relation(current_account.favorite_tags)
   end

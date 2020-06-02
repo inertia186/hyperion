@@ -3,7 +3,7 @@
     = pagy_bootstrap_combo_nav_js(@pagy).html_safe
   
   - if @posts.none?
-    .btn.btn-primary.m-2.disabled Mark all as read
+    .btn.btn-primary.m-2.disabled Mark shown as read
   - else
     = form_tag mark_all_as_read_posts_path, method: :patch, class: 'form-inline', data: {confirm: 'Are you sure?'} do
       - @posts.each do |post|
@@ -11,7 +11,7 @@
       = hidden_field_tag :sort, @sort, id: nil
       = hidden_field_tag :limit, @limit, id: nil
       = hidden_field_tag :tag, @tag, id: nil
-      = submit_tag 'Mark all as read', class: 'btn btn-primary m-2'
+      = submit_tag 'Mark shown as read', class: 'btn btn-primary m-2'
     
   - if @tag == '' || ignored_tags.include?(@tag)
     - if @tag == ''
@@ -68,7 +68,7 @@
               = pluralize Tag.distinct.count(:tag), 'tag'
   
   - if current_account.past_tags.any?
-    %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#past-tags'}}
+    %button.btn.btn.btn-dark.m-2{data: {controller: 'past-tags', toggle: 'modal', target: '#past-tags', action: 'past-tags#refreshTags'}}
       Past Tags / Categories
     
     .modal.fade#past-tags
@@ -80,6 +80,9 @@
             %button.close{type: 'button', data: {dismiss: 'modal'}}
               %span &times;
           .modal-body
+            .btn.btn-sm.btn-outline-dark.m-1
+              = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: '-'), class: 'btn-tag-text' do
+                &lt;All Tags&gt;
             - past_tags = current_account.past_tags.pluck(:tag)
             - past_tags.each do |tag|
               - name = best_tag_name(tag)
@@ -95,13 +98,14 @@
                   - 'btn-dark'
               .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag', 'data-past-tags-tag-value' => tag}
                 = link_to create_favorite_tag_path(tag), method: :post, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: none;' : 'display: inline-block;' do
-                  = icon('star', stroke: 'black')
+                  = icon('star', stroke: 'black', class: 'btn-tag-star')
                 = link_to destroy_favorite_tag_path(tag), method: :delete, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: inline-block;' : 'display: none;' do
-                  = icon('star-fill', stroke: 'black')
-                = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: tag.present? ? tag : '-'), class: btn_class do
+                  = icon('star-fill', stroke: 'black', class: 'btn-tag-star')
+                = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: tag.present? ? tag : '-'), class: 'btn-tag-text' do
                   = name
                 %span.badge.badge-light
-                  = tag_unread_count(tag)
+                  %span{'data-tag-count-url' => unread_count_tag_path(tag, format: :json)}
+                    .spinner-grow{style: 'width: 6px; height: 6px;'}
                   - unless tag == ''
                     = link_to clear_past_tag_post_path(tag), method: :delete, remote: true, class: 'close-badge-button', 'data-action' => 'ajax:success->past-tags#removeTag' do
                       = icon('x-circle', stroke: 'black')

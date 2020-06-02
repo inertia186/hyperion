@@ -34,6 +34,8 @@ Rails.application.routes.draw do
       delete :destroy_ignored
       delete :destroy_past
       delete :destroy_poisoned_pill
+      
+      get :unread_count
     end
   end
   

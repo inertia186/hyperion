@@ -94,3 +94,19 @@ body {
 .select2-container {
   min-width: 220px;
 }
+
+.btn-tag-star {
+  color: #ffd300;
+  margin-bottom: 2px;
+  margin-right: 2px;
+}
+
+.btn-tag-text {
+  color: #878791;
+  text-decoration: none;
+}
+
+.btn-tag-text:hover {
+  color: #e7e7f1;
+  text-decoration: none;
+}
