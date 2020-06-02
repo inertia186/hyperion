@@ -42,8 +42,12 @@ class PostsController < ApplicationController
       if !!session[:muted_authors_enabled]
         @posts = @posts.where.not(author: current_account.muted_authors)
       end
+      if !!session[:only_favorite_tags]
+        @posts = @posts.where(id: Tag.where(tag: current_account.favorite_tags.select(:tag)).select(:post_id))
+      end
     end
-    
+
+    @all_posts = @posts
     @related_authors = @posts.distinct.limit(1000).order(:author).pluck(:author)
     @pagy, @posts = pagy(@posts, items: @limit)
     
@@ -102,7 +106,9 @@ class PostsController < ApplicationController
       format.html {
         redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
       }
-      format.js { }
+      format.js {
+        index # to pick up current version of @all_posts
+      }
     end
   end
   
@@ -116,6 +122,8 @@ class PostsController < ApplicationController
         redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
       }
       format.js {
+        index # to pick up current version of @all_posts
+        
         render :mark_as_read
       }
     end
@@ -147,6 +155,14 @@ class PostsController < ApplicationController
       # even though it might be a little slow.
       current_account.refresh_muted_authors
     end
+    
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+  end
+  
+  def toggle_only_favorite_tags
+    read_params
+    
+    session[:only_favorite_tags] = !session[:only_favorite_tags]
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
   end
@@ -184,6 +200,7 @@ class PostsController < ApplicationController
   end
   
   def clear_past_tags
+    read_params
     only_ignored = params[:only_ignored] == 'true'
     
     if only_ignored
@@ -200,6 +217,8 @@ class PostsController < ApplicationController
     
     respond_to do |format|
       format.html {
+        read_params
+        
         redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
       }
       format.js {
