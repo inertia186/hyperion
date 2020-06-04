@@ -33,7 +33,11 @@
         %span.badge.badge-light#read-posts-count= current_account.read_posts.count
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
-    = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
+    -# TODO
+    -# = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
+    -#   .btn.btn-primary.mx-2
+    -#     Ignored tags:
+    -#     %span.badge.badge-light#read-posts-count= ignored_tags.size
     .btn.btn-primary.mx-2
       Ignored tags:
       %span.badge.badge-light#read-posts-count= ignored_tags.size

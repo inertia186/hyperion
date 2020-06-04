@@ -7,9 +7,8 @@
         %h5.modal-title
           = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
           = post.title
-          %em
-            by
-            = post.author
+          %small{title: (also = post.tags.where.not(tag: post.category)).any? ? " ... and #{also.pluck(:tag).to_sentence}" : ''}
+            (posted in #{best_tag_name(post.category)} by #{post.author})
         %button.close{type: 'button', data: {action: 'posts#previewDismiss'}}
           %span &times;
       .modal-body

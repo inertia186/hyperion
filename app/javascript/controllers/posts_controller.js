@@ -87,7 +87,23 @@ export default class extends Controller {
         var upvotes = 0;
         
         for ( var i = 0 ; i < response.length; i++ ) {
-          if ( response[i].percent > 0 ) upvotes++;
+          var voteCast = false;
+          if ( response[i].voter == $('#current-account').data('name') ) {
+            voteCount.classList.remove('badge-secondary');
+            voteCast = true;
+          }
+          
+          if ( response[i].percent > 0 ) {
+            upvotes++;
+            
+            if ( voteCast ) {
+              voteCount.classList.add('badge-success');
+            }
+          }
+          
+          if ( response[i].percent < 0 && voteCast ) {
+            voteCount.classList.add('badge-danger');
+          }
         }
   
         voteCount.textContent = 'Votes: ' + upvotes;
