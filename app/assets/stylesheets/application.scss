@@ -92,7 +92,8 @@ body {
 }
 
 .select2-container {
-  min-width: 220px;
+  min-width: 120px;
+  max-width: 200px;
 }
 
 .btn-tag-star {
@@ -109,4 +110,47 @@ body {
 .btn-tag-text:hover {
   color: #e7e7f1;
   text-decoration: none;
+}
+
+// Used for transition to .enabled-overlay
+.disabled-overlay {
+  background: transparent;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 1.0;
+}
+
+.enabled-overlay {
+  background: #212529;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0.5;
+}
+
+.global-spinner {
+  margin: 0 auto;
+  height: 64px;
+  width: 64px;
+  animation: rotate 0.8s infinite linear;
+  border: 5px solid #E31337;
+  border-right-color: transparent;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
