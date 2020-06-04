@@ -44,3 +44,6 @@
       .row
         .col-12
           = yield
+    - unless controller_name == 'sessions'
+      = link_to '#', class: 'float-right', style: 'position: sticky; bottom: 8px', data: {controller: 'help', action: 'help#show'} do
+        %code.badge.badge-light ? = toggle help
