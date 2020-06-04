@@ -40,7 +40,7 @@ class PostsController < ApplicationController
     
     unless @author
       if !!session[:muted_authors_enabled]
-        @posts = @posts.where.not(author: current_account.muted_authors)
+        @posts = @posts.where.not(author: current_account.reload.muted_authors)
       end
       if !!session[:only_favorite_tags]
         @posts = @posts.where(id: Tag.where(tag: current_account.favorite_tags.select(:tag)).select(:post_id))

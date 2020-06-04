@@ -34,7 +34,7 @@ class TagsController < ApplicationController
     posts = Post.active.unread(by: current_account).tagged_any(tag)
     
     if !!session[:muted_authors_enabled]
-      posts = posts.where.not(author: current_account.muted_authors)
+      posts = posts.where.not(author: current_account.reload.muted_authors)
     end
     
     respond_to do |format|

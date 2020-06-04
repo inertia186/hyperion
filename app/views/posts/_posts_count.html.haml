@@ -9,5 +9,5 @@
     = link_to "#{deleted_posts_count} deleted,", posts_tagged_path(sort: @sort, limit: @limit, tag: tag, only_deleted: true)
     - blacklisted_posts_count = Post.active.tagged_any(@tag).blacklisted.count
     = link_to "#{blacklisted_posts_count} blacklisted,", posts_tagged_path(sort: @sort, limit: @limit, tag: tag, only_blacklisted: true)
-    = Post.active.tagged_any(@tag).where(author: current_account.muted_authors).count
+    = Post.active.tagged_any(@tag).where(author: current_account.reload.muted_authors).count
     muted

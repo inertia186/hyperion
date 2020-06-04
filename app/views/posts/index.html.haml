@@ -34,9 +34,9 @@
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
     = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
-      .btn.btn-primary.mx-2
-        Ignored tags:
-        %span.badge.badge-light#read-posts-count= ignored_tags.size
+    .btn.btn-primary.mx-2
+      Ignored tags:
+      %span.badge.badge-light#read-posts-count= ignored_tags.size
     .btn.btn-outline-primary.mx-2
       = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
 
@@ -100,7 +100,7 @@
                 = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload rounded-circle', style: 'width: 16px; height: 16px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
               .pl-2
                 - author_text_style = 'width: 100%;'
-                - author_text_style += ' text-decoration: line-through;' if current_account.muted_authors.include? post.author
+                - author_text_style += ' text-decoration: line-through;' if current_account.reload.muted_authors.include? post.author
                 = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: author_text_style do
                   = post.author
           %td.w-auto

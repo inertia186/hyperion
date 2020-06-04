@@ -84,7 +84,7 @@ class Post < ApplicationRecord
     r = r.tagged_any(ignored_tags.pluck(:tag) - allow_tag, false)
     
     unless !!options[:include_muted]
-      r = r.where.not(author: account.muted_authors)
+      r = r.where.not(author: account.reload.muted_authors)
     end
     
     # TODO Don't want these to become a black-hole.  Need UI to check for
