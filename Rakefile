@@ -9,7 +9,14 @@ namespace :export do
   desc 'Exports read posts intended for populating seeds.rb.'
   task read_posts: :environment do
     ReadPost.find_each do |read_post|
-      puts "read_posts.find_or_create_by(post_id: Post.find_by(author: '#{read_post.post.author}', permlink: '#{read_post.post.permlink}'))"
+      puts "read_posts.find_or_create_by(post: Post.find_by(author: '#{read_post.post.author}', permlink: '#{read_post.post.permlink}'))"
+    end
+  end
+  
+  desc 'Exports favorite tags intended for populating seeds.rb.'
+  task favorite_tags: :environment do
+    AccountTag::Favorite.find_each do |tag|
+      puts "favorite_tags.find_or_create_by(tag: '#{tag.tag}')"
     end
   end
 end
