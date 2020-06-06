@@ -115,28 +115,26 @@
             .d-flex
               .btn-group.btn-group-sm.ml-auto
                 - all_tags = (@tag.present? && @tag == post.category) ? post.tags_without_category.pluck(:tag) : post.tags.pluck(:tag)
-                - first_tags = all_tags.first(1)
-                - first_tags.each do |tag|
-                  - tag_class = 'btn btn-outline-dark btn-sm'
-                  - if ignored_tags.include? tag
-                    - tag_class += ' strike'
-                  - if @tag.present? && @tag == post.category
-                    = link_to tag, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
-                  - else
-                    = link_to best_tag_name(tag, post), posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
-                - tags_more = all_tags - first_tags
-                .btn-group
-                  - if tags_more.any?
-                    %button.btn.btn-outline-dark.btn-sm.dropdown-toggle{data: {toggle: 'dropdown'}}
-                      .dropdown-menu
-                        - tags_more.each do |tag|
-                          - tag_class = 'dropdown-item'
-                          - if ignored_tags.include? tag
-                            - tag_class += ' strike'
-                          - name = @tag.present? && @tag == post.category ? category_name : tag
-                          = link_to name, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
-                  - else
-                    %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
+                - if (first_tags = all_tags.first(1)).any?
+                  - first_tags.each do |tag|
+                    - tag_class = 'btn btn-outline-dark btn-sm text-nowrap'
+                    - if ignored_tags.include? tag
+                      - tag_class += ' strike'
+                    - name = tag == post.category ? category_name : tag
+                    = link_to name, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class
+                  .btn-group
+                    - if (tags_more = all_tags - first_tags).any?
+                      %button.btn.btn-outline-dark.btn-sm.dropdown-toggle{data: {toggle: 'dropdown'}}
+                        .dropdown-menu
+                          - tags_more.each do |tag|
+                            - tag_class = 'dropdown-item'
+                            - if ignored_tags.include? tag
+                              - tag_class += ' strike'
+                            = link_to tag, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
+                    - else
+                      %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
+                - else
+                  %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}, style: 'opacity: 0'}
           %td.w-auto
             .d-flex
               .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
