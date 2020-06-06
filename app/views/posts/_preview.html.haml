@@ -7,8 +7,8 @@
         %h5.modal-title
           = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
           = post.title
-          %small{title: (also = post.tags.where.not(tag: post.category)).any? ? " ... and #{also.pluck(:tag).to_sentence}" : ''}
-            (posted in #{best_tag_name(post.category)} by #{post.author})
+          %small{title: (also = post.tags_without_category).any? ? " ... also tagged: #{also.pluck(:tag).to_sentence}" : ''}
+            (posted in #{category_name} by #{post.author}) 
         %button.close{type: 'button', data: {action: 'posts#previewDismiss'}}
           %span &times;
       .modal-body
@@ -16,9 +16,21 @@
           %iframe.embed-responsive-item.overflow-auto{src: 'about:blank', data: {src: content_sandbox_post_path(post_id, pp: :skip)}, sandbox: 'allow-same-origin allow-scripts allow-popups', loading: :lazy}
       .modal-footer.d-flex
         .p-2
-          .badge.badge-secondary{data: {posts: {target: 'previewVoteCount'}}}
-          .badge.badge-secondary{data: {posts: {target: 'previewReplyCount'}}}
-          .badge.badge-secondary{data: {posts: {target: 'previewPendingPayout'}}}
+          .btn-group.btn-group-sm
+            %button.btn.btn-secondary.btn-sm{data: {posts: {target: 'previewVoteCount'}}}
+              %span.align-middle{style: "height: 1px; width: 100%"}
+                %span{style: 'opacity: 0;'} Votes: 0
+            %button.btn.btn-secondary.btn-sm.dropdown-toggle.dropdown-toggle-ellipsis{data: {toggle: 'dropdown'}}
+            .btn-group
+              .dropdown-menu
+                %button.dropdown-item{data: {toggle: 'modal', target: "#upvote-#{post_id}"}} Up Vote
+                %button.dropdown-item{data: {toggle: 'modal', target: "#downvote-#{post_id}"}} Down Vote
+            %button.btn.btn-secondary.btn-sm{data: {posts: {target: 'previewReplyCount'}}}
+              %span.align-middle{style: "height: 1px; width: 100%"}
+                %span{style: 'opacity: 0;'} Replies: 0
+            %button.btn.btn-secondary.btn-sm{data: {posts: {target: 'previewPendingPayout'}}}
+              %span.align-middle{style: "height: 1px; width: 100%"}
+                %span{style: 'opacity: 0;'} 00.000 HBD
         .p-2.ml-auto
           View on:
           = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
@@ -45,3 +57,13 @@
               %button.btn.btn-outline-secondary.btn-sm{data: {action: 'posts#previewDismiss posts#previewPrevious'}, accesskey: 'l'}= icon('arrow-left')
               %button.btn.btn-outline-secondary.btn-sm{data: {action: 'posts#previewDismiss'}, accesskey: 'esc'} Close
               %button.btn.btn-outline-secondary.btn-sm{data: {action: 'posts#previewDismiss posts#previewNext'}, accesskey: 'h'}= icon('arrow-right')
+
+.modal{id: "upvote-#{post_id}", style: 'top: 80%'}
+  .modal-dialog
+    .modal-content
+      .modal-body= render partial: 'upvote'
+
+.modal{id: "downvote-#{post_id}", style: 'top: 80%'}
+  .modal-dialog
+    .modal-content
+      .modal-body= render partial: 'downvote'

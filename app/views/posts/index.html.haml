@@ -74,6 +74,7 @@
   %table.table-sm
     %tbody
       - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
+        - category_name = !!post.community ? post.community.title : post.category
         %tr.align-top{id: post_id = post.to_param, data: {controller: :posts, posts: {id: {value: post.to_param}, author: {value: post.author}, permlink: {value: post.permlink}}, action: 'focusin->posts#focusRowIn focusout->posts#focusRowOut'}}
           %td.w-auto
             .d-flex
@@ -129,7 +130,7 @@
                           - tag_class = 'dropdown-item'
                           - if ignored_tags.include? tag
                             - tag_class += ' strike'
-                          - name = @tag.present? && @tag == post.category ? tag : best_tag_name(tag, post)
+                          - name = @tag.present? && @tag == post.category ? category_name : tag
                           = link_to name, posts_tagged_path(sort: @sort, limit: @limit, tag: tag), class: tag_class, onclick: 'window.location.replace(this.href); return(false);'
                   - else
                     %button.btn.btn-outline-dark.btn-sm.dropdown-toggle.btn-secondary-outline.disabled{data: {toggle: 'dropdown'}}
@@ -138,7 +139,7 @@
               .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
                 = time_ago_in_words(post.created_at)
                 ago
-            = render partial: 'preview', locals: {post: post}
+            = render partial: 'preview', locals: {post: post, category_name: category_name}
 %hr
 
 - if @posts.any?

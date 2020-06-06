@@ -154,3 +154,12 @@ body {
     transform: rotate(360deg);
   }
 }
+
+.dropdown-toggle-ellipsis::after {
+  display: none;
+}
+
+.dropdown-toggle-ellipsis::before {
+  display: inline-block;
+  content: '⋯';
+}

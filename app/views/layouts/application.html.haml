@@ -51,7 +51,7 @@
             .modal-body.btn.btn-dark= render partial: '/shared/help_table'
 
     - unless controller_name == 'sessions'
-      = link_to '#', class: 'float-right', style: 'position: sticky; bottom: 8px', data: {controller: 'help', action: 'help#show'} do
+      = link_to '#', class: 'float-right', style: 'position: sticky; bottom: 8px', data: {controller: 'help', action: 'help#show focusin@window->help#bindHelpKeys'} do
         %code.badge.badge-light ? = toggle help
 
     - if !!current_account

@@ -9,11 +9,7 @@ export default class extends Controller {
   static targets = ['help']
   
   connect() {
-    bindingHelpShowKey = this.showKey.bind(this);
-    document.addEventListener('keydown', bindingHelpShowKey);
-    
-    bindingHelpDismissKey = this.hideKey.bind(this);
-    document.addEventListener('keydown', bindingHelpDismissKey);
+    this.bindHelpKeys();
   }
   
   disconnect() {
@@ -22,6 +18,14 @@ export default class extends Controller {
     
     bindingHelpDismissKey = this.hideKey.bind(this);
     document.removeEventListener('keydown', bindingHelpDismissKey);
+  }
+  
+  bindHelpKeys() {
+    bindingHelpShowKey = this.showKey.bind(this);
+    document.addEventListener('keydown', bindingHelpShowKey);
+    
+    bindingHelpDismissKey = this.hideKey.bind(this);
+    document.addEventListener('keydown', bindingHelpDismissKey);
   }
   
   show(e) {

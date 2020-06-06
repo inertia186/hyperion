@@ -7,6 +7,8 @@ var bindingPreviewDismissKey;
 var bindingPreviewDismissOutsideModal;
 var bindingPreviewPreviousKey;
 var bindingPreviewNextKey;
+var bindingMarkAsReadAndPreviewPreviousKey;
+var bindingMarkAsReadAndPreviewNextKey;
 var bindingFocusPreviousKey;
 var bindingFocusNextKey;
 var bindingScrollKey;
@@ -20,9 +22,7 @@ export default class extends Controller {
   static targets = ['row', 'pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout']
   
   connect() {
-    var pendingPayout = this.pendingPayoutTarget;
-    
-    updatePendingPayout(pendingPayout, this.authorValue, this.permlinkValue);
+    this.refreshPendingPayout(this.pendingPayoutTarget);
     
     var element = $(this.element);
     var link = document.getElementById(`#show-${this.idValue}`);
@@ -79,48 +79,9 @@ export default class extends Controller {
     
     $(preview).modal('show');
     
-    var voteCount = this.previewVoteCountTarget;
-    hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        var upvotes = 0;
-        
-        for ( var i = 0 ; i < response.length; i++ ) {
-          var voteCast = false;
-          if ( response[i].voter == $('#current-account').data('name') ) {
-            voteCount.classList.remove('badge-secondary');
-            voteCast = true;
-          }
-          
-          if ( response[i].percent > 0 ) {
-            upvotes++;
-            
-            if ( voteCast ) {
-              voteCount.classList.add('badge-success');
-            }
-          }
-          
-          if ( response[i].percent < 0 && voteCast ) {
-            voteCount.classList.add('badge-danger');
-          }
-        }
-  
-        voteCount.textContent = 'Votes: ' + upvotes;
-      }
-    });
-    
-    var replyCount = this.previewReplyCountTarget;
-    hive.api.getContentReplies(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        replyCount.textContent = 'Replies: ' + response.length;
-      }
-    });
-    
-    var pendingPayout = this.previewPendingPayoutTarget;
-    updatePendingPayout(pendingPayout, this.authorValue, this.permlinkValue);
+    this.refrestVoteCount();
+    this.refrestReplyCount();
+    this.refreshPendingPayout(this.previewPendingPayoutTarget);
     
     bindingScrollKey = this.scrollKey.bind(this);
     document.addEventListener('keydown', bindingScrollKey);
@@ -133,6 +94,12 @@ export default class extends Controller {
     
     bindingPreviewNextKey = this.previewNextKey.bind(this);
     document.addEventListener('keydown', bindingPreviewNextKey);
+    
+    bindingMarkAsReadAndPreviewPreviousKey = this.markAsReadAndPreviewPreviousKey.bind(this);
+    document.addEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
+    
+    bindingMarkAsReadAndPreviewNextKey = this.markAsReadAndPreviewNextKey.bind(this);
+    document.addEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
     
     bindingPreviewDismissOutsideModal = this.previewDismissOutsideModal.bind(this);
     document.addEventListener('click', bindingPreviewDismissOutsideModal);
@@ -198,7 +165,7 @@ export default class extends Controller {
     if ( e.keyCode == 37 // left
       || e.keyCode == 72 // h
       || e.keyCode == 74 // j
-      || e.keyCode == 38 // uo
+      || e.keyCode == 38 // up
     ) {
       this.previewDismiss(e);
       this.previewPrevious(e);
@@ -212,6 +179,22 @@ export default class extends Controller {
       || e.keyCode == 74 // j
     ) {
       this.previewDismiss(e);
+      this.previewNext(e);
+    }
+  }
+  
+  markAsReadAndPreviewPreviousKey(e) {
+    if ( e.shiftKey && e.keyCode == 188 ) { // < (shift + ,)
+      this.previewDismiss(e);
+      this.markRowAsRead(e);
+      this.previewPrevious(e);
+    }
+  }
+  
+  markAsReadAndPreviewNextKey(e) {
+    if ( e.shiftKey && e.keyCode == 190 ) { // > (shift + .)
+      this.previewDismiss(e);
+      this.markRowAsRead(e);
       this.previewNext(e);
     }
   }
@@ -303,7 +286,29 @@ export default class extends Controller {
     document.removeEventListener('keydown', bindingPreviewDismissKey);
     document.removeEventListener('keydown', bindingPreviewPreviousKey);
     document.removeEventListener('keydown', bindingPreviewNextKey);
+    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
+    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
     document.removeEventListener('click', bindingPreviewDismissOutsideModal);
+  }
+  
+  markRowAsRead(e) {
+    var element = $(this.element);
+    var post_id = element.data('posts-id-value');
+    var link = document.getElementById(`#mark-as-read-${post_id}`);
+    
+    if ( !!link ) {
+      link.click();
+    }
+  }
+  
+  markRowAsUnread(e) {
+    var element = $(this.element);
+    var post_id = element.data('posts-id-value');
+    var link = document.getElementById(`#mark-as-unread-${post_id}`);
+    
+    if ( !!link ) {
+      link.click();
+    }
   }
   
   // Also see posts#mark_as_read.js.erb
@@ -317,21 +322,105 @@ export default class extends Controller {
     
     row.fadeTo(100, 0.3, function() { $(this).fadeTo(500, 1.0); });
   }
-}
-
-function updatePendingPayout(pendingPayout, author, permlink) {
-  pendingPayout.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>';
-
-  hive.api.getContent(author, permlink, function(err, response) {
-    if ( !!err ) console.log(pendingPayout, err);
+  
+  refrestVoteCount() {
+    var voteCount = this.previewVoteCountTarget;
     
-    if ( !!response ) {
-      if ( response.cashout_time == '1969-12-31T23:59:59' ) {
-        // Just in case we're showing a post that has already paid.
-        pendingPayout.textContent = response.total_payout_value;
-      } else {
-        pendingPayout.textContent = response.pending_payout_value;
+    voteCount.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Votes: 0</span>';
+    
+    hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
+      if ( !!err ) console.log(preview, err);
+  
+      if ( !!response ) {
+        var upvotes = 0;
+        
+        for ( var i = 0 ; i < response.length; i++ ) {
+          var voteCast = false;
+          if ( response[i].voter == $('#current-account').data('name') ) {
+            voteCount.classList.remove('badge-secondary');
+            voteCast = true;
+          }
+          
+          if ( response[i].percent > 0 ) {
+            upvotes++;
+            
+            if ( voteCast ) {
+              voteCount.classList.add('badge-success');
+            }
+          }
+          
+          if ( response[i].percent < 0 && voteCast ) {
+            voteCount.classList.add('badge-danger');
+          }
+        }
+  
+        voteCount.textContent = 'Votes: ' + upvotes;
       }
-    }
-  });
+    });
+  }
+  
+  refrestReplyCount() {
+    var replyCount = this.previewReplyCountTarget;
+    
+    replyCount.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Replies: 0</span>';
+    
+    hive.api.getContentReplies(this.authorValue, this.permlinkValue, function(err, response) {
+      if ( !!err ) console.log(preview, err);
+  
+      if ( !!response ) {
+        replyCount.textContent = 'Replies: ' + response.length;
+      }
+    });
+  }
+  
+  refreshPendingPayout(pendingPayout) {
+    pendingPayout.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>';
+
+    hive.api.getContent(this.authorValue, this.permlinkValue, function(err, response) {
+      if ( !!err ) console.log(pendingPayout, err);
+      
+      if ( !!response ) {
+        if ( response.cashout_time == '1969-12-31T23:59:59' ) {
+          // Just in case we're showing a post that has already paid.
+          pendingPayout.textContent = response.total_payout_value;
+        } else {
+          pendingPayout.textContent = response.pending_payout_value;
+        }
+      }
+    });
+  }
+  
+  changeUpvote(e) {
+    $(`#upvote-${this.idValue} .upvote-percent`).html($(e.target).val() + ' %');
+  }
+  
+  changeDownvote(e) {
+    $(`#downvote-${this.idValue} .downvote-percent`).html(-parseInt($(e.target).val()) + ' %');
+  }
+  
+  upvote(e) {
+    var voter = $('#current-account').data('name');
+    var weight = parseInt($(`#upvote-${this.idValue} input`).val()) * 100;
+    
+    hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
+      this.refrestVoteCount();
+      this.refreshPendingPayout(this.pendingPayoutTarget);
+      this.refreshPendingPayout(this.previewPendingPayoutTarget);
+      
+      $(`#upvote-${this.idValue}`).modal('hide');
+    });
+  }
+
+  downvote(e) {
+    var voter = $('#current-account').data('name');
+    var weight = parseInt($(`#downvote-${this.idValue} input`).val()) * 100;
+    
+    hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
+      this.refrestVoteCount();
+      this.refreshPendingPayout(this.pendingPayoutTarget);
+      this.refreshPendingPayout(this.previewPendingPayoutTarget);
+      
+      $(`#downvote-${this.idValue}`).modal('hide');
+    });
+  }
 }
