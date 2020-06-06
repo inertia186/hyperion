@@ -104,7 +104,7 @@ class PostsController < ApplicationController
     
     respond_to do |format|
       format.html {
-        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
       }
       format.js {
         index # to pick up current version of @all_posts
@@ -119,7 +119,7 @@ class PostsController < ApplicationController
     
     respond_to do |format|
       format.html {
-        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
       }
       format.js {
         index # to pick up current version of @all_posts
@@ -144,7 +144,7 @@ class PostsController < ApplicationController
       end
     end
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def toggle_mutes
@@ -156,7 +156,7 @@ class PostsController < ApplicationController
       current_account.refresh_muted_authors
     end
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def toggle_only_favorite_tags
@@ -164,7 +164,7 @@ class PostsController < ApplicationController
     
     session[:only_favorite_tags] = !session[:only_favorite_tags]
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def ignore_all
@@ -175,14 +175,14 @@ class PostsController < ApplicationController
       current_account.ignored_tags.create(tag: tag)
     end
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag, only_ignored: true)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern, only_ignored: true)
   end
   
   def clear_read
     read_params
     clear_read_posts
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def clear_ignored_tags
@@ -196,7 +196,7 @@ class PostsController < ApplicationController
       current_account.ignored_tags.destroy_all
     end
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def clear_past_tags
@@ -209,7 +209,7 @@ class PostsController < ApplicationController
       current_account.past_tags.destroy_all
     end
     
-    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+    redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
   end
   
   def clear_past_tag
@@ -219,12 +219,15 @@ class PostsController < ApplicationController
       format.html {
         read_params
         
-        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag)
+        redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
       }
       format.js {
         head :accepted
       }
     end
+  end
+  
+  def new_saved_query
   end
 private
   def read_params
@@ -246,7 +249,8 @@ private
     end
     
     @tag = @tag.gsub('+', ' ')
-    @tag, *@other_tags = @tag.split(' ') if @tag.include?(' ')
+    @tag, *@other_tags = @tag.split(' ') + @other_tags if @tag.include?(' ')
+    @other_tags = @other_tags.uniq
     
     @tag = '' if @tag == '-'
     
@@ -259,6 +263,8 @@ private
     @other_tags = @other_tags.select do |tag|
       !tag.starts_with?('-')
     end
+    
+    @tag_pattern = [([@tag] + @other_tags).reject(&:empty?).join('+'), @without_tags].reject(&:empty?).join('+-')
     
     [@tag].flatten.reject(&:empty?).map(&:downcase).each do |tag|
       current_account.past_tags.find_or_create_by(tag: tag)

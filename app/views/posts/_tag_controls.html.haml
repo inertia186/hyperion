@@ -17,7 +17,7 @@
     - if @tag == ''
       .btn.btn-outline-primary.m-2.hidden.disabled= 25.times.map{'&nbsp;'}.join.html_safe
     - else
-      = link_to "Stop Ignoring #{best_tag_name @tag}", clear_ignored_tags_posts_path(allow_tag: @tag, sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-secondary m-2'
+      = link_to "Stop Ignoring #{best_tag_name @tag}", clear_ignored_tags_posts_path(allow_tag: @tag, sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-secondary m-2'
   - else
     = form_tag ignore_all_posts_path, method: :patch, class: 'form-inline', data: {confirm: 'Are you sure?'} do
       = hidden_field_tag :'ignore_tag', @tag, id: nil
@@ -26,46 +26,7 @@
       = hidden_field_tag :tag, @tag, id: nil
       = submit_tag "Ignore all #{best_tag_name @tag}", class: 'btn btn-primary m-2'
   
-  - if @related_tags.any?
-    - word_list = []
-    - maximum_scale = 300.0
-    - scores = related_tag_post_count.values.first(@related_tags.size)
-    - average = scores.sum / scores.size
-    - base_score = 1.5
-    - @related_tags.shuffle.each do |name, tag|
-      - text_decoration = 'none'
-      - if ignored_tags.include? tag
-        - text_decoration = 'line-through'
-      
-      - weight = [((related_tag_post_count[tag].to_f / average) / base_score) * 50.0, maximum_scale].min
-      -# - title = {related_tag_post_count: related_tag_post_count[tag], maximum_scale: maximum_scale, average: average, weight: weight}.to_json
-      - title = nil
-      - word_list << [link_to(name, posts_tagged_path(sort: @sort, limit: @limit, tag: [@tag, tag].reject(&:empty?).join('+')), title: title, style: "font-size: #{'%.1f' % weight}%; overflow: hidden; position: relative; margin: 20px auto; padding: 0; text-decoration: #{text_decoration}"), weight]
-    
-    %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#related-tags'}}
-      Related Tags / Categories
-    
-    .modal.fade#related-tags
-      .modal-dialog.modal-lg
-        .modal-content
-          .modal-header
-            %h5.modal-title
-              - if @tag.present?
-                Tags / Categories Related to
-                = best_tag_name @tag
-              - else
-                Related Tags / Categories
-            %button.close{type: 'button', data: {dismiss: 'modal'}}
-              %span &times;
-          .modal-body
-            - word_list.each do |link, weight|
-              = link.html_safe
-          .modal-footer
-            %small
-              Showing
-              = @related_tags.size
-              out of
-              = pluralize Tag.distinct.count(:tag), 'tag'
+  = render partial: 'tag_cloud', locals: {tags: @related_tags}
   
   - if current_account.past_tags.any?
     %button.btn.btn.btn-dark.m-2{data: {controller: 'past-tags', toggle: 'modal', target: '#past-tags', action: 'past-tags#refreshTags'}}
@@ -83,9 +44,9 @@
             .btn.btn-sm.btn-outline-dark.m-1
               = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: '-'), class: 'btn-tag-text' do
                 &lt;All Tags&gt;
-            - past_tags = current_account.past_tags.pluck(:tag)
-            - past_tags.each do |tag|
-              - name = best_tag_name(tag)
+            - past_tags = current_account.past_tags.includes(:community).pluck(:title, :tag)
+            - past_tags.each do |title, tag|
+              - name = title || tag
               - btn_class = if name.downcase == tag.downcase
                 - if ignored_tags.include? tag
                   - 'btn-outline-secondary strike'
@@ -110,5 +71,5 @@
                     = link_to clear_past_tag_post_path(tag), method: :delete, remote: true, class: 'close-badge-button', 'data-action' => 'ajax:success->past-tags#removeTag' do
                       = icon('x-circle', stroke: 'black')
             - if (past_tags & ignored_tags).any?
-              = link_to 'Clear Ignored Tags', clear_past_tags_posts_path(only_ignored: true, sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-success btn-sm'
-            = link_to 'Clear All Tags', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'
+              = link_to 'Clear Ignored Tags', clear_past_tags_posts_path(only_ignored: true, sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-success btn-sm'
+            = link_to 'Clear All Tags', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'

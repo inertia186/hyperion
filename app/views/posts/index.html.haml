@@ -3,7 +3,7 @@
     = form_tag posts_path, method: :get, class: 'form-inline', style: 'font-size: 0.88rem;' do
       = hidden_field_tag :limit, @limit, id: nil
       .form-group.mx-2
-        %label.mr-2{for: :tag} Tag/Category/Author:
+        %label.mr-2{for: 'tag[]'} Tag/Category/Author:
         - tag_search = @tag.to_s
         - if @other_tags.any?
           - tag_search += ' ' + @other_tags.join(' ')
@@ -11,28 +11,31 @@
           - tag_search += ' -' + @without_tags.join(' -')
         - if @author.present?
           - tag_search += " @#{@author}"
-        -# = text_field_tag :tag, tag_search.strip, class: 'form-control', id: nil
         .select2{'data-controller' => 'search-tags'}
           - tag_searches = tag_search.strip.split(' ')
-          - tags_for_select = tag_searches.map{|t| [best_tag_name(t), t]}
-          - tags_for_select += current_account.past_tags.pluck(:tag).map{|t| [best_tag_name(t), t]}
+          - tags_for_select = current_account.favorite_tags.includes(:community).pluck(:title, :tag).map{|t| [("★ #{t[0] || t[1]}"), t[1]]}
+          - tags_for_select += tag_searches.map{|t| [best_tag_name(t), t]}
+          - tags_for_select += current_account.past_tags.includes(:community).pluck(:title, :tag).map{|t| [t[0] || t[1], t[1]]}
           - tags_for_select += @related_tags.map{|t| [t[0], t[1]]}.sort_by{|v| v[0].downcase}
           - tags_for_select += @related_authors.map{|a| ["@#{a}", "@#{a}"]}
-          - tags_for_select = tags_for_select.select{|t| t[1].to_s.present?}.uniq
-          = select_tag :tag, options_for_select(tags_for_select, tag_searches), class: 'form-control search-tags', size: 1, multiple: 'multiple', 'data-action' => 'change->search-tags#updateToTagOptions'
+          - tags_for_select = tags_for_select.select{|t| t[1].to_s.present?}.uniq{|k, v| v}
+          = select_tag 'tag[]', options_for_select(tags_for_select, tag_searches), class: 'form-control search-tags', size: 1, multiple: 'multiple', 'data-action' => 'change->search-tags#updateToTagOptions'
       .form-group.mx-2
         %label.mr-2{for: :sort} Sort:
         = select_tag :sort, options_for_select([['Latest', 'latest'], ['Oldest', 'oldest'], ['Prolific', 'most_prolific'], ['Non-prolific', 'least_prolific'], ['Most Tags', 'most_tags'], ['Least Tags', 'least_tags']], @sort), class: 'form-control', id: nil
       .form-group.mx-2
         = submit_tag 'Query', class: 'btn btn-primary btn-search'
+      -# TODO
+      -# .form-group.mx-2
+      -#   = link_to 'Save Query', new_saved_query_posts_path, class: 'btn btn-secondary', remote: true
   
   .p-2
-    = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: (@tag.present? ? @tag : '-'), only_read: true) do
+    = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: (@tag.present? ? @tag_pattern : '-'), only_read: true) do
       .btn.btn-primary.mx-2
         Posts read:
         %span.badge.badge-light#read-posts-count= current_account.read_posts.count
     .btn.btn-outline-primary.mx-2
-      = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+      = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
     -# TODO
     -# = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
     -#   .btn.btn-primary.mx-2
@@ -42,7 +45,7 @@
       Ignored tags:
       %span.badge.badge-light#read-posts-count= ignored_tags.size
     .btn.btn-outline-primary.mx-2
-      = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+      = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
 
 .row.d-flex
   .p-2.mr-auto
@@ -79,11 +82,11 @@
           %td.w-auto
             .d-flex
               - if post.readers.include? current_account
-                = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Unread', method: :patch, remote: true, 'data-action' => 'ajax:success->posts#successMarkAsUnread' do
+                = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag_pattern), id: "#mark-as-unread-#{post.to_param}", title: 'Mark as Unread', method: :patch, remote: true, 'data-action' => 'ajax:success->posts#successMarkAsUnread' do
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-default')
                   = icon('x-square', class: 'bi bi-alert-x-square text-info hover-stack hover-stack-hover')
               - else
-                = link_to mark_as_read_post_path(post, sort: @sort, limit: @limit, tag: @tag), title: 'Mark as Read', method: :patch, remote: true, 'data-action' => 'ajax:success->posts#successMarkAsRead' do
+                = link_to mark_as_read_post_path(post, sort: @sort, limit: @limit, tag: @tag_pattern), id: "#mark-as-read-#{post.to_param}", title: 'Mark as Read', method: :patch, remote: true, 'data-action' => 'ajax:success->posts#successMarkAsRead' do
                   = icon('square', class: 'bi bi-alert-square text-info hover-stack hover-stack-default')
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-hover')
           %td.w-auto
@@ -105,8 +108,8 @@
                 = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload rounded-circle', style: 'width: 16px; height: 16px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
               .pl-2
                 - author_text_style = 'width: 100%;'
-                - author_text_style += ' text-decoration: line-through;' if current_account.reload.muted_authors.include? post.author
-                = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag), style: author_text_style do
+                - author_text_style += ' text-decoration: line-through;' if current_account.muted_authors.include? post.author
+                = link_to posts_authored_path(author: post.author, sort: @sort, limit: @limit, tag: @tag_pattern), style: author_text_style do
                   = post.author
           %td.w-auto
             .d-flex

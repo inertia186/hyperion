@@ -1,4 +1,6 @@
 class TagsController < ApplicationController
+  skip_before_action :sign_in, only: :unread_count
+  
   def index
     read_params
     

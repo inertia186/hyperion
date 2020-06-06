@@ -15,6 +15,8 @@ Rails.application.routes.draw do
       patch :toggle_mutes
       patch :toggle_only_favorite_tags
       get :content_loading
+      get :new_saved_query
+      post :create_saved_query
     end
     
     member do

@@ -2,7 +2,7 @@
   = surround '(', ')' do
     = tag_unread_count(@tag, true)
     unread#{@tag.to_s == '' ? ',' : ' in tag,'}
-    - tag = @tag.present? ? @tag : '-'
+    - tag = @tag.present? ? @tag_pattern : '-'
     - ignored_posts_count = Post.active.tagged_any(@tag).where(id: Tag.where(tag: ignored_tags).select(:post_id)).count
     = link_to "#{ignored_posts_count} ignored,", posts_tagged_path(sort: @sort, limit: @limit, tag: tag, only_ignored: true)
     - deleted_posts_count = Post.active.tagged_any(@tag).deleted.count

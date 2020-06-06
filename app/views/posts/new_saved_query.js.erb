@@ -1,0 +1,19 @@
+<% ref = URI.parse(request.referrer) %>
+var path = '<%= ref.path %>';
+var query = '<%= ref.query %>';
+var saved_query_name = '';
+
+while ( saved_query_name == '' ) {
+  saved_query_name = prompt('Query Name', '');
+}
+
+if ( saved_query_name != null ) {
+  Rails.ajax({
+    type: 'post',
+    url: '<%= create_saved_query_posts_path %>',
+    // TODO add post data
+    success: (result) => {
+      window.location = '<%= posts_path %>';
+    }
+  });
+}

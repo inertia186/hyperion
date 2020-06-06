@@ -1,0 +1,40 @@
+- if tags.any?
+  - word_list = []
+  - maximum_scale = 300.0
+  - scores = related_tag_post_count.values.first(tags.size)
+  - average = scores.sum / scores.size
+  - base_score = 1.5
+  - tags.shuffle.each do |name, tag|
+    - text_decoration = 'none'
+    - if ignored_tags.include? tag
+      - text_decoration = 'line-through'
+    
+    - weight = [((related_tag_post_count[tag].to_f / average) / base_score) * 50.0, maximum_scale].min
+    -# - title = {related_tag_post_count: related_tag_post_count[tag], maximum_scale: maximum_scale, average: average, weight: weight}.to_json
+    - title = nil
+    - word_list << [link_to(name, posts_tagged_path(sort: @sort, limit: @limit, tag: [@tag, tag].reject(&:empty?).join('+')), title: title, style: "font-size: #{'%.1f' % weight}%; overflow: hidden; position: relative; margin: 20px auto; padding: 0; text-decoration: #{text_decoration}"), weight]
+  
+  %button.btn.btn.btn-dark.m-2{data: {toggle: 'modal', target: '#related-tags'}}
+    Related Tags / Categories
+  
+  .modal.fade#related-tags
+    .modal-dialog.modal-lg
+      .modal-content
+        .modal-header
+          %h5.modal-title
+            - if @tag.present?
+              Tags / Categories Related to
+              = best_tag_name @tag
+            - else
+              Related Tags / Categories
+          %button.close{type: 'button', data: {dismiss: 'modal'}}
+            %span &times;
+        .modal-body
+          - word_list.each do |link, weight|
+            = link.html_safe
+        .modal-footer
+          %small
+            Showing
+            = tags.size
+            out of
+            = pluralize Tag.distinct.count(:tag), 'tag'
