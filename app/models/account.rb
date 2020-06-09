@@ -13,17 +13,28 @@ class Account < ApplicationRecord
   
   validates_uniqueness_of :name
   
-  def self.public_keys(names)
+  def self.public_keys(names, role = nil)
     names = [names].flatten
     public_keys = []
     
     with_simple_failover do
       database_api.find_accounts(accounts: names) do |result|
         result.accounts.each do |account|
-          public_keys += account.owner.key_auths.map{|k| k[0]}
-          public_keys += account.active.key_auths.map{|k| k[0]}
-          public_keys += account.posting.key_auths.map{|k| k[0]}
-          public_keys << account.memo_key
+          if role.nil? || role == :owner
+            public_keys += account.owner.key_auths.map{|k| k[0]}
+          end
+          
+          if role.nil? || role == :active
+            public_keys += account.active.key_auths.map{|k| k[0]}
+          end
+          
+          if role.nil? || role == :posting
+            public_keys += account.posting.key_auths.map{|k| k[0]}
+          end
+          
+          if role.nil? || role == :memo
+            public_keys << account.memo_key
+          end
         end
       end
     end
@@ -63,16 +74,16 @@ class Account < ApplicationRecord
     count = -1
     
     Account::with_simple_failover do
-    until count == muted_authors.size
-      count = muted_authors.size
+      until count == muted_authors.size
+        count = muted_authors.size
         Account::api.get_following(name, muted_authors.last, 'ignore', 1000) do |result|
-        self.muted_authors += result.map &:following
-        self.muted_authors = muted_authors.uniq
+          self.muted_authors += result.map &:following
+          self.muted_authors = muted_authors.uniq
           
-        sleep 0.1
+          sleep 0.1
+        end
       end
     end
-  end
     
     return muted_authors
   end
