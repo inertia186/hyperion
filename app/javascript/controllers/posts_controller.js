@@ -401,6 +401,9 @@ export default class extends Controller {
   upvote(e) {
     var voter = $('#current-account').data('name');
     var weight = parseInt($(`#upvote-${this.idValue} input`).val()) * 100;
+    var label = $(e.target);
+    
+    label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
     hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
       this.refrestVoteCount();
@@ -408,12 +411,16 @@ export default class extends Controller {
       this.refreshPendingPayout(this.previewPendingPayoutTarget);
       
       $(`#upvote-${this.idValue}`).modal('hide');
+      label.html('Vote');
     });
   }
 
   downvote(e) {
     var voter = $('#current-account').data('name');
     var weight = parseInt($(`#downvote-${this.idValue} input`).val()) * 100;
+    var label = $(e.target);
+    
+    label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
     hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
       this.refrestVoteCount();
@@ -421,6 +428,7 @@ export default class extends Controller {
       this.refreshPendingPayout(this.previewPendingPayoutTarget);
       
       $(`#downvote-${this.idValue}`).modal('hide');
+      label.html('Vote');
     });
   }
 }
