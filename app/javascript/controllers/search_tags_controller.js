@@ -11,15 +11,18 @@ export default class extends Controller {
   static values = {
     tagsSearchPath: String
   }
-  connect() {
+  
+  initialize() {
     $('.search-tags').select2({
       tags: true,
       tokenSeparators: [',', ' ']
     });
-    
+  }
+  
+  connect() {
     $('.search-tags').on('keypress', function (e) {
       if (e.keyCode === 13) {
-        $(this).closest('form').submit();
+        $(e.target).closest('form').submit();
       }
     });
     
