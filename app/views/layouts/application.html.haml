@@ -14,29 +14,16 @@
   %body.disabled-overlay{data: {controller: 'hyperion'}}
     .d-flex.float-right
       .ml-auto.p-2
-        - if !!current_account
+        - if !!current_account && controller_name == 'posts'
           .float-right
-            = link_to posts_authored_path author: current_account.name do
-              = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
-            = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
-              Log Out
-              = icon('box-arrow-right')
-        
-            = form_tag toggle_mutes_posts_path, method: :patch, class: 'form-inline' do
-              = hidden_field_tag :sort, @sort, id: nil
-              = hidden_field_tag :limit, @limit, id: nil
-              = hidden_field_tag :tag, @tag, id: nil
-              .custom-control.custom-switch
-                %input#toggle-mutes.custom-control-input{checked: !!session[:muted_authors_enabled], type: 'checkbox', data: {action: 'hyperion#toggleMuted'}}
-                %label.custom-control-label{for: 'toggle-mutes'} Enable Mute
-
-            = form_tag toggle_only_favorite_tags_posts_path, method: :patch, class: 'form-inline' do
-              = hidden_field_tag :sort, @sort, id: nil
-              = hidden_field_tag :limit, @limit, id: nil
-              = hidden_field_tag :tag, @tag, id: nil
-              .custom-control.custom-switch
-                %input#toggle-only-favorite-tags.custom-control-input{checked: !!session[:only_favorite_tags], type: 'checkbox', data: {action: 'hyperion#toggleOnlyFavoriteTags'}}
-                %label.custom-control-label{for: 'toggle-only-favorite-tags'} Only Favorite Tags
+            - if !!current_account
+              = link_to posts_authored_path author: current_account.name do
+                = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
+                = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
+                  Log Out
+                  = icon('box-arrow-right')
+            - if controller_name == 'posts'
+              .px-4= render partial: 'dashboard/posts_nav'
 
         -# .p-4= render partial: 'dashboard/quick_stats'
 

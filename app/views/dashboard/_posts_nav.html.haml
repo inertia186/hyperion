@@ -1,0 +1,36 @@
+.row
+  = form_tag toggle_mutes_posts_path, method: :patch, class: 'form-inline' do
+    = hidden_field_tag :sort, @sort, id: nil
+    = hidden_field_tag :limit, @limit, id: nil
+    = hidden_field_tag :tag, @tag, id: nil
+    .custom-control.custom-switch
+      %input#toggle-mutes.custom-control-input{checked: !!session[:muted_authors_enabled], type: 'checkbox', data: {action: 'hyperion#toggleMuted'}}
+      %label.custom-control-label{for: 'toggle-mutes'} Enable Mute
+
+.row
+  = form_tag toggle_only_favorite_tags_posts_path, method: :patch, class: 'form-inline' do
+    = hidden_field_tag :sort, @sort, id: nil
+    = hidden_field_tag :limit, @limit, id: nil
+    = hidden_field_tag :tag, @tag, id: nil
+    .custom-control.custom-switch
+      %input#toggle-only-favorite-tags.custom-control-input{checked: !!session[:only_favorite_tags], type: 'checkbox', data: {action: 'hyperion#toggleOnlyFavoriteTags'}}
+      %label.custom-control-label{for: 'toggle-only-favorite-tags'} Only Favorite Tags
+
+.row.p-2
+  .btn-group-vertical
+    = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: (@tag.present? ? @tag_pattern : '-'), only_read: true), class: 'btn btn-primary' do
+      Posts read:
+      %span.badge.badge-light#read-posts-count= current_account.read_posts.count
+    .btn.btn-outline-primary
+      = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
+
+    -# TODO
+    -# = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE), class: 'btn btn-primary' do
+    -#   Ignored tags:
+    -#   %span.badge.badge-light#read-posts-count= ignored_tags.size
+    .my-2
+    .btn.btn-primary
+      Ignored tags:
+      %span.badge.badge-light#read-posts-count= ignored_tags.size
+    .btn.btn-outline-primary
+      = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'

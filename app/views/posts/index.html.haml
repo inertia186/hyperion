@@ -29,24 +29,6 @@
       -# .form-group.mx-2
       -#   = link_to 'Save Query', new_saved_query_posts_path, class: 'btn btn-secondary', remote: true
   
-  .p-2
-    = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: (@tag.present? ? @tag_pattern : '-'), only_read: true) do
-      .btn.btn-primary.mx-2
-        Posts read:
-        %span.badge.badge-light#read-posts-count= current_account.read_posts.count
-    .btn.btn-outline-primary.mx-2
-      = link_to 'Clear', clear_read_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
-    -# TODO
-    -# = link_to tags_by_type_path(sort: 'latest', limit: 30, type: AccountTag::IGNORED_TYPE) do
-    -#   .btn.btn-primary.mx-2
-    -#     Ignored tags:
-    -#     %span.badge.badge-light#read-posts-count= ignored_tags.size
-    .btn.btn-primary.mx-2
-      Ignored tags:
-      %span.badge.badge-light#read-posts-count= ignored_tags.size
-    .btn.btn-outline-primary.mx-2
-      = link_to 'Clear', clear_ignored_tags_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'list-group-item-action'
-
 .row.d-flex
   .p-2.mr-auto
     %h4
