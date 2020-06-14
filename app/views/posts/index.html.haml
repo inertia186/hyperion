@@ -55,7 +55,7 @@
 - if @posts.none?
   = render partial: 'emptiness'
 
-.table-responsive-sm#posts
+.table#posts
   %table.table-sm
     %tbody
       - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
