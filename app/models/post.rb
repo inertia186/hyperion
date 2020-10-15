@@ -184,12 +184,32 @@ class Post < ApplicationRecord
   # condenser_api method is a good fit because we can request with a truncate
   # body of zero.
   def in_blog?(limit = 100)
-    # Temporarily disable this method call.  There seems to be a problem with
-    # the hivemind index.
-    return false
-    
     begin
-      Post::api.get_discussions_by_blog(tag: author, limit: limit, truncate_body: 0) do |blog|
+      # This will quickly scan a bit of account history for the timestamp we're
+      # looking for and return early.  But not all nodes run this, so we have a
+      # fallback method.
+      Post::account_history_api.get_account_history(account: author, start: -1, limit: limit) do |result|
+        result.history.each do |idx, trx|
+          op_type = trx.op.type
+          
+          next unless op_type == 'comment_operation'
+          
+          op_value = trx.op.value
+          
+          next unless op_value.author == author
+          next unless op_value.permlink == permlink
+          
+          timestamp = Time.parse(trx.timestamp + 'Z')
+          
+          return (created_at - timestamp).abs < 60 # It's ok if we drift into the stuffle window.
+        end
+      end
+      
+      # Temporarily disable this fallback method call.  There seems to be a
+      # problem with the hivemind index.
+      return false
+      
+      Post::api.get_discussions_by_blog(tag: author, limit: [100, limit].min, truncate_body: 0) do |blog|
         blog.each do |comment|
           comment_created = Time.parse(comment.created + 'Z')
           

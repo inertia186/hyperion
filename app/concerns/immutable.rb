@@ -28,6 +28,10 @@ module Immutable
     @api ||= Hive::Api.new(url: DEFAULT_NODE_URLS.sample)
   end
 
+  def account_history_api
+    @account_history_api ||= Hive::AccountHistoryApi.new(url: DEFAULT_NODE_URLS.sample)
+  end
+
   def database_api
     @database_api ||= Hive::DatabaseApi.new(url: DEFAULT_NODE_URLS.sample)
   end

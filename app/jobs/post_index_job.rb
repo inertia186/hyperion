@@ -58,7 +58,6 @@ class PostIndexJob < ApplicationJob
           comment_batch = {}
           delete_comments = []
           mutes = []
-          blog_history_limit = (Time.now - timestamp < 60) ? 1 : 100
           
           transactions.each_with_index do |trx, index|
             trx_id = block.transaction_ids[index]
@@ -95,7 +94,7 @@ class PostIndexJob < ApplicationJob
             end.compact
           end
           
-          process_comments(comment_batch, block_num, timestamp, blog_history_limit, overdue_catch_up)
+          process_comments(comment_batch, block_num, timestamp, overdue_catch_up)
           process_delete_comments(delete_comments, timestamp)
           process_mutes(mutes)
         end
@@ -103,7 +102,7 @@ class PostIndexJob < ApplicationJob
     end
   end
   
-  def process_comments(comment_batch, block_num, timestamp, blog_history_limit, overdue_catch_up = false)
+  def process_comments(comment_batch, block_num, timestamp, overdue_catch_up = false)
     comment_batch.each do |trx_id, comments|
       comments.each do |comment|
         comment_params = comment.slice('title', 'body')
@@ -126,16 +125,11 @@ class PostIndexJob < ApplicationJob
           
           post.fetch_latest
           post.save
-        elsif overdue_catch_up
-          # We might end up with a few duplicate posts from edits, but it's
-          # faster to do this if we're trying to catch up.
-          
-          Rails.logger.info "[#{post.author}] - Catching up."
-        elsif !post.in_blog?(blog_history_limit)
-          if blog_history_limit == 1
-            Rails.logger.info "[#{post.author}] - Not in the last blog entry.  Fetching latest ..."
+        elsif !post.in_blog?(overdue_catch_up ? 1000 : 100)
+          if overdue_catch_up
+            Rails.logger.info "[#{post.author}] - Not in the last blog entry (trying to catch up).  Fetching latest ..."
           else
-            Rails.logger.info "[#{post.author}] - Not in the last #{blog_history_limit} blog entries.  Fetching latest ..."
+            Rails.logger.info "[#{post.author}] - Not in the last blog entry.  Fetching latest ..."
           end
           
           # Attempt to determine if this post is in the latest blog for
