@@ -4,7 +4,7 @@ class PostIndexJob < ApplicationJob
   extend Immutable
   extend Memoist
   
-  DEPLORABLES = %w(crystalliu anfeng)
+  DEPLORABLES = %w(crystalliu anfeng nchain)
   
   queue_as :default
   
@@ -13,6 +13,7 @@ class PostIndexJob < ApplicationJob
     https://rpc.ausbit.dev)
   BLOCK_INTERVAL_SEC = 3
   BLOCK_INTERVAL_7_DAYS = (Time.now.utc - 7.days.ago) / BLOCK_INTERVAL_SEC
+  BLOCK_INTERVAL_DAY = (Time.now.utc - 1.day.ago) / BLOCK_INTERVAL_SEC
   MAX_TAGS = 50
   
   def perform(*args)
@@ -30,6 +31,9 @@ class PostIndexJob < ApplicationJob
     else
       Rails.logger.info "Skipping #{start_block_num - maximum_block_num} blocks (too old to index)."
     end
+    
+    # Over one day of catch-up, don't bother to check with "in_blog?"" method.
+    overdue_catch_up = head_block_num - start_block_num > BLOCK_INTERVAL_DAY
     
     Rails.logger.info "Starting on block_num: #{start_block_num}"
     Rails.logger.info "Blacklist size: #{blacklist(true).size}" # reload blacklist
@@ -88,7 +92,7 @@ class PostIndexJob < ApplicationJob
             end.compact
           end
           
-          process_comments(comment_batch, block_num, timestamp, blog_history_limit)
+          process_comments(comment_batch, block_num, timestamp, blog_history_limit, overdue_catch_up)
           process_delete_comments(delete_comments, timestamp)
           process_mutes(mutes)
         end
@@ -96,7 +100,7 @@ class PostIndexJob < ApplicationJob
     end
   end
   
-  def process_comments(comment_batch, block_num, timestamp, blog_history_limit)
+  def process_comments(comment_batch, block_num, timestamp, blog_history_limit, overdue_catch_up = false)
     comment_batch.each do |trx_id, comments|
       comments.each do |comment|
         comment_params = comment.slice('title', 'body')
@@ -119,6 +123,11 @@ class PostIndexJob < ApplicationJob
           
           post.fetch_latest
           post.save
+        elsif overdue_catch_up
+          # We might end up with a few duplicate posts from edits, but it's
+          # faster to do this if we're trying to catch up.
+          
+          Rails.logger.info "[#{post.author}] - Catching up."
         elsif !post.in_blog?(blog_history_limit)
           if blog_history_limit == 1
             Rails.logger.info "[#{post.author}] - Not in the last blog entry.  Fetching latest ..."
