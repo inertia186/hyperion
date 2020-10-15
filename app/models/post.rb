@@ -184,6 +184,10 @@ class Post < ApplicationRecord
   # condenser_api method is a good fit because we can request with a truncate
   # body of zero.
   def in_blog?(limit = 100)
+    # Temporarily disable this method call.  There seems to be a problem with
+    # the hivemind index.
+    return false
+    
     begin
       Post::api.get_discussions_by_blog(tag: author, limit: limit, truncate_body: 0) do |blog|
         blog.each do |comment|
