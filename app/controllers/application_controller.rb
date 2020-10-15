@@ -3,7 +3,7 @@ require 'open-uri'
 class ApplicationController < ActionController::Base
   include Pagy::Backend
   
-  DEFAULT_NODE_URLS = %w(https://api.openhive.network http://anyx.io)
+  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.openhive.network,http://anyx.io').split(',')
   
   helper_method :current_account
   helper_method :post_to_slug

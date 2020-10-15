@@ -8,9 +8,7 @@ class PostIndexJob < ApplicationJob
   
   queue_as :default
   
-  DEFAULT_NODE_URLS = %w(https://api.openhive.network https://api.hive.blog
-    http://anyx.io https://api.hivekings.com https://hived.privex.io
-    https://rpc.ausbit.dev)
+  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.openhive.network,https://api.hive.blog,http://anyx.io,https://api.hivekings.com,https://hived.privex.io,https://rpc.ausbit.dev').split(',')
   HIVE_MAX_WITNESSES = 21
   BLOCK_INTERVAL_SEC = 3
   BLOCK_INTERVAL_7_DAYS = (Time.now.utc - 7.days.ago) / BLOCK_INTERVAL_SEC
@@ -98,6 +96,12 @@ class PostIndexJob < ApplicationJob
           process_delete_comments(delete_comments, timestamp)
           process_mutes(mutes)
         end
+      end
+    rescue Hive::UnknownError => e
+      if e.to_s.include? 'Request Entity Too Large'
+        
+        Hive::BlockApi.const_set 'MAX_RANGE_SIZE', 1
+        throw :retry
       end
     end
   end

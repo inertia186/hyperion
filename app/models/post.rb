@@ -154,6 +154,25 @@ class Post < ApplicationRecord
   
   def fetch_latest
     Post::with_simple_failover do
+      comment_found = false
+      
+      Post::bridge.get_discussion(author: author, permlink: permlink) do |result|
+        comment = result["#{author}/#{permlink}"]
+        
+        self.body = comment.body
+        self.metadata = comment.json_metadata
+        
+        # Also ensure this really is an edit for this payout window.  Some
+        # authors go back and edit their content. which will look like a whole
+        # new post, if we're not careful.
+        self.created_at = Time.parse(comment.created + 'Z')
+        comment_found = true
+      end
+      
+      # Fallback
+      
+      next if !!comment_found
+      
       Post::database_api.list_comments(start: [author, permlink], limit: 1, order: 'by_permlink') do |result|
         if result.nil?
           Rails.logger.warn 'Invalid response from list_comments, retrying ...'

@@ -1,7 +1,7 @@
 module Immutable
   extend ActiveSupport::Concern
 
-  DEFAULT_NODE_URLS = %w(https://api.openhive.network)
+  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.openhive.network').split(',')
   MAX_RETRY = 10
   MAX_BACKOFF_SEC = 30.0
 
@@ -24,6 +24,10 @@ module Immutable
     end; end
   end
 
+  def bridge
+    @bridge ||= Hive::Bridge.new(url: DEFAULT_NODE_URLS.sample)
+  end
+
   def api
     @api ||= Hive::Api.new(url: DEFAULT_NODE_URLS.sample)
   end
@@ -41,6 +45,6 @@ module Immutable
   end
   
   def api_reset
-    @api = @database_api = stream = nil
+    @bridge = @api = @account_history_api = @database_api = stream = nil
   end
 end
