@@ -11,9 +11,11 @@ class PostIndexJob < ApplicationJob
   DEFAULT_NODE_URLS = %w(https://api.openhive.network https://api.hive.blog
     http://anyx.io https://api.hivekings.com https://hived.privex.io
     https://rpc.ausbit.dev)
+  HIVE_MAX_WITNESSES = 21
   BLOCK_INTERVAL_SEC = 3
   BLOCK_INTERVAL_7_DAYS = (Time.now.utc - 7.days.ago) / BLOCK_INTERVAL_SEC
   BLOCK_INTERVAL_DAY = (Time.now.utc - 1.day.ago) / BLOCK_INTERVAL_SEC
+  BLOCK_INTERVAL_SHUFFLE_WINDOW = BLOCK_INTERVAL_SEC * HIVE_MAX_WITNESSES
   MAX_TAGS = 50
   
   def perform(*args)
@@ -32,9 +34,6 @@ class PostIndexJob < ApplicationJob
       Rails.logger.info "Skipping #{start_block_num - maximum_block_num} blocks (too old to index)."
     end
     
-    # Over one day of catch-up, don't bother to check with "in_blog?"" method.
-    overdue_catch_up = head_block_num - start_block_num > BLOCK_INTERVAL_DAY
-    
     Rails.logger.info "Starting on block_num: #{start_block_num}"
     Rails.logger.info "Blacklist size: #{blacklist(true).size}" # reload blacklist
     
@@ -47,6 +46,10 @@ class PostIndexJob < ApplicationJob
           PostIndexJob::api_reset
           throw :retry
         end
+        
+        # Over one shuffle window of catch-up, don't bother to check with
+        # "in_blog?"" method.
+        overdue_catch_up = head_block_num - block_num > BLOCK_INTERVAL_SHUFFLE_WINDOW
         
         Post.transaction do
           start_block_num = block_num
