@@ -156,17 +156,23 @@ class Post < ApplicationRecord
     Post::with_simple_failover do
       comment_found = false
       
-      Post::bridge.get_discussion(author: author, permlink: permlink) do |result|
-        comment = result["#{author}/#{permlink}"]
+      begin
+        Post::bridge.get_discussion(author: author, permlink: permlink) do |result|
+          comment = result["#{author}/#{permlink}"]
+          
+          self.body = comment.body
+          self.metadata = comment.json_metadata
+          
+          # Also ensure this really is an edit for this payout window.  Some
+          # authors go back and edit their content. which will look like a whole
+          # new post, if we're not careful.
+          self.created_at = Time.parse(comment.created + 'Z')
+          comment_found = true
+        end
+      rescue Hive::ArgumentError => e
+        # Post might be deleted.
         
-        self.body = comment.body
-        self.metadata = comment.json_metadata
-        
-        # Also ensure this really is an edit for this payout window.  Some
-        # authors go back and edit their content. which will look like a whole
-        # new post, if we're not careful.
-        self.created_at = Time.parse(comment.created + 'Z')
-        comment_found = true
+        return
       end
       
       # Fallback
