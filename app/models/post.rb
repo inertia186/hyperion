@@ -160,6 +160,9 @@ class Post < ApplicationRecord
         Post::bridge.get_discussion(author: author, permlink: permlink) do |result|
           comment = result["#{author}/#{permlink}"]
           
+          # Post might be deleted or not indexed yet.
+          return if comment.nil?
+          
           self.body = comment.body
           self.metadata = comment.json_metadata
           
