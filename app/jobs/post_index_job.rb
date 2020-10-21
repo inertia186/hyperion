@@ -120,7 +120,12 @@ class PostIndexJob < ApplicationJob
         post = Post.find_or_initialize_by(comment.slice('author', 'permlink'))
         post.update(comment_params)
         
-        if post.body =~ Post::DIFF_MATCH_PATCH_PATTERN
+        if post.body.nil?
+          Rails.logger.info "[#{post.author}] - Fixing previous fetch.  Fetching latest ..."
+          
+          post.fetch_latest
+          post.save
+        elsif post.body =~ Post::DIFF_MATCH_PATCH_PATTERN
           Rails.logger.info "[#{post.author}] - Looks like an edit.  Fetching latest ..."
           
           # Detect if the body contains an edit.  Need to fetch the full
