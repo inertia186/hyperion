@@ -7,10 +7,14 @@
   .col-4
     = form_tag sessions_path, remote: true, 'data-controller' => 'sessions', 'data-action' => 'ajax:success->sessions#beginLogin' do
       .form-group
-        = label_tag :account_name, 'Account Name', class: 'col-form-label'
-        = text_field_tag :account_name, @account_name, class: 'form-control'
+        .form-row
+          .col-12
+            = label_tag :account_name, 'Account Name', class: 'col-form-label mb-2'
+            = text_field_tag :account_name, @account_name, class: 'form-control mb-2'
       .form-group
-        = submit_tag 'Login with Hive Keychain', class: 'form-control btn btn-lg btn-primary'
+        .form-row
+          .mx-auto= image_submit_tag image_url('hive-keychain.png'), style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
+          .mx-auto= image_submit_tag image_url('hivesigner.svg'), name: 'hivesigner', style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
     
     #success-alert.alert.alert-primary{style: 'display: none;'}
     #error-alert.alert.alert-danger{style: 'display: none;'}
