@@ -154,6 +154,7 @@ class PostsController < ApplicationController
       # Do this inline to ensure we have the latest mute list for this author,
       # even though it might be a little slow.
       current_account.refresh_muted_authors
+      current_account.save
     end
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
