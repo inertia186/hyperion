@@ -1,7 +1,11 @@
 Rails.application.routes.draw do
   resources :sessions, only: %i(new create destroy) do
+    collection do
+      get :authorized # hivesigner
+    end
+    
     member do
-      get :authorized
+      get :authorized # hive keychain
     end
   end
   
