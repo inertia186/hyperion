@@ -405,16 +405,30 @@ export default class extends Controller {
     
     label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
-    hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
-      setTimeout(() => {
-      this.refrestVoteCount();
-      this.refreshPendingPayout(this.pendingPayoutTarget);
-      this.refreshPendingPayout(this.previewPendingPayoutTarget);
-      }, 10000);
-      
-      $(`#upvote-${this.idValue}`).modal('hide');
-      label.html('Vote');
-    });
+    if ( !!hivesignerAccessToken ) {
+      window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${weight}`)
+      window.addEventListener('focus', () => {
+        setTimeout(() => {
+          this.refrestVoteCount();
+          this.refreshPendingPayout(this.pendingPayoutTarget);
+          this.refreshPendingPayout(this.previewPendingPayoutTarget);
+        }, 10000);
+        
+        $(`#upvote-${this.idValue}`).modal('hide');
+        label.html('Vote');
+      });
+    } else {
+      hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
+        setTimeout(() => {
+          this.refrestVoteCount();
+          this.refreshPendingPayout(this.pendingPayoutTarget);
+          this.refreshPendingPayout(this.previewPendingPayoutTarget);
+        }, 10000);
+        
+        $(`#upvote-${this.idValue}`).modal('hide');
+        label.html('Vote');
+      });
+    }
   }
 
   downvote(e) {
@@ -424,15 +438,29 @@ export default class extends Controller {
     
     label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
-    hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
-      setTimeout(() => {
-      this.refrestVoteCount();
-      this.refreshPendingPayout(this.pendingPayoutTarget);
-      this.refreshPendingPayout(this.previewPendingPayoutTarget);
-      }, 10000);
-      
-      $(`#downvote-${this.idValue}`).modal('hide');
-      label.html('Vote');
-    });
+    if ( !!hivesignerAccessToken ) {
+      window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${-weight}`)
+      window.addEventListener('focus', () => {
+        setTimeout(() => {
+          this.refrestVoteCount();
+          this.refreshPendingPayout(this.pendingPayoutTarget);
+          this.refreshPendingPayout(this.previewPendingPayoutTarget);
+        }, 10000);
+        
+        $(`#downvote-${this.idValue}`).modal('hide');
+        label.html('Vote');
+      });
+    } else {
+      hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
+        setTimeout(() => {
+          this.refrestVoteCount();
+          this.refreshPendingPayout(this.pendingPayoutTarget);
+          this.refreshPendingPayout(this.previewPendingPayoutTarget);
+        }, 10000);
+        
+        $(`#downvote-${this.idValue}`).modal('hide');
+        label.html('Vote');
+      });
+    }
   }
 }
