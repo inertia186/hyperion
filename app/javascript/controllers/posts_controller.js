@@ -406,9 +406,11 @@ export default class extends Controller {
     label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
     hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
+      setTimeout(() => {
       this.refrestVoteCount();
       this.refreshPendingPayout(this.pendingPayoutTarget);
       this.refreshPendingPayout(this.previewPendingPayoutTarget);
+      }, 10000);
       
       $(`#upvote-${this.idValue}`).modal('hide');
       label.html('Vote');
@@ -423,9 +425,11 @@ export default class extends Controller {
     label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
     
     hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
+      setTimeout(() => {
       this.refrestVoteCount();
       this.refreshPendingPayout(this.pendingPayoutTarget);
       this.refreshPendingPayout(this.previewPendingPayoutTarget);
+      }, 10000);
       
       $(`#downvote-${this.idValue}`).modal('hide');
       label.html('Vote');
