@@ -17,16 +17,16 @@
   %body.disabled-overlay{data: {controller: 'hyperion'}}
     .container-fluid
       .row
-        .col-9
-          = yield
-        .col-3
-          .nav.navbar.navbar-expand-lg.navbar-light
-            %button.navbar-toggler{type: 'button', data: {toggle: 'collapse', target: '#navbarSupportedContent'}}
-              %span.navbar-toggler-icon
-            .collapse.navbar-collapse#navbarSupportedContent
-              %ul.navbar-nav.mr-auto
-                %li.nav-item.active
-                  - if !!current_account && controller_name == 'posts'
+        - if !!current_account && controller_name == 'posts'
+          .col-9
+            = yield
+          .col-3
+            .nav.navbar.navbar-expand-lg.navbar-light
+              %button.navbar-toggler{type: 'button', data: {toggle: 'collapse', target: '#navbarSupportedContent'}}
+                %span.navbar-toggler-icon
+              .collapse.navbar-collapse#navbarSupportedContent
+                %ul.navbar-nav.mr-auto
+                  %li.nav-item.active
                     - if !!current_account
                       = link_to posts_authored_path author: current_account.name do
                         = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
@@ -37,6 +37,9 @@
                       .px-4= render partial: 'dashboard/posts_nav'
                   
                   -# .p-4= render partial: 'dashboard/quick_stats'
+        - else
+          .col-12
+            = yield
         .global-spinner{style: 'display: none;'}
       
       .modal#help
