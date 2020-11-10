@@ -15,31 +15,35 @@
     = stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload'
     = javascript_pack_tag 'application', 'data-turbolinks-track': 'reload'
   %body.disabled-overlay{data: {controller: 'hyperion'}}
-    .d-flex.float-right
-      .ml-auto.p-2
-        - if !!current_account && controller_name == 'posts'
-          .float-right
-            - if !!current_account
-              = link_to posts_authored_path author: current_account.name do
-                = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
-                = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
-                  Log Out
-                  = icon('box-arrow-right')
-            - if controller_name == 'posts'
-              .px-4= render partial: 'dashboard/posts_nav'
-
-        -# .p-4= render partial: 'dashboard/quick_stats'
-
-    .container
+    .container-fluid
       .row
-        .col-12
+        .col-9
           = yield
+        .col-3
+          .nav.navbar.navbar-expand-lg.navbar-light
+            %button.navbar-toggler{type: 'button', data: {toggle: 'collapse', target: '#navbarSupportedContent'}}
+              %span.navbar-toggler-icon
+            .collapse.navbar-collapse#navbarSupportedContent
+              %ul.navbar-nav.mr-auto
+                %li.nav-item.active
+                  - if !!current_account && controller_name == 'posts'
+                    - if !!current_account
+                      = link_to posts_authored_path author: current_account.name do
+                        = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
+                        = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
+                          Log Out
+                          = icon('box-arrow-right')
+                    - if controller_name == 'posts'
+                      .px-4= render partial: 'dashboard/posts_nav'
+                  
+                  -# .p-4= render partial: 'dashboard/quick_stats'
         .global-spinner{style: 'display: none;'}
+      
       .modal#help
         .modal-dialog
           .modal-content
             .modal-body.btn.btn-dark= render partial: '/shared/help_table'
-
+    
     - unless controller_name == 'sessions'
       = link_to '#', class: 'float-right', style: 'position: sticky; bottom: 8px', data: {controller: 'help', action: 'help#show focusin@window->help#bindHelpKeys'} do
         %code.badge.badge-light ? = toggle help
