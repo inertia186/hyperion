@@ -326,8 +326,6 @@ export default class extends Controller {
   refrestVoteCount() {
     var voteCount = this.previewVoteCountTarget;
     
-    voteCount.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Votes: 0</span>';
-    
     hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
       if ( !!err ) console.log(preview, err);
   
@@ -374,8 +372,6 @@ export default class extends Controller {
   }
   
   refreshPendingPayout(pendingPayout) {
-    pendingPayout.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>';
-
     hive.api.getContent(this.authorValue, this.permlinkValue, function(err, response) {
       if ( !!err ) console.log(pendingPayout, err);
       
@@ -408,23 +404,13 @@ export default class extends Controller {
     if ( !!hivesignerAccessToken ) {
       window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${weight}`)
       window.addEventListener('focus', () => {
-        setTimeout(() => {
-          this.refrestVoteCount();
-          this.refreshPendingPayout(this.pendingPayoutTarget);
-          this.refreshPendingPayout(this.previewPendingPayoutTarget);
-        }, 10000);
-        
+        this.refreshPostDetails(e, 3000);
         $(`#upvote-${this.idValue}`).modal('hide');
         label.html('Vote');
       });
     } else {
       hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
-        setTimeout(() => {
-          this.refrestVoteCount();
-          this.refreshPendingPayout(this.pendingPayoutTarget);
-          this.refreshPendingPayout(this.previewPendingPayoutTarget);
-        }, 10000);
-        
+        this.refreshPostDetails(e, 10000);
         $(`#upvote-${this.idValue}`).modal('hide');
         label.html('Vote');
       });
@@ -440,27 +426,28 @@ export default class extends Controller {
     
     if ( !!hivesignerAccessToken ) {
       window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${-weight}`)
-      window.addEventListener('focus', () => {
-        setTimeout(() => {
-          this.refrestVoteCount();
-          this.refreshPendingPayout(this.pendingPayoutTarget);
-          this.refreshPendingPayout(this.previewPendingPayoutTarget);
-        }, 10000);
-        
-        $(`#downvote-${this.idValue}`).modal('hide');
-        label.html('Vote');
-      });
+      this.refreshPostDetails(e, 3000);
+      $(`#downvote-${this.idValue}`).modal('hide');
+      label.html('Vote');
     } else {
       hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
-        setTimeout(() => {
-          this.refrestVoteCount();
-          this.refreshPendingPayout(this.pendingPayoutTarget);
-          this.refreshPendingPayout(this.previewPendingPayoutTarget);
-        }, 10000);
-        
+        this.refreshPostDetails(e, 10000);
         $(`#downvote-${this.idValue}`).modal('hide');
         label.html('Vote');
       });
     }
+  }
+  
+  refreshPostDetails(e, timeout) {
+    this.previewVoteCountTarget.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Votes: 0</span>';
+    this.previewPendingPayoutTarget.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>';
+    
+    window.addEventListener('focus', () => {
+      setTimeout(() => {
+        this.refrestVoteCount();
+        this.refreshPendingPayout(this.pendingPayoutTarget);
+        this.refreshPendingPayout(this.previewPendingPayoutTarget);
+      }, timeout);
+    });
   }
 }
