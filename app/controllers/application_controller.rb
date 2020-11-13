@@ -5,6 +5,7 @@ class ApplicationController < ActionController::Base
   
   DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.openhive.network,http://anyx.io').split(',')
   
+  helper_method :best_title
   helper_method :current_account
   helper_method :post_to_slug
   helper_method :bridge
@@ -16,6 +17,25 @@ class ApplicationController < ActionController::Base
   
   before_action :sign_in
 private
+  def best_title
+    best_title = ''
+    tags = [params[:tag]].flatten.join(' ').split(/[ \+]/)
+    
+    tags.each do |tag|
+      best_tag = best_tag_name tag
+      
+      best_title += best_title.empty? ? best_tag : ", #{best_tag}"
+    end
+    
+    if best_title.empty?
+      best_title = 'Hyperion'
+    else
+      best_title += ' - Hyperion'
+    end
+    
+    best_title
+  end
+  
   def sign_in
     unless !!current_account
       session[:return_to] ||= request.original_url
