@@ -19,7 +19,8 @@
       .row
         - if !!current_account && controller_name == 'posts'
           .col-9
-            = yield
+            .row
+              .col-12.mx-2= yield
           .col-3
             .nav.navbar.navbar-expand-lg.navbar-light
               %button.navbar-toggler{type: 'button', data: {toggle: 'collapse', target: '#navbarSupportedContent'}}
