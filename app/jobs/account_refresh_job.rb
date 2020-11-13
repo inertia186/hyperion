@@ -6,7 +6,6 @@ class AccountRefreshJob < ApplicationJob
     account = Account.find(account_id)
     
     account.refresh_muted_authors
-    account.save
     
     Rails.logger.debug "Refreshed account: #{account}"
   end
