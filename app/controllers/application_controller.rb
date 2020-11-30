@@ -14,9 +14,24 @@ class ApplicationController < ActionController::Base
   helper_method :best_tag_name, :tag_unread_count, :related_tag_post_count
   helper_method :favorite_tags, :ignored_tags, :past_tags, :poisoned_pill_tags
   helper_method :random_oneliner
+  helper_method :tags_community_count, :tags_count
   
   before_action :sign_in
 private
+  def tags_community_count(options = {community: true})
+    community = !!options[:community]
+    
+    Rails.cache.fetch("tags-count-community-#{community}", expires_in: 10.minutes) do
+      Tag.community(community).distinct.count(:tag)
+    end
+  end
+  
+  def tags_count
+    Rails.cache.fetch("tags-count", expires_in: 10.minutes) do
+      Tag.distinct.count(:tag)
+    end
+  end
+  
   def best_title
     best_title = ''
     tags = [params[:tag]].flatten.join(' ').split(/[ \+]/)
@@ -27,7 +42,7 @@ private
       best_title += best_title.empty? ? best_tag : ", #{best_tag}"
     end
     
-    if best_title.empty?
+    if best_title.empty? || best_title == '-'
       best_title = 'Hyperion'
     else
       best_title += ' - Hyperion'
@@ -116,7 +131,9 @@ private
   end
   
   def related_tag_post_count
-    @related_tag_post_count ||= Post.joins(:tags).active.tagged_any(@tag).group_by_tag_count
+    Rails.cache.fetch("related-tags-cloud-#{@tag}", expires_in: 10.minutes) do
+      Post.joins(:tags).active.tagged_any(@tag).group_by_tag_count
+    end
   end
   
   def all_tag_unread

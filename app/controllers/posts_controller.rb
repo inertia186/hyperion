@@ -16,10 +16,18 @@ class PostsController < ApplicationController
       @posts = @posts.author(@author)
     elsif @only_deleted
       @posts.deleted
-    elsif !!@app
-      @posts.app(@app)
     else
       @posts.active.blacklisted(@only_blacklisted) # but not older than 7 days
+    end
+    
+    if !!@app
+      [@app].flatten.each do |a|
+        if a.starts_with? '-'
+          @posts = @posts.app(a.split('-').last, false)
+        else
+          @posts = @posts.app(a)
+        end
+      end
     end
     
     @posts = if @only_ignored
@@ -246,7 +254,12 @@ private
     
     if @tag.starts_with?('@')
       @author = @tag.split('@').last
-      @tag = ''
+      @tag = @tag.gsub("@#{@author}", '')
+    end
+    
+    if @tag.starts_with?('app:')
+      @app = @tag.split('app:').last
+      @tag = @tag.gsub("app:#{@app}", '')
     end
     
     @tag = @tag.gsub('+', ' ')

@@ -8,7 +8,7 @@
           = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{post.author}/avatar"}
           = post.title
           %small{title: (also = post.tags_without_category).any? ? " ... also tagged: #{also.pluck(:tag).to_sentence}" : ''}
-            (posted in #{category_name} by #{post.author}) 
+            (posted in #{category_name} by #{post.author} using #{post.app}) 
         %button.close{type: 'button', data: {action: 'posts#previewDismiss'}}
           %span &times;
       .modal-body
@@ -33,6 +33,10 @@
                 %span{style: 'opacity: 0;'} 00.000 HBD
         .p-2.ml-auto
           View on:
+          - unless %w(hive.blog peakd.com).include? ((uri = URI(post.canonical_url)).host)
+            = link_to post.canonical_url, target: '_new', class: 'btn btn-outline-primary btn-sm' do
+              = uri.host.split('.').last(2).join('.')
+              = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: "https://#{uri.host}/favicon.ico"}
           = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
             hive.blog
             = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hive.blog/favicon.ico'}

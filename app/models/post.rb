@@ -152,6 +152,10 @@ class Post < ApplicationRecord
     metadata.fetch('canonical_url', "https://hive.blog/#{category}/@#{author}/#{permlink}") rescue nil
   end
   
+  def app
+    ((metadata.fetch('app', nil) rescue nil) || 'unknown').split('/')[0]
+  end
+  
   def fetch_latest
     Post::with_simple_failover do
       comment_found = false

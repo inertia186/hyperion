@@ -11,6 +11,8 @@
           - tag_search += ' -' + @without_tags.join(' -')
         - if @author.present?
           - [@author].flatten.each{|a| tag_search += " @#{a}"}
+        - if @app.present?
+          - [@app].flatten.map{|a| tag_search += " app:#{a}"}
         .select2{'data-controller' => 'search-tags'}
           - tag_searches = tag_search.strip.split(' ')
           - tags_for_select = current_account.favorite_tags.includes(:community).pluck(:title, :tag).map{|t| [("★ #{t[0] || t[1]}"), t[1]]}
