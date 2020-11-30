@@ -33,28 +33,32 @@
                 %span{style: 'opacity: 0;'} 00.000 HBD
         .p-2.ml-auto
           View on:
-          - unless %w(hive.blog peakd.com).include? ((uri = URI(post.canonical_url)).host)
-            = link_to post.canonical_url, target: '_new', class: 'btn btn-outline-primary btn-sm' do
-              = uri.host.split('.').last(2).join('.')
-              = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: "https://#{uri.host}/favicon.ico"}
-          = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
-            hive.blog
-            = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hive.blog/favicon.ico'}
-          = link_to "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
-            peakd.com
-            = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://peakd.com/assets/favicons/apple-touch-icon-57x57.png'}
-          - hiveblocks_url = "https://hiveblocks.com/#{post.category}/@#{post.author}/#{post.permlink}"
-          - if post.deleted?
-            - hiveblocks_url = "https://hiveblocks.com/tx/#{post.trx_id}"
-          = link_to hiveblocks_url, target: '_new', class: 'btn btn-outline-primary btn-sm' do
-            hiveblocks.com
-            = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
-          = link_to "https://hive-db.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
-            hive-db.com
-            = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
-          = link_to "http://scribe.hivekings.com/?url=" + CGI.escape("http://hive.blog/@#{post.author}/#{post.permlink}"), target: '_new', class: 'btn btn-outline-primary btn-sm' do
-            scribe.hivekings.com
-            = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+          .btn-group
+            - unless %w(hive.blog peakd.com).include? ((uri = URI(post.canonical_url)).host)
+              = link_to post.canonical_url, target: '_new', class: 'btn btn-outline-primary btn-sm' do
+                = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: "https://#{uri.host}/favicon.ico"}
+                = uri.host.split('.').last(2).join('.')
+            = link_to "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
+              = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hive.blog/favicon.ico'}
+              hive.blog
+            = link_to "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm' do
+              = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://peakd.com/assets/favicons/apple-touch-icon-57x57.png'}
+              peakd.com
+            .btn-group.dropdown
+              .btn.btn-outline-primary.dropdown-toggle#explorersMenuButton{data: {toggle: 'dropdown'}} Other
+              .dropdown-menu
+                - hiveblocks_url = "https://hiveblocks.com/#{post.category}/@#{post.author}/#{post.permlink}"
+                - if post.deleted?
+                  - hiveblocks_url = "https://hiveblocks.com/tx/#{post.trx_id}"
+                = link_to hiveblocks_url, target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
+                  = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+                  hiveblocks.com
+                = link_to "https://hive-db.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
+                  = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+                  hive-db.com
+                = link_to "http://scribe.hivekings.com/?url=" + CGI.escape("http://hive.blog/@#{post.author}/#{post.permlink}"), target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
+                  = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
+                  scribe.hivekings.com
         .p-2
           .btn-group.btn-group-sm
             .btn-group
