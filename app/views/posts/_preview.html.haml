@@ -45,7 +45,7 @@
               = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://peakd.com/assets/favicons/apple-touch-icon-57x57.png'}
               peakd.com
             .btn-group.dropdown
-              .btn.btn-outline-primary.dropdown-toggle#explorersMenuButton{data: {toggle: 'dropdown'}} Other
+              .btn.btn-outline-primary.btn-sm.dropdown-toggle#explorersMenuButton{data: {toggle: 'dropdown'}} Other
               .dropdown-menu
                 - hiveblocks_url = "https://hiveblocks.com/#{post.category}/@#{post.author}/#{post.permlink}"
                 - if post.deleted?
