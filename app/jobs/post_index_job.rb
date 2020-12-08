@@ -4,7 +4,7 @@ class PostIndexJob < ApplicationJob
   extend Immutable
   extend Memoist
   
-  DEPLORABLES = %w(crystalliu anfeng nchain)
+  DEPLORABLES = %w(crystalliu anfeng nchain crystalan)
   
   queue_as :default
   
@@ -99,9 +99,10 @@ class PostIndexJob < ApplicationJob
       end
     rescue Hive::UnknownError => e
       if e.to_s.include? 'Request Entity Too Large'
-        
         Hive::BlockApi.const_set 'MAX_RANGE_SIZE', 1
         throw :retry
+      else
+        puts e
       end
     end
   end
@@ -109,15 +110,18 @@ class PostIndexJob < ApplicationJob
   def process_comments(comment_batch, block_num, timestamp, overdue_catch_up = false)
     comment_batch.each do |trx_id, comments|
       comments.each do |comment|
-        comment_params = comment.slice('title', 'body')
-        comment_params[:category] = comment.parent_permlink
-        comment_params[:metadata] = JSON[comment.json_metadata] rescue {}
+        comment = comment.with_indifferent_access
+        comment_params = comment.slice(:title, :body)
+        comment_params[:category] = comment[:parent_permlink]
+        comment_params[:metadata] = JSON[comment[:json_metadata]] rescue {}
         comment_params[:block_num] = block_num
         comment_params[:trx_id] = trx_id
-        comment_params[:blacklisted] = blacklist.include?(comment.author)
+        comment_params[:blacklisted] = blacklist.include?(comment[:author])
         comment_params[:created_at] = timestamp
         
-        post = Post.find_or_initialize_by(comment.slice('author', 'permlink'))
+        comment_params = comment_params.with_indifferent_access
+        
+        post = Post.find_or_initialize_by(comment.slice(:author, :permlink))
         post.update(comment_params)
         
         if post.body.nil?
@@ -136,9 +140,9 @@ class PostIndexJob < ApplicationJob
           post.save
         elsif !post.in_blog?(overdue_catch_up ? 1000 : 100)
           if overdue_catch_up
-            Rails.logger.info "[#{post.author}] - Not in the last blog entry (trying to catch up).  Fetching latest ..."
+            Rails.logger.info "[#{post.author}/#{post.permlink}] - Not in the last blog entry (trying to catch up).  Fetching latest ..."
           else
-            Rails.logger.info "[#{post.author}] - Not in the last blog entry.  Fetching latest ..."
+            Rails.logger.info "[#{post.author}/#{post.permlink}] - Not in the last blog entry.  Fetching latest ..."
           end
           
           # Attempt to determine if this post is in the latest blog for
@@ -153,16 +157,16 @@ class PostIndexJob < ApplicationJob
           post.fetch_latest
           post.save
         else
-          Rails.logger.info "[#{post.author}] - New post."
+          Rails.logger.info "[#{post.author}/#{post.permlink}] - New post."
         end
         
         if post.persisted?
-          tags = [comment.parent_permlink] + ([post.metadata.fetch('tags')].flatten rescue [])
+          tags = [comment[:parent_permlink]] + ([post.metadata.fetch('tags')].flatten rescue [])
           
           tags.map(&:downcase).uniq.first(MAX_TAGS).each do |tag|
             next if tag.size > 32
             
-            post.tags.find_or_create_by(tag: tag, category: tag == comment.parent_permlink)
+            post.tags.find_or_create_by(tag: tag, category: tag == comment[:parent_permlink])
           end
         else
           Rails.logger.error post.errors.messages
@@ -173,10 +177,11 @@ class PostIndexJob < ApplicationJob
   
   def process_delete_comments(delete_comments, timestamp)
     delete_comments.each do |delete_comment|
-      count = Post.where(delete_comment.slice('author', 'permlink')).update_all(deleted_at: timestamp)
+      delete_comment = delete_comment.with_indifferent_access
+      count = Post.where(delete_comment.slice(:author, :permlink)).update_all(deleted_at: timestamp)
       
       if count > 0
-        Rails.logger.info "[#{delete_comment.author}] - Deleted post."
+        Rails.logger.info "[#{delete_comment[:author]}] - Deleted post."
         
         PostCleanupJob.perform_later
       end
@@ -192,7 +197,13 @@ class PostIndexJob < ApplicationJob
   end
   
   def blacklist
-    open('https://raw.githubusercontent.com/themarkymark-steem/buildawhaleblacklist/master/blacklist.txt').read.split("\n")
+    @blacklist_data ||= begin
+      URI.open('https://raw.githubusercontent.com/themarkymark-steem/buildawhaleblacklist/master/blacklist.txt').read
+    rescue => e
+      Rails.logger.error "Unable to read blacklist: #{e}"
+      
+      ''
+    end.split("\n")
   end
   memoize :blacklist
 end
