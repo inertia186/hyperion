@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-ruby '2.5.7'
+ruby '2.7.2'
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 gem 'rails', '~> 6.0.3', '>= 6.0.3.1'
@@ -32,8 +32,9 @@ gem 'jbuilder', '~> 2.7'
 gem 'bootsnap', '>= 1.4.2', require: false
 
 gem 'haml-rails', '~> 2.0'
+gem 'coffee-rails'
 
-gem 'hive-ruby', require: 'hive', path: '../hive-ruby'
+gem 'hive-ruby', '1.0.2', require: 'hive'
 
 gem 'kramdown'
 
