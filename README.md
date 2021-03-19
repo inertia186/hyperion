@@ -1,6 +1,6 @@
 # Hyperion
 
-The backend for hive-reader.com.
+The backend for hyperion.zone.
 
 # Setup
 
