@@ -162,8 +162,9 @@ class PostIndexJob < ApplicationJob
         
         if post.persisted?
           tags = [comment[:parent_permlink]] + ([post.metadata.fetch('tags')].flatten rescue [])
+          tags = tags.map(&:downcase) rescue [] # Deals with malformed tags.
           
-          tags.map(&:downcase).uniq.first(MAX_TAGS).each do |tag|
+          tags.uniq.first(MAX_TAGS).each do |tag|
             next if tag.size > 32
             
             post.tags.find_or_create_by(tag: tag, category: tag == comment[:parent_permlink])
