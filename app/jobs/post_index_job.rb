@@ -4,7 +4,8 @@ class PostIndexJob < ApplicationJob
   extend Immutable
   extend Memoist
   
-  DEPLORABLES = %w(crystalliu anfeng nchain crystalan)
+  DEPLORABLES = %w(crystalliu anfeng nchain crystalan crystal.liu crystalliuyifei hkex liuyifei lyf)
+  TRUSTED_COMMUNITIES = %w(hive-163399 hive-196037 hive-139531 hive-136001)
   
   queue_as :default
   
@@ -102,7 +103,7 @@ class PostIndexJob < ApplicationJob
         Hive::BlockApi.const_set 'MAX_RANGE_SIZE', 1
         throw :retry
       else
-        puts e
+        raise e
       end
     end
   end
@@ -123,6 +124,10 @@ class PostIndexJob < ApplicationJob
         
         post = Post.find_or_initialize_by(comment.slice(:author, :permlink))
         post.update(comment_params)
+        
+        if !(post.body =~ Post::DIFF_MATCH_PATCH_PATTERN) && post.body =~ /@@/
+          Rails.logger.warn "[#{post.author}/#{post.permlink}] - Non-regex edit match."
+        end
         
         if post.body.nil?
           Rails.logger.info "[#{post.author}] - Fixing previous fetch.  Fetching latest ..."
@@ -198,13 +203,38 @@ class PostIndexJob < ApplicationJob
   end
   
   def blacklist
-    @blacklist_data ||= begin
-      URI.open('https://raw.githubusercontent.com/themarkymark-steem/buildawhaleblacklist/master/blacklist.txt').read
-    rescue => e
-      Rails.logger.error "Unable to read blacklist: #{e}"
+    return []
+    
+    # Old method was to grab the published list.
+    # @blacklist_data ||= begin
+    #   URI.open('https://raw.githubusercontent.com/themarkymark-steem/buildawhaleblacklist/master/blacklist.txt').read
+    # rescue => e
+    #   Rails.logger.error "Unable to read blacklist: #{e}"
+    # 
+    #   ''
+    # end.split("\n")
+    
+    # Instead, we now grab the list from trusted communities.
+    
+    return @blacklist if !!@blacklist
+    
+    @blacklist = []
+    
+    TRUSTED_COMMUNITIES.each do |community_name|
+      community = Community.find_or_create_by(name: community_name)
+      community.refresh_community
       
-      ''
-    end.split("\n")
+      begin
+        @blacklist += community.muted_roles
+      rescue => e
+        Rails.logger.warn "Attempting to refresh blacklist: #{e} (retrying)"
+        sleep 3
+        
+        redo
+      end
+    end
+    
+    @blacklist.uniq
   end
   memoize :blacklist
 end

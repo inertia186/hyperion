@@ -34,7 +34,7 @@ gem 'bootsnap', '>= 1.4.2', require: false
 gem 'haml-rails', '~> 2.0'
 gem 'coffee-rails'
 
-gem 'hive-ruby', '1.0.2', require: 'hive'
+gem 'hive-ruby', require: 'hive', git: 'https://gitlab.syncad.com/hive/hive-ruby.git', branch: 'get-block-range'
 
 gem 'kramdown'
 

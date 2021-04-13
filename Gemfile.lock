@@ -1,3 +1,17 @@
+GIT
+  remote: https://gitlab.syncad.com/hive/hive-ruby.git
+  revision: 94142bc9b21a662ce8f467c60f1e039a7e62d832
+  branch: get-block-range
+  specs:
+    hive-ruby (1.0.3)
+      base58 (~> 0.2, >= 0.2.3)
+      bindata (~> 2.4, >= 2.4.4)
+      bitcoin-ruby (~> 0.0, = 0.0.20)
+      ffi (~> 1.9, >= 1.9.23)
+      hashie (>= 3.5)
+      json (~> 2.1, >= 2.1.0)
+      logging (~> 2.2, >= 2.2.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -131,14 +145,6 @@ GEM
       html2haml (>= 1.0.1)
       railties (>= 5.1)
     hashie (4.1.0)
-    hive-ruby (1.0.2)
-      base58 (~> 0.2, >= 0.2.3)
-      bindata (~> 2.4, >= 2.4.4)
-      bitcoin-ruby (~> 0.0, = 0.0.20)
-      ffi (~> 1.9, >= 1.9.23)
-      hashie (~> 4.1, >= 3.5.7)
-      json (~> 2.1, >= 2.1.0)
-      logging (~> 2.2, >= 2.2.0)
     html2haml (2.2.0)
       erubis (~> 2.7.0)
       haml (>= 4.0, < 6)
@@ -148,8 +154,8 @@ GEM
       concurrent-ruby (~> 1.0)
     jbuilder (2.10.1)
       activesupport (>= 5.0.0)
-    json (2.3.1)
-    json (2.3.1-java)
+    json (2.5.1)
+    json (2.5.1-java)
     kramdown (2.3.0)
       rexml
     listen (3.3.3)
@@ -333,7 +339,8 @@ DEPENDENCIES
   fast_stack
   flamegraph
   haml-rails (~> 2.0)
-  hive-ruby (= 1.0.2)
+  hashie
+  hive-ruby!
   jbuilder (~> 2.7)
   kramdown
   listen (~> 3.2)
