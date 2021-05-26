@@ -11,7 +11,7 @@ class Community < ApplicationRecord
   def refresh_community
     Rails.logger.info "Fetching community: #{name} ..."
     
-    bridge = Hive::Bridge.new(url: 'http://anyx.io')
+    bridge = Hive::Bridge.new(url: DEFAULT_NODE_URLS.sample)
     community = bridge.get_community(name: name).result rescue nil
     
     if !!community
