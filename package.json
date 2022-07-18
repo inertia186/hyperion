@@ -8,7 +8,7 @@
     "@rails/webpacker": "5.4.0",
     "bootstrap": "4.6.0",
     "jquery": "^3.5.1",
-    "jquery-ui": "^1.12.1",
+    "jquery-ui": "^1.13.2",
     "lazyload": "^2.0.0-rc.2",
     "popper.js": "^1.16.0",
     "select2": "4.1.0-rc.0",
