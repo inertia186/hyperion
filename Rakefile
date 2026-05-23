@@ -12,7 +12,7 @@ namespace :export do
       puts "read_posts.find_or_create_by(post: Post.find_by(author: '#{read_post.post.author}', permlink: '#{read_post.post.permlink}'))"
     end
   end
-  
+
   desc 'Exports favorite tags intended for populating seeds.rb.'
   task favorite_tags: :environment do
     AccountTag::Favorite.find_each do |tag|
@@ -28,11 +28,13 @@ namespace :index do
       begin
         PostCleanupJob.perform_now
         PostIndexJob.perform_now
+
+        sleep 3
       rescue => e
         puts "Process interrupted: #{e}"
-        
+
         sleep 3
       end
     end
-  end  
+  end
 end
