@@ -45,6 +45,6 @@ module Immutable
   end
   
   def api_reset
-    @bridge = @api = @account_history_api = @database_api = stream = nil
+    @bridge = @api = @account_history_api = @database_api = @stream = nil
   end
 end

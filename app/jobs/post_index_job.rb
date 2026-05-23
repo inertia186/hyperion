@@ -18,6 +18,14 @@ class PostIndexJob < ApplicationJob
   MAX_TAGS = 50
   
   def perform(*args)
+    if hafsql_indexer_enabled?
+      HafsqlPostIndexer.new.perform
+    else
+      perform_with_rpc(*args)
+    end
+  end
+
+  def perform_with_rpc(*args)
     head_block_num, blockchain_time = PostIndexJob::database_api.get_dynamic_global_properties do |dgpo|
       [dgpo.head_block_number, Time.parse(dgpo.time + 'Z')]
     end
@@ -106,6 +114,10 @@ class PostIndexJob < ApplicationJob
         raise e
       end
     end
+  end
+
+  def hafsql_indexer_enabled?
+    ActiveModel::Type::Boolean.new.cast(ENV.fetch('HAFSQL_INDEXER_ENABLED', 'true'))
   end
   
   def process_comments(comment_batch, block_num, timestamp, overdue_catch_up = false)

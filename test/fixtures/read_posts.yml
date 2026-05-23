@@ -1,0 +1,5 @@
+curated_read_allowed:
+  account: curated
+  post: read_allowed
+  created_at: <%= 1.day.ago %>
+

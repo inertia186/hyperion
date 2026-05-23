@@ -28,7 +28,7 @@ private
   
   def tags_count
     Rails.cache.fetch("tags-count", expires_in: 10.minutes) do
-      Tag.distinct.count(:tag)
+      TagCount.count
     end
   end
   
@@ -75,7 +75,7 @@ private
   end
   
   def post_body(post)
-    original_body = post.body
+    original_body = post.body.to_s
     sanitized_body = ActionController::Base.helpers.sanitize(original_body, tags: ALLOWED_TAGS, attributes: ALLOWED_ATTRIBUTES)
     markdown_ready_body = sanitized_body.gsub('>', " markdown=\"span\">\n")
     markdown_ready_body = markdown_ready_body.gsub(/<\/(.*) markdown="span">/, "\n</\\1>")
@@ -132,7 +132,12 @@ private
   
   def related_tag_post_count
     Rails.cache.fetch("related-tags-cloud-#{@tag}", expires_in: 10.minutes) do
-      Post.joins(:tags).active.tagged_any(@tag).group_by_tag_count
+      if @tag.blank?
+        tag_values = @related_tags.map { |(_name, tag)| tag }
+        TagCount.group_by_tag_count(tags: tag_values, limit: tag_values.size)
+      else
+        Post.joins(:tags).active.tagged_any(@tag).group_by_tag_count
+      end
     end
   end
   

@@ -1,0 +1,50 @@
+allowed_unread_haf:
+  post: allowed_unread
+  tag: haf
+  category: false
+
+allowed_unread_community:
+  post: allowed_unread
+  tag: hive-13323
+  category: true
+
+muted_unread_haf:
+  post: muted_unread
+  tag: haf
+  category: false
+
+muted_unread_community:
+  post: muted_unread
+  tag: hive-13323
+  category: true
+
+ignored_unread_spam:
+  post: ignored_unread
+  tag: spam
+  category: false
+
+read_allowed_haf:
+  post: read_allowed
+  tag: haf
+  category: false
+
+read_allowed_community:
+  post: read_allowed
+  tag: hive-13323
+  category: true
+
+old_allowed_haf:
+  post: old_allowed
+  tag: haf
+  category: false
+
+deleted_allowed_haf:
+  post: deleted_allowed
+  tag: haf
+  category: false
+
+blacklisted_allowed_haf:
+  post: blacklisted_allowed
+  tag: haf
+  category: false
+

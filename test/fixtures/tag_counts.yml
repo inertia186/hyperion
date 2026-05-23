@@ -1,0 +1,18 @@
+haf:
+  tag: haf
+  posts_count: 6
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+hive_13323:
+  tag: hive-13323
+  posts_count: 3
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+spam:
+  tag: spam
+  posts_count: 1
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+

@@ -5,6 +5,10 @@ class Post < ApplicationRecord
   IMAGE_URL_PATTERN = /(http(s?):\/\/.*\.(jpeg|jpg|gif|png))/
   YOUTUBE_SHORT_URL_PATTERN = /http(s?):\/\/youtu.be\/(.*)/
   YOUTUBE_LONG_URL_PATTERN = /http(s?):\/\/.*youtube.com\/.*?.*v=(.*)(&?).*/
+  LIST_COLUMNS = %i(
+    id author permlink title category metadata block_num trx_id deleted_at
+    blacklisted tags_count created_at updated_at
+  )
   
   has_many :tags, dependent: :destroy, counter_cache: :tags_count
   has_many :tags_without_category, -> { include_category(false) }, class_name: 'Tag'
@@ -91,6 +95,8 @@ class Post < ApplicationRecord
     # authors who have taken the poisoned pills.  Also, these results don't seem
     # any less spammy than when the normal ignored tag rules are applied.
     # r = r.where.not(id: account.poisoned_posts)
+    
+    r
   }
   
   scope :author, lambda { |author = nil, invert = true|
@@ -108,15 +114,24 @@ class Post < ApplicationRecord
       where("metadata->>'app' NOT ILIKE ?", "#{app}/%")
     end
   }
+
+  scope :order_by_tag_count, lambda { |direction = :desc|
+    direction = direction.to_s.downcase == 'asc' ? :asc : :desc
+
+    order(tags_count: direction)
+  }
   
-  scope :order_by_prolific, lambda {|tag = nil, direction = :DESC|
-    tag = [tag].flatten.reject(&:empty?).compact
+  scope :order_by_prolific, lambda {|tag = nil, direction = :desc|
+    tag = [tag].flatten.compact.reject(&:empty?)
+    direction = direction.to_s.downcase == 'asc' ? 'ASC' : 'DESC'
     
-    if tag.none?
-      order("(SELECT DISTINCT count(author) FROM posts distinct_author_posts WHERE distinct_author_posts.author = posts.author) #{direction}, author #{direction}")
+    prolific_order = if tag.none?
+      sanitize_sql_array(["(SELECT count(*) FROM posts distinct_author_posts WHERE distinct_author_posts.author = posts.author) #{direction}, posts.author #{direction}"])
     else
-      order("(SELECT DISTINCT count(author) FROM posts distinct_author_posts INNER JOIN tags ON tags.post_id = distinct_author_posts.id AND tags.tag IN ('#{tag.join(',')}') WHERE distinct_author_posts.author = posts.author) #{direction}, author #{direction}")
+      sanitize_sql_array(["(SELECT count(*) FROM posts distinct_author_posts INNER JOIN tags ON tags.post_id = distinct_author_posts.id WHERE distinct_author_posts.author = posts.author AND tags.tag IN (?)) #{direction}, posts.author #{direction}", tag])
     end
+
+    order(Arel.sql(prolific_order))
   }
   
   def self.group_by_tag_count(direction = :desc)
@@ -129,16 +144,17 @@ class Post < ApplicationRecord
   
   def thumbnail_url
     thumbnail_url = [metadata.fetch('image')].flatten[0] rescue nil
+    post_body = has_attribute?(:body) ? body.to_s : ''
     
-    thumbnail_url ||= if matches = body.match(IMAGE_URL_PATTERN)
+    thumbnail_url ||= if matches = post_body.match(IMAGE_URL_PATTERN)
       matches[1]
     end
     
-    thumbnail_url ||= if matches = body.match(YOUTUBE_SHORT_URL_PATTERN)
+    thumbnail_url ||= if matches = post_body.match(YOUTUBE_SHORT_URL_PATTERN)
       "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
     end
     
-    thumbnail_url ||= if matches = body.match(YOUTUBE_LONG_URL_PATTERN)
+    thumbnail_url ||= if matches = post_body.match(YOUTUBE_LONG_URL_PATTERN)
       "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
     end
     
@@ -209,6 +225,19 @@ class Post < ApplicationRecord
         end
       end
     end
+  end
+
+  def load_body!
+    return body if body.present?
+
+    self.body = HafsqlPostIndexer.new.fetch_body(author, permlink) if HafsqlRecord.configured?
+
+    if body.blank?
+      fetch_latest
+    end
+
+    save! if changed?
+    body
   end
   
   # Checks if this post is in the latest blog with roughly the same timestamp.

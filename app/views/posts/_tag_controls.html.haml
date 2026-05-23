@@ -1,3 +1,5 @@
+- show_tag_extras = true if local_assigns[:show_tag_extras].nil?
+
 .row.d-flex
   .m-auto
     = pagy_bootstrap_combo_nav_js(@pagy).html_safe
@@ -26,9 +28,10 @@
       = hidden_field_tag :tag, @tag, id: nil
       = submit_tag "Ignore all #{best_tag_name @tag}", class: 'btn btn-primary m-2'
   
-  = render partial: 'tag_cloud', locals: {tags: @related_tags}
+  - if show_tag_extras
+    = render partial: 'tag_cloud', locals: {tags: @related_tags}
   
-  - if current_account.past_tags.any?
+  - if show_tag_extras && @has_past_tags
     %button.btn.btn.btn-dark.m-2{data: {controller: 'past-tags', toggle: 'modal', target: '#past-tags', action: 'past-tags#refreshTags'}}
       Past Tags / Categories
     
@@ -44,8 +47,7 @@
             .btn.btn-sm.btn-outline-dark.m-1
               = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: '-'), class: 'btn-tag-text' do
                 &lt;All Tags&gt;
-            - past_tags = current_account.past_tags.includes(:community).pluck(:title, :tag)
-            - past_tags.each do |title, tag|
+            - @past_tags.each do |title, tag|
               - name = title || tag
               - btn_class = if name.downcase == tag.downcase
                 - if ignored_tags.include? tag
@@ -58,9 +60,9 @@
                 - else
                   - 'btn-dark'
               .btn.btn-sm.m-1{class: btn_class, 'data-controller' => 'past-tags', 'data-past-tags-target' => 'pastTag', 'data-past-tags-tag-value' => tag}
-                = link_to create_favorite_tag_path(tag), method: :post, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: none;' : 'display: inline-block;' do
+                = link_to create_favorite_tag_path(tag), method: :post, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: @favorite_tag_set.include?(tag) ? 'display: none;' : 'display: inline-block;' do
                   = icon('star', stroke: 'black', class: 'btn-tag-star')
-                = link_to destroy_favorite_tag_path(tag), method: :delete, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: favorite_tags.include?(tag) ? 'display: inline-block;' : 'display: none;' do
+                = link_to destroy_favorite_tag_path(tag), method: :delete, remote: true, 'data-action' => 'ajax:success->past-tags#successFavorite', style: @favorite_tag_set.include?(tag) ? 'display: inline-block;' : 'display: none;' do
                   = icon('star-fill', stroke: 'black', class: 'btn-tag-star')
                 = link_to posts_tagged_path(sort: @sort, limit: @limit, tag: tag.present? ? tag : '-'), class: 'btn-tag-text' do
                   = name
@@ -70,6 +72,6 @@
                   - unless tag == ''
                     = link_to clear_past_tag_post_path(tag), method: :delete, remote: true, class: 'close-badge-button', 'data-action' => 'ajax:success->past-tags#removeTag' do
                       = icon('x-circle', stroke: 'black')
-            - if (past_tags & ignored_tags).any?
+            - if (@past_tags.map(&:last) & ignored_tags).any?
               = link_to 'Clear Ignored Tags', clear_past_tags_posts_path(only_ignored: true, sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-success btn-sm'
             = link_to 'Clear All Tags', clear_past_tags_posts_path(sort: @sort, limit: @limit, tag: @tag_pattern), method: :patch, data: {confirm: 'Are you sure?'}, class: 'btn btn-outline-primary btn-sm'

@@ -1,0 +1,9 @@
+curated:
+  name: fixture-curator
+  read_posts_count: 1
+  account_tags_count: 3
+  muted_authors:
+    - muted-author
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+

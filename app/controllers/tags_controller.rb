@@ -33,7 +33,7 @@ class TagsController < ApplicationController
   def unread_count
     tag = params[:id]
     
-    posts = Post.active.unread(by: current_account).tagged_any(tag)
+    posts = Post.active.unread(by: current_account, include_muted: true).tagged_any(tag)
     
     if !!session[:muted_authors_enabled]
       posts = posts.where.not(author: current_account.reload.muted_authors)

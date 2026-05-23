@@ -5,6 +5,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
     assert_routing 'posts', controller: 'posts', action: 'index'
     assert_routing posts_tagged_path(tag: 'tag', sort: 'latest', limit: '30'), controller: 'posts', action: 'index', tag: 'tag', sort: 'latest', limit: '30'
     assert_routing posts_authored_path(author: 'author', sort: 'latest', limit: '30'), controller: 'posts', action: 'index', tag: '@author', sort: 'latest', limit: '30'
+    assert_routing '/posts/@web2.support/latest/30', controller: 'posts', action: 'index', author: 'web2.support', sort: 'latest', limit: '30'
     assert_routing 'posts/42/content_sandbox', controller: 'posts', action: 'content_sandbox', id: '42'
     assert_routing 'posts/content_loading', controller: 'posts', action: 'content_loading'
     assert_routing({ method: 'patch', path: '/posts/clear_read' }, controller: 'posts', action: 'clear_read')

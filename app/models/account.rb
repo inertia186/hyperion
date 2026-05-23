@@ -76,14 +76,19 @@ class Account < ApplicationRecord
     Account::with_simple_failover do
       until count == muted_authors.size
         count = muted_authors.size
-        Account::api.get_following(name, muted_authors.last, 'ignore', 1000) do |result|
-          self.muted_authors += result.map &:following
-          self.muted_authors = muted_authors.uniq
-          
-          sleep 0.1
-        end
+        # Public Hive nodes commonly keep this legacy follow method available
+        # through condenser_api, even when they do not expose follow_api.
+        response = Account::api.rpc_client.rpc_execute(:condenser_api, :get_following, [name, muted_authors.last || '', 'ignore', 1000])
+        raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+        self.muted_authors += response.result.map(&:following)
+        self.muted_authors = muted_authors.uniq
+        
+        sleep 0.1
       end
     end
+    
+    save!
     
     return muted_authors
   end

@@ -1,0 +1,122 @@
+allowed_unread:
+  author: visible-author
+  permlink: allowed-unread
+  title: Allowed Unread
+  body:
+  category: hive-13323
+  metadata:
+    tags:
+      - haf
+      - hive-13323
+  block_num: 100
+  trx_id: fixture-allowed
+  deleted_at:
+  blacklisted: false
+  tags_count: 2
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+muted_unread:
+  author: muted-author
+  permlink: muted-unread
+  title: Muted Unread
+  body:
+  category: hive-13323
+  metadata:
+    tags:
+      - haf
+      - hive-13323
+  block_num: 101
+  trx_id: fixture-muted
+  deleted_at:
+  blacklisted: false
+  tags_count: 2
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+ignored_unread:
+  author: visible-author
+  permlink: ignored-unread
+  title: Ignored Unread
+  body:
+  category: spam
+  metadata:
+    tags:
+      - spam
+  block_num: 102
+  trx_id: fixture-ignored
+  deleted_at:
+  blacklisted: false
+  tags_count: 1
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+read_allowed:
+  author: visible-author
+  permlink: read-allowed
+  title: Read Allowed
+  body:
+  category: hive-13323
+  metadata:
+    tags:
+      - haf
+      - hive-13323
+  block_num: 103
+  trx_id: fixture-read
+  deleted_at:
+  blacklisted: false
+  tags_count: 2
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+
+old_allowed:
+  author: visible-author
+  permlink: old-allowed
+  title: Old Allowed
+  body:
+  category: haf
+  metadata:
+    tags:
+      - haf
+  block_num: 104
+  trx_id: fixture-old
+  deleted_at:
+  blacklisted: false
+  tags_count: 1
+  created_at: <%= 8.days.ago %>
+  updated_at: <%= 8.days.ago %>
+
+deleted_allowed:
+  author: visible-author
+  permlink: deleted-allowed
+  title: Deleted Allowed
+  body:
+  category: haf
+  metadata:
+    tags:
+      - haf
+  block_num: 105
+  trx_id: fixture-deleted
+  deleted_at: <%= 1.hour.ago %>
+  blacklisted: false
+  tags_count: 1
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.hour.ago %>
+
+blacklisted_allowed:
+  author: visible-author
+  permlink: blacklisted-allowed
+  title: Blacklisted Allowed
+  body:
+  category: haf
+  metadata:
+    tags:
+      - haf
+  block_num: 106
+  trx_id: fixture-blacklisted
+  deleted_at:
+  blacklisted: true
+  tags_count: 1
+  created_at: <%= 1.day.ago %>
+  updated_at: <%= 1.day.ago %>
+

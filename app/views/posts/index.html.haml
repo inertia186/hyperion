@@ -60,12 +60,14 @@
 .table#posts
   %table.table-sm
     %tbody
-      - @posts.includes(:tags_without_category, :tags, :readers, :community).each do |post|
-        - category_name = !!post.community ? post.community.title : post.category
+      - @posts.each do |post|
+        - category_name = @post_communities[post.category] || post.category
+        - post_tags = (@post_tags[post.id] || []).map { |(_post_id, tag, category)| [tag, category] }
+        - post_tags_without_category = post_tags.reject { |(_tag, category)| category }.map(&:first)
         %tr.align-top{id: post_id = post.to_param, data: {controller: :posts, posts: {id: {value: post.to_param}, author: {value: post.author}, permlink: {value: post.permlink}}, action: 'focusin->posts#focusRowIn focusout->posts#focusRowOut'}}
           %td.w-auto
             .d-flex
-              - if post.readers.include? current_account
+              - if @read_post_ids.include? post.id
                 = link_to mark_as_unread_post_path(post, sort: @sort, limit: @limit, tag: @tag_pattern), id: "#mark-as-unread-#{post.to_param}", title: 'Mark as Unread', method: :patch, remote: true, 'data-action' => 'ajax:success->posts#successMarkAsUnread' do
                   = icon('check-square', class: 'bi bi-alert-check-square text-info hover-stack hover-stack-default')
                   = icon('x-square', class: 'bi bi-alert-x-square text-info hover-stack hover-stack-hover')
@@ -82,7 +84,8 @@
               = link_to '#', id: "#show-#{post.to_param}", data: {toggle: 'modal@delegated->action', target: "#preview-#{post.to_param}", action: 'posts#previewShow'} do
                 .thumbnail-area.float-left
                   - begin
-                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: post.thumbnail_url.starts_with?('data:') ? post.thumbnail_url : ('https://images.hive.blog/0x48/' + post.thumbnail_url)}
+                    - thumbnail_url = post.thumbnail_url
+                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: thumbnail_url.starts_with?('data:') ? thumbnail_url : ('https://images.hive.blog/0x48/' + thumbnail_url)}
                   - rescue Sprockets::Rails::Helper::AssetNotFound => e
                     = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'img-thumbnail mw-100', style: 'width: 48px;'
                   = post.title.truncate(70)
@@ -98,7 +101,7 @@
           %td.w-auto
             .d-flex
               .btn-group.btn-group-sm.ml-auto
-                - all_tags = (@tag.present? && @tag == post.category) ? post.tags_without_category.pluck(:tag) : post.tags.pluck(:tag)
+                - all_tags = (@tag.present? && @tag == post.category) ? post_tags_without_category : post_tags.map(&:first)
                 - if (first_tags = all_tags.first(1)).any?
                   - first_tags.each do |tag|
                     - tag_class = 'btn btn-outline-dark btn-sm text-nowrap'
@@ -124,11 +127,11 @@
               .badge.badge-secondary.min-vw-25.w-100{data: {toggle: 'tooltip'}, title: post.created_at}
                 = time_ago_in_words(post.created_at)
                 ago
-            = render partial: 'preview', locals: {post: post, category_name: category_name}
+            = render partial: 'preview', locals: {post: post, category_name: category_name, also_tags: post_tags_without_category}
 %hr
 
 - if @posts.any?
-  #bottom-tag-controls= render partial: 'tag_controls'
+  #bottom-tag-controls= render partial: 'tag_controls', locals: {show_tag_extras: false}
 
 %p
 %p

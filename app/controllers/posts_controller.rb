@@ -1,4 +1,8 @@
+require 'set'
+
 class PostsController < ApplicationController
+  TAG_CLOUD_LIMIT = 250
+
   skip_before_action :sign_in, only: :content_loading
   
   def index
@@ -41,7 +45,7 @@ class PostsController < ApplicationController
     elsif @only_blacklisted
       @posts
     else
-      @posts.unread(by: current_account, allow_tag: @tag)
+      @posts.unread(by: current_account, include_muted: true)
     end
     
     @posts = @posts.where("body ILIKE ?", "%#{@query}%") if !!@query
@@ -58,34 +62,45 @@ class PostsController < ApplicationController
     @all_posts = @posts
     @related_authors = @posts.distinct.limit(1000).order(:author).pluck(:author)
     @pagy, @posts = pagy(@posts, items: @limit)
+    @posts = @posts.select(Post::LIST_COLUMNS)
     
     @posts = case @sort
     when 'latest' then @posts.order(created_at: :desc)
     when 'oldest' then @posts.order(created_at: :asc)
-    when 'most_tags' then @posts.order('(SELECT count(tag) FROM tags WHERE tags.post_id = posts.id) DESC')
-    when 'least_tags' then @posts.order('(SELECT count(tag) FROM tags WHERE tags.post_id = posts.id) ASC')
+    when 'most_tags' then @posts.order_by_tag_count(:desc)
+    when 'least_tags' then @posts.order_by_tag_count(:asc)
     when 'most_prolific' then @posts.order_by_prolific(@tag, :DESC)
     when 'least_prolific' then @posts.order_by_prolific(@tag, :ASC)
     else
       @posts
     end
-    
+
+    @posts = @posts.to_a
+    post_ids = @posts.map(&:id)
+
+    @read_post_ids = current_account.read_posts.where(post_id: post_ids).pluck(:post_id)
+    @post_tags = Tag.where(post_id: post_ids).order(:id).pluck(:post_id, :tag, :category).group_by(&:first)
+    @post_communities = Community.where(name: @posts.map(&:category).select { |category| category =~ Tag::COMMUNITY_CATEGORY_REGEX }).pluck(:name, :title).to_h
+     
     @related_tags = if !!@author
-      Tag.related_author(@author)
+      Tag.related_author(@author, TAG_CLOUD_LIMIT)
     else
-      Tag.related_tags(@tag)
+      Tag.related_tags(@tag, TAG_CLOUD_LIMIT)
     end
     
     @related_tags = @related_tags.uniq - [[@tag, '']].flatten
     
     community_tags = @related_tags.select{|tag| tag =~ Tag::COMMUNITY_CATEGORY_REGEX}
-    @related_communities = Community.where(name: community_tags).map do |community|
-      [community.name, community.title]
-    end.to_h
+    @related_communities = Community.where(name: community_tags).pluck(:name, :title).to_h
     
     @related_tags = @related_tags.map do |tag|
       [(@related_communities[tag] || tag), tag]
     end#.sort_by{|k, v| k.downcase}.to_h
+
+    @tags_count = TagCount.count
+    @past_tags = current_account.past_tags.left_outer_joins(:community).pluck('communities.title', 'account_tags.tag')
+    @has_past_tags = @past_tags.any?
+    @favorite_tag_set = current_account.favorite_tags.pluck(:tag).to_set
   end
   
   def content_loading
@@ -94,8 +109,9 @@ class PostsController < ApplicationController
   
   def content_sandbox
     @post = Post.find params[:id]
+    @post.load_body!
     
-    if @post.body =~ Post::DIFF_MATCH_PATCH_PATTERN
+    if @post.body.to_s =~ Post::DIFF_MATCH_PATCH_PATTERN
       # Detecting edit just in time.
     
       @post.fetch_latest
@@ -156,13 +172,12 @@ class PostsController < ApplicationController
   end
   
   def toggle_mutes
-    read_params
+    read_params(track_past_tags: false)
     
     if session[:muted_authors_enabled] = !session[:muted_authors_enabled]
       # Do this inline to ensure we have the latest mute list for this author,
       # even though it might be a little slow.
       current_account.refresh_muted_authors
-      current_account.save
     end
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)
@@ -239,7 +254,7 @@ class PostsController < ApplicationController
   def new_saved_query
   end
 private
-  def read_params
+  def read_params(track_past_tags: true)
     @sort = params[:sort] || 'latest'
     @limit = (params[:limit] || '30').to_i
     @tag = [params[:tag] || ''].flatten.first
@@ -280,6 +295,8 @@ private
     
     @tag_pattern = [([@tag] + @other_tags).reject(&:empty?).join('+'), @without_tags].reject(&:empty?).join('+-')
     
+    return unless track_past_tags
+
     [@tag].flatten.reject(&:empty?).map(&:downcase).each do |tag|
       current_account.past_tags.find_or_create_by(tag: tag)
     end

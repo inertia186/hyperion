@@ -1,0 +1,18 @@
+ignored_spam:
+  type: AccountTag::Ignored
+  account: curated
+  tag: spam
+  created_at: <%= 2.days.ago %>
+
+favorite_haf:
+  type: AccountTag::Favorite
+  account: curated
+  tag: haf
+  created_at: <%= 2.days.ago %>
+
+past_haf:
+  type: AccountTag::Past
+  account: curated
+  tag: haf
+  created_at: <%= 1.day.ago %>
+

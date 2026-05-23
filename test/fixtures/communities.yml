@@ -1,0 +1,20 @@
+haf_community:
+  name: hive-13323
+  title: HAF
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+

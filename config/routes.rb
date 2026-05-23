@@ -47,7 +47,7 @@ Rails.application.routes.draw do
   end
   
   get '/posts/:tag(/:sort)(/:limit)', to: 'posts#index', as: :posts_tagged
-  get '/posts/@:author(/:sort)(/:limit)', to: 'posts#index', as: :posts_authored, constraints: { account: /([^\/])+/ }
+  get '/posts/@:author(/:sort)(/:limit)', to: 'posts#index', as: :posts_authored, constraints: { author: /[^\/]+/ }, format: false
   
   get '/tags/:type(/:sort)(/:limit)', to: 'tags#index', as: :tags_by_type
   

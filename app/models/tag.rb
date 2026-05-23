@@ -8,7 +8,8 @@ class Tag < ApplicationRecord
   
   validates_uniqueness_of :tag, scope: :post
   
-  after_create :initalize_community
+  after_create :initalize_community, :increment_tag_count
+  after_destroy :decrement_tag_count
   
   scope :include_category, lambda { |include_category = true|
     if include_category
@@ -27,6 +28,8 @@ class Tag < ApplicationRecord
   }
   
   def self.related_tags(tag = nil, limit = 1000)
+    return TagCount.group_by_tag_count(limit: limit).keys if tag.blank?
+
     tags = Post.joins(:tags).active.tagged_any(tag)
     tags = tags.limit(limit).group_by_tag_count
     
@@ -63,6 +66,14 @@ private
     unless Community.where(name: tag).exists?
       CommunityRefreshJob.perform_later(tag)
     end
+  end
+
+  def increment_tag_count
+    TagCount.increment!(tag)
+  end
+
+  def decrement_tag_count
+    TagCount.decrement!(tag)
   end
   
   def self.community_title(name)
