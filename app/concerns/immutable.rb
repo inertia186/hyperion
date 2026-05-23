@@ -1,7 +1,7 @@
 module Immutable
   extend ActiveSupport::Concern
 
-  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.openhive.network').split(',')
+  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.hive.blog').split(',')
   MAX_RETRY = 10
   MAX_BACKOFF_SEC = 30.0
 

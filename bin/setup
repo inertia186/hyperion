@@ -8,6 +8,26 @@ def system!(*args)
   system(*args) || abort("\n== Command #{args} failed ==")
 end
 
+def ensure_node_version!
+  expected_major = File.read(File.join(APP_ROOT, '.nvmrc')).strip.to_i
+  version = `node --version 2>/dev/null`.strip
+  actual_major = version[/\Av(\d+)/, 1].to_i
+
+  return if actual_major == expected_major
+
+  abort <<~MESSAGE
+
+    == Node #{expected_major} is required ==
+    Current Node version: #{version.empty? ? 'not found' : version}
+
+    Run:
+      nvm install
+      nvm use
+
+    Then rerun bin/setup.
+  MESSAGE
+end
+
 FileUtils.chdir APP_ROOT do
   # This script is a way to setup or update your development environment automatically.
   # This script is idempotent, so that you can run it at anytime and get an expectable outcome.
@@ -17,8 +37,11 @@ FileUtils.chdir APP_ROOT do
   system! 'gem install bundler --conservative'
   system('bundle check') || system!('bundle install')
 
-  # Install JavaScript dependencies
-  # system('bin/yarn')
+  # Install and build JavaScript/CSS dependencies.
+  ensure_node_version!
+  system! 'yarn install --frozen-lockfile'
+  system! 'yarn build'
+  system! 'yarn build:css'
 
   # puts "\n== Copying sample files =="
   # unless File.exist?('config/database.yml')

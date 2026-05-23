@@ -13,7 +13,7 @@
     :javascript
       var hivesignerAccessToken = "#{session[:hivesigner_access_token]}";
     = stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload'
-    = javascript_pack_tag 'application', 'data-turbolinks-track': 'reload'
+    = javascript_include_tag 'application', 'data-turbolinks-track': 'reload', defer: true
   %body.disabled-overlay{data: {controller: 'hyperion'}}
     .container-fluid
       .row
@@ -31,16 +31,16 @@
             - if !!current_account
               = link_to posts_authored_path author: current_account.name do
                 = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail rounded-circle mw-100', style: 'width: 48px;', data: {src: "https://images.hive.blog/u/#{current_account.name}/avatar"}
-                = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
-                  Log Out
-                  = icon('box-arrow-right')
-                    - if controller_name == 'posts'
-                      .px-4= render partial: 'dashboard/posts_nav'
-                  
-                  -# .p-4= render partial: 'dashboard/quick_stats'
+              = link_to session_path(current_account.name), method: :delete, class: 'btn btn-outline-dark', data: {action: 'hyperion#disableBody'} do
+                Log Out
+                = icon('box-arrow-right')
+              - if controller_name == 'posts'
+                .px-4= render partial: 'dashboard/posts_nav'
+
+              -# .p-4= render partial: 'dashboard/quick_stats'
         - else
           .col-12
-          = yield
+            = yield
         .global-spinner{style: 'display: none;'}
       
       .modal#help

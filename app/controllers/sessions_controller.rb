@@ -12,7 +12,7 @@ class SessionsController < ApplicationController
     @random_oneliner = random_oneliner
     
     if !!params[:hivesigner]
-      redirect_to 'https://hivesigner.com/oauth2/authorize?client_id=hyperion.zone&redirect_uri=https://hyperion.zone/sessions/authorized&scope=login'
+      redirect_to_hivesigner
     else
       render :hive_keychain_request_sign_buffer
     end
@@ -42,6 +42,7 @@ class SessionsController < ApplicationController
       uri = URI.parse('https://hivesigner.com/api/me')
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == 'https'
+      http.cert_store = hivesigner_cert_store
       request = Net::HTTP::Get.new(uri.request_uri)
       request['Authorization'] = access_token
       response = http.request(request)
@@ -71,5 +72,31 @@ class SessionsController < ApplicationController
     reset_session
     
     redirect_to new_session_url
+  end
+
+private
+  def redirect_to_hivesigner
+    hivesigner_url = "https://hivesigner.com/oauth2/authorize?#{hivesigner_authorize_params}"
+
+    if request.xhr?
+      render plain: "window.location.assign(#{hivesigner_url.to_json});", content_type: 'text/javascript'
+    else
+      redirect_to hivesigner_url, allow_other_host: true
+    end
+  end
+
+  def hivesigner_authorize_params
+    URI.encode_www_form(
+      client_id: 'hyperion.zone',
+      redirect_uri: authorized_sessions_url,
+      scope: 'login'
+    )
+  end
+
+  def hivesigner_cert_store
+    store = OpenSSL::X509::Store.new
+    store.set_default_paths
+    store.flags = 0 if store.respond_to?(:flags=)
+    store
   end
 end

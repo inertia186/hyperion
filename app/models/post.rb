@@ -211,67 +211,17 @@ class Post < ApplicationRecord
     end
   end
   
-  # Checks if this post is in the latest blog (with roughly the same timestamp).
-  # Since we just need a way to just check the timestamp.  For this, we can try
-  # using AccountHistoryApi and fallback on CondenserApi.
-  # 
-  # The old (fallback) CondenserApi method is a good fit because we can request
-  # with a truncate body of zero.
+  # Checks if this post is in the latest blog with roughly the same timestamp.
   def in_blog?(limit = 100)
     begin
-      # This will quickly scan a bit of account history for the timestamp we're
-      # looking for and return early.  But not all nodes run this, so we have a
-      # fallback method.
-      
-      # We're looking specifically for comment_operation, therefore, for the
-      # first 64 operation types (as defined in protocol/operations.hpp), we set
-      # the corresponding bit in operation_filter_low; for the higher-numbered
-      # operations, set the bit in operation_filter_high (pretending
-      # operation_filter is a 128-bit bitmask composed of
-      # {operation_filter_high, operation_filter_low})
-      # 
-      # Note, we don't really use the operation_filter_high because
-      # comment_operation is the second flag.  In fact, operation_filter_high
-      # could even be nil, if we wanted.
-      # 
-      # https://gitlab.syncad.com/hive/hive/-/blob/master/libraries/protocol/include/hive/protocol/operations.hpp
-      
-      operation_mask = 0x02 # comment_operation
-      operation_filter_low = operation_mask & 0xFFFFFFFF
-      operation_filter_high = (operation_mask & 0xFFFFFFFF00000000) >> 32
-      
-      Post::account_history_api.get_account_history(account: author, start: -1, limit: limit, include_reversible: true, operation_filter_low: operation_filter_low, operation_filter_high: operation_filter_high) do |result|
-        result.history.each do |idx, trx|
-          op_type = trx.op.type
-          
-          # Although the operation_mask should limit the results to only
-          # comments, we should also independently check the operation in case
-          # the node does not support the option.
-          
-          next unless op_type == 'comment_operation'
-          
-          op_value = trx.op.value
-          
-          next unless op_value.author == author
-          next unless op_value.permlink == permlink
-          
-          timestamp = Time.parse(trx.timestamp + 'Z')
-          
-          return (created_at - timestamp).abs < 60 # It's ok if we drift into the stuffle window.
-        end
-      end
-      
-      # Temporarily disable this fallback method call.  There seems to be a
-      # problem with the hivemind index.
-      return false
-      
-      Post::api.get_discussions_by_blog(tag: author, limit: [100, limit].min, truncate_body: 0) do |blog|
-        blog.each do |comment|
-          comment_created = Time.parse(comment.created + 'Z')
-          
-          if comment.author == author && comment.permlink == permlink
-            return (created_at - comment_created).abs < 60 # It's ok if we drift into the stuffle window.
-          end
+      Post::bridge.get_account_posts(sort: 'blog', account: author, limit: [20, limit].min) do |blog|
+        blog.each do |post|
+          next unless post.author == author
+          next unless post.permlink == permlink
+
+          timestamp = Time.parse(post.created + 'Z')
+
+          return (created_at - timestamp).abs < 60 # It's ok if we drift into the shuffle window.
         end
       end
     rescue => e
