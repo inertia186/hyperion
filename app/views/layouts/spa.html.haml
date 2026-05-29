@@ -1,0 +1,15 @@
+!!!
+%html
+  %head
+    %meta{content: 'text/html; charset=UTF-8', 'http-equiv' => 'Content-Type'}
+    %meta{content: 'width=device-width, initial-scale=1.0, viewport-fit=cover', name: 'viewport'}
+    = favicon_link_tag 'favicon.svg', rel: 'shortcut icon', type: 'image/svg'
+    %title Hyperion
+    = csrf_meta_tags
+    = csp_meta_tag
+    %script{src: "https://cdn.jsdelivr.net/npm/@hiveio/hive-js/dist/hive.min.js"}
+    = vite_client_tag
+    = vite_react_refresh_tag
+    = vite_javascript_tag 'application'
+  %body
+    = yield

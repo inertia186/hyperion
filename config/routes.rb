@@ -1,4 +1,33 @@
 Rails.application.routes.draw do
+  namespace :api do
+    namespace :v1 do
+      resource :session, only: :show
+
+      resources :posts, only: %i(index show) do
+        member do
+          patch :read, action: :mark_read
+          delete :read, action: :mark_unread
+        end
+
+        collection do
+          patch :read, action: :mark_many_read
+        end
+      end
+
+      post '/tags/:tag/ignored', to: 'tags#create_ignored', as: :tag_ignored, constraints: { tag: /[^\/]+/ }, format: false
+      delete '/tags/:tag/ignored', to: 'tags#destroy_ignored', constraints: { tag: /[^\/]+/ }, format: false
+      post '/tags/:tag/favorite', to: 'tags#create_favorite', as: :tag_favorite, constraints: { tag: /[^\/]+/ }, format: false
+      delete '/tags/:tag/favorite', to: 'tags#destroy_favorite', constraints: { tag: /[^\/]+/ }, format: false
+      delete '/past_tags/:tag', to: 'tags#destroy_past', as: :past_tag, constraints: { tag: /[^\/]+/ }, format: false
+      delete '/past_tags', to: 'tags#destroy_past_tags'
+      delete '/ignored_tags', to: 'tags#destroy_ignored_tags'
+
+      patch '/preferences/mute', to: 'preferences#mute'
+      patch '/preferences/only_favorite_tags', to: 'preferences#only_favorite_tags'
+      patch '/preferences/blacklists', to: 'preferences#blacklists'
+    end
+  end
+
   resources :sessions, only: %i(new create destroy) do
     collection do
       get :authorized # hivesigner
@@ -51,5 +80,5 @@ Rails.application.routes.draw do
   
   get '/tags/:type(/:sort)(/:limit)', to: 'tags#index', as: :tags_by_type
   
-  root to: 'posts#index'
+  root to: 'spa#show'
 end
