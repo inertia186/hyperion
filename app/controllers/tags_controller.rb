@@ -68,7 +68,7 @@ class TagsController < ApplicationController
     
     respond_to do |format|
       format.html {
-        redirect_to params[:return_to] || tags_url(sort: @sort, limit: @limit, type: @type)
+        redirect_to tags_return_url
       }
       format.js {
         if count == 0
@@ -119,7 +119,7 @@ private
     respond_to do |format|
       format.html {
         if tag.persisted?
-          redirect_to params[:return_to] || tags_url(sort: @sort, limit: @limit, type: @type)
+          redirect_to tags_return_url
         else
           render 'new'
         end
@@ -144,7 +144,7 @@ private
     
     respond_to do |format|
       format.html {
-        redirect_to params[:return_to] || tags_url(sort: @sort, limit: @limit, type: @type)
+        redirect_to tags_return_url
       }
       format.js {
         if count == 0
@@ -154,5 +154,15 @@ private
         end
       }
     end
+  end
+  
+  def tags_return_url
+    safe_return_to || tags_url(sort: @sort, limit: @limit, type: @type)
+  end
+  
+  def safe_return_to
+    url_from(params[:return_to].presence)
+  rescue URI::InvalidURIError
+    nil
   end
 end
