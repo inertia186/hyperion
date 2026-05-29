@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_05_23_002000) do
+ActiveRecord::Schema[7.2].define(version: 2026_05_26_002000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -29,6 +29,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_23_002000) do
     t.json "muted_authors", default: [], null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.json "settings", default: {}, null: false
     t.index ["name"], name: "index_name_on_accounts", unique: true
   end
 
@@ -51,6 +52,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_23_002000) do
     t.integer "type_id", default: 1, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.json "community_account", default: {}, null: false
     t.index ["name"], name: "index_name_on_communities", unique: true
   end
 
@@ -78,6 +80,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_05_23_002000) do
     t.integer "tags_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.json "blacklist_reasons", default: [], null: false
     t.index ["author", "blacklisted"], name: "index_author_blacklisted_on_posts"
     t.index ["author", "created_at"], name: "index_posts_author_listing", order: { created_at: :desc }
     t.index ["author", "permlink"], name: "index_author_permlink_on_posts", unique: true

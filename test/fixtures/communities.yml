@@ -15,6 +15,117 @@ haf_community:
   settings: {}
   team: []
   type_id: 1
+  community_account:
+    json_metadata:
+      profile:
+        profile_image: https://example.com/haf-community.png
   created_at: <%= 2.days.ago %>
   updated_at: <%= 1.day.ago %>
 
+side_community:
+  name: hive-19999
+  title: Side Community
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  community_account:
+    json_metadata:
+      profile:
+        profile_image: https://example.com/side-community.png
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+
+trusted_blacklist_community:
+  name: hive-163399
+  title: Trusted Safety
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  community_account: {}
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+
+trusted_curators_community:
+  name: hive-196037
+  title: Trusted Curators
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  community_account: {}
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+
+trusted_spam_watch_community:
+  name: hive-139531
+  title: Trusted Spam Watch
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  community_account: {}
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>
+
+trusted_ban_hammer_community:
+  name: hive-136001
+  title: Ban Hammer
+  about:
+  avatar_url:
+  context: {}
+  description:
+  flag_text:
+  is_nsfw: false
+  lang: en
+  num_authors: 0
+  num_pending: 0
+  subscribers: 0
+  sum_pending: 0
+  settings: {}
+  team: []
+  type_id: 1
+  community_account: {}
+  created_at: <%= 2.days.ago %>
+  updated_at: <%= 1.day.ago %>

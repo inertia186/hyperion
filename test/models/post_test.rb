@@ -19,6 +19,79 @@ class PostTest < ActiveSupport::TestCase
     assert post.thumbnail_url.starts_with?('data:')
   end
 
+  test 'post image url prefers metadata image' do
+    post = create_post(author: 'alice', permlink: 'metadata-image')
+    post.metadata = {'image' => ['https://example.com/metadata.jpg']}
+    post.body = 'https://example.com/body.jpg'
+
+    assert_equal 'https://example.com/metadata.jpg', post.post_image_url
+  end
+
+  test 'post image url falls back to first body image' do
+    post = create_post(author: 'alice', permlink: 'body-image')
+
+    assert_equal 'https://example.com/body.png', post.post_image_url('body https://example.com/body.png')
+  end
+
+  test 'display body leaves normal posts unchanged' do
+    post = create_post(author: 'alice', permlink: 'normal-body')
+    post.body = 'Plain post body'
+
+    assert_equal 'Plain post body', post.display_body
+  end
+
+  test 'display body uses referenced post for cross posts' do
+    original = create_post(author: 'alice', permlink: 'original')
+    original.update!(body: 'Original post content')
+    post = create_post(author: 'alice', permlink: 'cross-post-body', tags: %w(cross-post))
+    post.body = 'This is a cross post of [@alice/original](/hive-1/@alice/original) by @bob.<br><br>Actual post content'
+
+    assert_equal "Original post content\n\n---\n\nActual post content", post.display_body
+  end
+
+  test 'display body avoids duplicating matching cross post copy' do
+    original = create_post(author: 'alice', permlink: 'matching-original')
+    original.update!(body: 'Same post content')
+    post = create_post(author: 'alice', permlink: 'matching-cross-post-body', tags: %w(cross-post))
+    post.body = 'This is a cross post of [@alice/matching-original](/hive-1/@alice/matching-original) by @bob.<br><br>Same post content'
+
+    assert_equal 'Same post content', post.display_body
+  end
+
+  test 'display body keeps malformed cross post bodies unchanged' do
+    post = create_post(author: 'alice', permlink: 'malformed-cross-post-body', tags: %w(cross-post))
+    post.body = 'This is a cross post of something without the expected separator'
+
+    assert_equal post.body, post.display_body
+  end
+
+  test 'post image url uses display body for cross posts' do
+    original = create_post(author: 'alice', permlink: 'image-original')
+    original.update!(body: 'Original image https://example.com/original.png')
+    post = create_post(author: 'alice', permlink: 'cross-post-image', tags: %w(cross-post))
+    post.body = 'This is a cross post of [@alice/image-original](/hive-1/@alice/image-original) by @bob.<br><br>Actual image https://example.com/cross.png'
+
+    assert_equal 'https://example.com/original.png', post.post_image_url
+  end
+
+  test 'display post falls back to stripped body when referenced post is unavailable' do
+    referenced_post = create_post(author: 'alice', permlink: 'missing-original')
+    post = create_post(author: 'alice', permlink: 'missing-cross-post-body', tags: %w(cross-post))
+    post.body = 'This is a cross post of [@alice/missing-original](/hive-1/@alice/missing-original) by @bob.<br><br>Copied post content'
+
+    referenced_post.stub(:load_body!, nil) do
+      Post.stub(:find_by, referenced_post) do
+        assert_equal 'Copied post content', post.display_body
+      end
+    end
+  end
+
+  test 'post image url falls back to youtube thumbnail' do
+    post = create_post(author: 'alice', permlink: 'youtube-image')
+
+    assert_equal 'https://img.youtube.com/vi/video-id/0.jpg', post.post_image_url('https://youtu.be/video-id')
+  end
+
   test 'orders by tag count without raw SQL' do
     low = create_post(author: 'alice', permlink: 'low-tags', tags_count: 1)
     high = create_post(author: 'alice', permlink: 'high-tags', tags_count: 3)

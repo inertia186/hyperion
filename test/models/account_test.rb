@@ -39,4 +39,27 @@ class AccountTest < ActiveSupport::TestCase
 
     assert_equal ['muted-author'], account.reload.muted_authors
   end
+
+  test 'enabled blacklist sources default to empty' do
+    assert_equal [], accounts(:curated).enabled_blacklist_sources
+  end
+
+  test 'enabled blacklist sources keep only trusted communities' do
+    account = accounts(:curated)
+
+    account.update_enabled_blacklist_sources!(%w(hive-163399 hive-unknown hive-136001 hive-163399))
+
+    assert_equal %w(hive-163399 hive-136001), account.reload.enabled_blacklist_sources
+  end
+
+  test 'blacklist source catalog includes enabled state' do
+    account = accounts(:curated)
+    account.update_enabled_blacklist_sources!(%w(hive-136001))
+
+    catalog = account.blacklist_source_catalog
+
+    assert_equal PostIndexJob::TRUSTED_COMMUNITIES, catalog.map { |source| source.fetch(:community) }
+    assert_equal ['hive-136001'], catalog.select { |source| source.fetch(:enabled) }.map { |source| source.fetch(:community) }
+    assert_includes catalog.map { |source| source.fetch(:name) }, 'Ban Hammer'
+  end
 end

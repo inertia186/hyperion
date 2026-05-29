@@ -1,6 +1,8 @@
 class Account < ApplicationRecord
   extend Immutable
   extend Memoist
+
+  ENABLED_BLACKLIST_SOURCES_SETTING = 'enabled_blacklist_sources'
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
   has_many :account_tags, dependent: :destroy, counter_cache: :account_tags_count
@@ -58,6 +60,31 @@ class Account < ApplicationRecord
   def post_read?(id)
     read_posts.where(post_id: id).exists?
   end
+
+  def enabled_blacklist_sources
+    normalize_blacklist_sources((settings || {})[ENABLED_BLACKLIST_SOURCES_SETTING])
+  end
+
+  def update_enabled_blacklist_sources!(sources)
+    update!(settings: (settings || {}).merge(ENABLED_BLACKLIST_SOURCES_SETTING => normalize_blacklist_sources(sources)))
+  end
+
+  def blacklist_source_catalog
+    enabled = enabled_blacklist_sources
+
+    self.class.blacklist_source_catalog.map do |source|
+      source.merge(enabled: enabled.include?(source[:community]))
+    end
+  end
+
+  def self.blacklist_source_catalog
+    Community.ensure_present!(PostIndexJob::TRUSTED_COMMUNITIES)
+    communities = Community.where(name: PostIndexJob::TRUSTED_COMMUNITIES).pluck(:name, :title).to_h
+
+    PostIndexJob::TRUSTED_COMMUNITIES.map do |community|
+      {community: community, name: communities[community] || community}
+    end
+  end
   
   def poisoned_posts(poisoned_posts = true)
     if poisoned_posts
@@ -91,5 +118,10 @@ class Account < ApplicationRecord
     save!
     
     return muted_authors
+  end
+
+private
+  def normalize_blacklist_sources(sources)
+    Array(sources).map(&:to_s).select { |source| PostIndexJob::TRUSTED_COMMUNITIES.include?(source) }.uniq
   end
 end

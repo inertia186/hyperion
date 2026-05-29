@@ -8,6 +8,11 @@ allowed_unread_community:
   tag: hive-13323
   category: true
 
+allowed_unread_side_community:
+  post: allowed_unread
+  tag: hive-19999
+  category: false
+
 muted_unread_haf:
   post: muted_unread
   tag: haf
@@ -47,4 +52,3 @@ blacklisted_allowed_haf:
   post: blacklisted_allowed
   tag: haf
   category: false
-

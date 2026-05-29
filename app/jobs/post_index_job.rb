@@ -16,6 +16,26 @@ class PostIndexJob < ApplicationJob
   BLOCK_INTERVAL_DAY = (Time.now.utc - 1.day.ago) / BLOCK_INTERVAL_SEC
   BLOCK_INTERVAL_SHUFFLE_WINDOW = BLOCK_INTERVAL_SEC * HIVE_MAX_WITNESSES
   MAX_TAGS = 50
+  BLACKLIST_CACHE_TTL = 30.minutes
+  BLACKLIST_RETRY_DELAYS = [2, 5, 10].freeze
+
+  class << self
+    def cached_blacklist_reasons_by_account(include_expired: false)
+      cache = @blacklist_reasons_cache
+      return nil unless cache
+      return cache[:value] if include_expired || cache[:expires_at] > Time.current
+
+      nil
+    end
+
+    def cache_blacklist_reasons_by_account(reasons)
+      @blacklist_reasons_cache = {value: reasons, expires_at: BLACKLIST_CACHE_TTL.from_now}
+    end
+
+    def clear_blacklist_cache!
+      @blacklist_reasons_cache = nil
+    end
+  end
   
   def perform(*args)
     if hafsql_indexer_enabled?
@@ -129,12 +149,14 @@ class PostIndexJob < ApplicationJob
         comment_params[:metadata] = JSON[comment[:json_metadata]] rescue {}
         comment_params[:block_num] = block_num
         comment_params[:trx_id] = trx_id
-        comment_params[:blacklisted] = blacklist.include?(comment[:author])
         comment_params[:created_at] = timestamp
         
         comment_params = comment_params.with_indifferent_access
         
         post = Post.find_or_initialize_by(comment.slice(:author, :permlink))
+        reasons = blacklist_reasons_for(comment[:author])
+        comment_params[:blacklisted] = post.blacklisted? || reasons.any?
+        comment_params[:blacklist_reasons] = reasons if reasons.any?
         post.update(comment_params)
         
         if !(post.body =~ Post::DIFF_MATCH_PATCH_PATTERN) && post.body =~ /@@/
@@ -214,39 +236,98 @@ class PostIndexJob < ApplicationJob
     end
   end
   
-  def blacklist
-    return []
-    
-    # Old method was to grab the published list.
-    # @blacklist_data ||= begin
-    #   URI.open('https://raw.githubusercontent.com/themarkymark-steem/buildawhaleblacklist/master/blacklist.txt').read
-    # rescue => e
-    #   Rails.logger.error "Unable to read blacklist: #{e}"
-    # 
-    #   ''
-    # end.split("\n")
-    
-    # Instead, we now grab the list from trusted communities.
-    
-    return @blacklist if !!@blacklist
-    
-    @blacklist = []
-    
+  def blacklist(reload = false)
+    @blacklist = @blacklist_reasons_by_account = nil if reload
+    PostIndexJob.clear_blacklist_cache! if reload
+    return @blacklist if @blacklist
+
+    @blacklist = blacklist_reasons_by_account.keys
+  end
+
+  def blacklist_reasons_by_account(reload = false)
+    @blacklist = @blacklist_reasons_by_account = nil if reload
+    PostIndexJob.clear_blacklist_cache! if reload
+    return @blacklist_reasons_by_account if @blacklist_reasons_by_account
+
+    Community.ensure_present!(TRUSTED_COMMUNITIES)
+
+    if (cached_reasons = PostIndexJob.cached_blacklist_reasons_by_account)
+      @blacklist_reasons_by_account = cached_reasons
+      return @blacklist_reasons_by_account
+    end
+
+    reasons = Hash.new { |hash, key| hash[key] = [] }
+    successful_fetches = 0
+
     TRUSTED_COMMUNITIES.each do |community_name|
-      community = Community.find_or_create_by(name: community_name)
-      community.refresh_community
-      
-      begin
-        @blacklist += community.muted_roles
-      rescue => e
-        Rails.logger.warn "Attempting to refresh blacklist: #{e} (retrying)"
-        sleep 3
-        
-        redo
+      muted_accounts = muted_roles_for_community(community_name)
+      next if muted_accounts.nil?
+
+      successful_fetches += 1
+      muted_accounts.each do |account|
+        account = account.to_s.downcase
+        next if account.blank?
+
+        reason = {'community' => community_name}
+        reasons[account] << reason unless reasons[account].include?(reason)
       end
     end
-    
-    @blacklist.uniq
+
+    if successful_fetches.zero?
+      stale_reasons = PostIndexJob.cached_blacklist_reasons_by_account(include_expired: true)
+      return @blacklist_reasons_by_account = stale_reasons if stale_reasons
+    end
+
+    @blacklist_reasons_by_account = reasons.transform_values { |account_reasons| account_reasons.sort_by { |reason| reason.fetch('community') } }
+    PostIndexJob.cache_blacklist_reasons_by_account(@blacklist_reasons_by_account)
+    @blacklist_reasons_by_account
+  end
+
+  def blacklist_reasons_for(author)
+    blacklist_reasons_by_account[author.to_s.downcase] || []
+  end
+
+  def muted_roles_for_community(community_name)
+    muted_accounts = []
+    last = ''
+
+    loop do
+      roles = list_community_roles_with_retry(community_name, last) || []
+      break if roles.empty?
+
+      muted_accounts += roles.select { |(_account, role, _title)| role.to_s == 'muted' }.map { |(account, _role, _title)| account.to_s }
+
+      next_last = roles.last&.first.to_s
+      break if roles.size < 100 || next_last.blank? || next_last == last
+
+      last = next_last
+    end
+
+    muted_accounts
+  rescue => e
+    Rails.logger.warn "Unable to refresh blacklist from #{community_name}: #{e.class}: #{e.message}"
+    nil
+  end
+
+  def list_community_roles_with_retry(community_name, last)
+    attempts = 0
+
+    begin
+      PostIndexJob::bridge.list_community_roles(community: community_name, last: last, limit: 100).result
+    rescue => e
+      raise e unless rate_limited_error?(e) && attempts < BLACKLIST_RETRY_DELAYS.size
+
+      delay = BLACKLIST_RETRY_DELAYS[attempts]
+      attempts += 1
+      Rails.logger.warn "Rate limited refreshing blacklist from #{community_name}; retrying in #{delay}s"
+      sleep delay
+      PostIndexJob::api_reset
+      retry
+    end
+  end
+
+  def rate_limited_error?(error)
+    error.to_s.include?('429') || error.to_s.include?('Too Many Requests')
   end
   memoize :blacklist
 end
