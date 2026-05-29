@@ -133,6 +133,63 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
     assert_equal [{'community' => 'hive-163399'}], post.blacklist_reasons
   end
 
+  test 'sweep refreshes old rows without regressing incremental cursor' do
+    original_cursor = 1.day.ago.change(usec: 0)
+    new_cursor = Time.current.change(usec: 0)
+    sweep_time = 6.days.ago.change(usec: 0)
+    IndexerState.fetch!(HafsqlPostIndexer::STATE_NAME).update!(
+      last_id: 20,
+      last_indexed_at: original_cursor,
+      last_sweep_at: 2.hours.ago
+    )
+    connection = CursorAwareHafsqlConnection.new(
+      incremental_rows: [
+        {
+          'id' => 30,
+          'author' => 'alice',
+          'permlink' => 'incremental',
+          'title' => 'Incremental',
+          'body' => nil,
+          'category' => 'test',
+          'metadata' => {},
+          'block_num' => 130,
+          'trx_id' => 'incremental-trx',
+          'created_at' => new_cursor,
+          'updated_at' => new_cursor,
+          'deleted_at' => nil
+        }
+      ],
+      sweep_rows: [
+        {
+          'id' => 10,
+          'author' => 'alice',
+          'permlink' => 'sweep',
+          'title' => 'Sweep',
+          'body' => nil,
+          'category' => 'test',
+          'metadata' => {},
+          'block_num' => 120,
+          'trx_id' => 'sweep-trx',
+          'created_at' => sweep_time,
+          'updated_at' => sweep_time,
+          'deleted_at' => nil
+        }
+      ]
+    )
+
+    with_blacklist([]) do
+      with_hafsql(connection) do
+        HafsqlPostIndexer.new.perform
+      end
+    end
+
+    state = IndexerState.find_by!(name: HafsqlPostIndexer::STATE_NAME)
+    assert_equal new_cursor, state.last_indexed_at
+    assert_equal 30, state.last_id
+    assert Post.exists?(author: 'alice', permlink: 'incremental')
+    assert Post.exists?(author: 'alice', permlink: 'sweep')
+  end
+
   test 'fetches and stores body lazily' do
     post = Post.create!(
       author: 'alice',
@@ -174,6 +231,22 @@ private
 
     def quote_column_name(name)
       %("#{name}")
+    end
+  end
+
+  class CursorAwareHafsqlConnection < FakeHafsqlConnection
+    def initialize(incremental_rows:, sweep_rows:)
+      super([])
+      @incremental_rows = incremental_rows
+      @sweep_rows = sweep_rows
+    end
+
+    def exec_query(sql, name = nil, binds = [])
+      return [] if sql.include?('LIMIT 0')
+      return super unless name == 'HafSQL post index'
+
+      bind_names = binds.map(&:name)
+      bind_names.include?('last_indexed_at') ? @incremental_rows : @sweep_rows
     end
   end
 

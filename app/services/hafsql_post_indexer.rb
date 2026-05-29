@@ -18,12 +18,19 @@ class HafsqlPostIndexer
     sweep = sweep_due?(state)
 
     Post.transaction do
-      rows = fetch_rows(state, sweep)
+      rows = fetch_rows(state, false)
       rows.each { |row| upsert_post(row) }
 
-      state.last_id = rows.map(&:id).compact.max || state.last_id
-      state.last_indexed_at = rows.map(&:updated_at).compact.max || state.last_indexed_at
-      state.last_sweep_at = Time.current if sweep
+      if sweep && state.last_indexed_at.present?
+        sweep_rows = fetch_rows(state, true)
+        sweep_rows.each { |row| upsert_post(row) }
+        state.last_sweep_at = Time.current
+      else
+        sweep_rows = []
+      end
+
+      state.last_id = [state.last_id, rows.map(&:id).compact.max, sweep_rows.map(&:id).compact.max].compact.max
+      state.last_indexed_at = [state.last_indexed_at, rows.map(&:updated_at).compact.max].compact.max
       state.save!
 
       PostCleanupJob.perform_later if sweep
