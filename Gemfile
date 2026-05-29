@@ -12,7 +12,7 @@ gem 'stackprof'
 # Use sqlite3 as the database for Active Record
 gem 'pg', '~> 1.5'
 # Use Puma as the app server
-gem 'puma', '~> 6.4'
+gem 'puma', '~> 7.0', '>= 7.0.3'
 # Build JavaScript and CSS with modern bundlers while keeping the asset pipeline.
 gem 'jsbundling-rails'
 gem 'cssbundling-rails'

@@ -2,7 +2,7 @@
   "name": "hyperion",
   "private": true,
   "engines": {
-    "node": ">=24 <26",
+    "node": "24.x",
     "yarn": ">=1.22 <2"
   },
   "scripts": {
