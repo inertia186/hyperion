@@ -53,7 +53,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to posts_path
-    assert_equal HIVE_KEYCHAIN_ACCOUNT, Account.find(session[:current_account]).name
+    assert_equal HIVE_KEYCHAIN_ACCOUNT, session[:current_account].name
   end
 
   def test_hive_keychain_authorized_redirects_when_public_key_is_not_on_account
