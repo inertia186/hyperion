@@ -61,7 +61,7 @@ class PostsController < ApplicationController
 
     @all_posts = @posts
     @related_authors = @posts.distinct.limit(1000).order(:author).pluck(:author)
-    @pagy, @posts = pagy(@posts, items: @limit)
+    @pagy, @posts = pagy(:offset, @posts, limit: @limit)
     @posts = @posts.select(Post::LIST_COLUMNS)
     
     @posts = case @sort

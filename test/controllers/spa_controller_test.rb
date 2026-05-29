@@ -15,6 +15,6 @@ class SpaControllerTest < ActionController::TestCase
     get :show
 
     assert_response :success
-    assert_includes response.body, "id='root'"
+    assert_select '#root', count: 1
   end
 end

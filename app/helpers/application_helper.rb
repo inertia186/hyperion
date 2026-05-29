@@ -1,6 +1,4 @@
 module ApplicationHelper
-  include Pagy::Frontend
-  
   def icon(icon_name, options = {})
     file = File.read(Rails.root.join('app', 'assets', 'images', 'bootstrap-icons', "#{icon_name}.svg"))
     icon = Nokogiri::HTML::DocumentFragment.parse file

@@ -1,7 +1,7 @@
 require 'open-uri'
 
 class ApplicationController < ActionController::Base
-  include Pagy::Backend
+  include Pagy::Method
   
   DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.hive.blog').split(',')
   

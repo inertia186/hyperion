@@ -2,7 +2,7 @@
 
 .row.d-flex
   .m-auto
-    = pagy_bootstrap_combo_nav_js(@pagy).html_safe
+    = @pagy.input_nav_js(:bootstrap).html_safe
   
   - if @posts.none?
     .btn.btn-primary.m-2.disabled Mark shown as read
