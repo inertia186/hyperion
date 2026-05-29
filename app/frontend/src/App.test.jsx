@@ -333,6 +333,7 @@ describe('App', () => {
     expect(screen.getByRole('dialog', {name: 'Settings'})).toBeInTheDocument()
     expect(screen.getByLabelText(/Trusted Safety/)).not.toBeChecked()
     expect(screen.getByLabelText(/Ban Hammer/)).not.toBeChecked()
+    expect(screen.getByRole('link', {name: 'Legacy Inbox'})).toHaveAttribute('href', '/posts')
 
     fireEvent.click(screen.getByRole('button', {name: 'Close settings'}))
     expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()

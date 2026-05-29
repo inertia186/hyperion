@@ -141,11 +141,14 @@ function SettingsModal({session, onClose, onSave}) {
           </div>
           {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3">
-          <button className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50" type="button" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="inline-flex h-9 items-center rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" type="button" onClick={save} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+        <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
+          <a className="text-sm text-blue-700 hover:underline" href="/posts">Legacy Inbox</a>
+          <div className="ml-auto flex items-center gap-2">
+            <button className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50" type="button" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="inline-flex h-9 items-center rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" type="button" onClick={save} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
