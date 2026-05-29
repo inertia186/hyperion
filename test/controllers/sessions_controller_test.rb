@@ -52,7 +52,21 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
       get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params
     end
 
-    assert_redirected_to posts_path
+    assert_redirected_to root_path
+    assert_equal HIVE_KEYCHAIN_ACCOUNT, session[:current_account].name
+  end
+
+  def test_hive_keychain_authorized_redirects_to_spa_when_return_to_is_legacy_inbox
+    get posts_path
+
+    assert_redirected_to new_session_url
+
+    Account.stub(:public_keys, [HIVE_KEYCHAIN_PUBLIC_KEY]) do
+      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params
+    end
+
+    assert_redirected_to root_path
+    assert_nil session[:return_to]
     assert_equal HIVE_KEYCHAIN_ACCOUNT, session[:current_account].name
   end
 

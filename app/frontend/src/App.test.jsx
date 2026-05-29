@@ -322,6 +322,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
+    expect(screen.queryByRole('link', {name: 'Legacy inbox'})).not.toBeInTheDocument()
   })
 
   test('opens settings with blacklist sources disabled by default', async () => {

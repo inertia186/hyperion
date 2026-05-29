@@ -617,7 +617,6 @@ export default function CurationInbox({session, refreshKey = 0}) {
           <div ref={listScrollRef} className="overflow-hidden rounded-md border border-slate-200 bg-white">
             <div className="flex items-center gap-3 border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
               <span>{loading ? 'Loading posts' : resultCountLabel}</span>
-              <a className="ml-auto text-blue-700 hover:underline" href={`/posts?${params.toString()}`}>Legacy inbox</a>
             </div>
             {!loading && posts.length > 0 && (
               <SelectionBar

@@ -53,10 +53,9 @@ class SessionsController < ApplicationController
     
     if !!account && account.persisted?
       session[:current_account] = account
-      return_to = session[:return_to]
       session[:return_to] = nil
       
-      redirect_to return_to || posts_path
+      redirect_to root_path
       
       return
     end
