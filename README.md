@@ -39,3 +39,34 @@ empty transaction id unless `HAFSQL_COMMENTS_BLOCK_NUM_COLUMN` and
 
 Set `HAFSQL_INDEXER_ENABLED=false` to fall back to the original RPC stream
 indexer.
+
+# Heroku
+
+This repo includes Heroku process definitions for the Rails web process,
+the optional indexing worker, and release-phase database migrations.
+
+```
+heroku create hyperion-zone
+heroku buildpacks:set heroku/nodejs
+heroku buildpacks:add heroku/ruby --index 2
+heroku addons:create heroku-postgresql:essential-0
+heroku config:set RAILS_ENV=production RAILS_LOG_TO_STDOUT=enabled RAILS_SERVE_STATIC_FILES=enabled
+heroku config:set SECRET_KEY_BASE=$(openssl rand -hex 64)
+git push heroku main
+```
+
+If you deploy from a branch other than `main`, push it explicitly:
+
+```
+git push heroku HEAD:main
+```
+
+Scale the indexer only when you want Heroku to run the background import loop:
+
+```
+heroku ps:scale worker=1
+```
+
+Post indexing uses the public HafSQL connection by default. Set
+`HAFSQL_DATABASE_URL` or the individual `HAFSQL_*` config vars above if the
+production app should use a different HafSQL endpoint.

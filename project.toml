@@ -1,0 +1,8 @@
+[[io.buildpacks.group]]
+uri = "heroku/nodejs"
+
+[[io.buildpacks.group]]
+uri = "heroku/ruby"
+
+[[io.buildpacks.group]]
+uri = "heroku/procfile"
