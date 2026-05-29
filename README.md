@@ -42,8 +42,8 @@ indexer.
 
 # Heroku
 
-This repo includes Heroku process definitions for the Rails web process,
-the optional indexing worker, and release-phase database migrations.
+This repo includes Heroku process definitions for the Rails web process and
+release-phase database migrations.
 
 ```
 heroku create hyperion-zone
@@ -61,10 +61,11 @@ If you deploy from a branch other than `main`, push it explicitly:
 git push heroku HEAD:main
 ```
 
-Scale the indexer only when you want Heroku to run the background import loop:
+Use Heroku Scheduler for periodic indexing. Add a Scheduler job that runs every
+10 minutes:
 
 ```
-heroku ps:scale worker=1
+bundle exec rake index:once
 ```
 
 Post indexing uses the public HafSQL connection by default. Set

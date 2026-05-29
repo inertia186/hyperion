@@ -22,12 +22,17 @@ namespace :export do
 end
 
 namespace :index do
+  desc 'Run one index pass.'
+  task once: :environment do
+    PostCleanupJob.perform_now
+    PostIndexJob.perform_now
+  end
+
   desc 'Main index process.'
   task run: :environment do
     loop do
       begin
-        PostCleanupJob.perform_now
-        PostIndexJob.perform_now
+        Rake::Task['index:once'].execute
 
         sleep 3
       rescue => e
