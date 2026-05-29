@@ -1,4 +1,6 @@
 class SessionsController < ApplicationController
+  require 'rbsecp256k1'
+
   skip_before_action :sign_in
   
   def new
@@ -26,13 +28,7 @@ class SessionsController < ApplicationController
     
     # hive keychain
     if !!account_name && !!public_key
-      raise 'public key does not match account' unless Account.public_keys(account_name).include? public_key
-      
-      pub = Bitcoin.decode_base58(public_key[3..-1])[0..65]
-      digest = params[:digest].split.pack('H*')
-      signature = params[:signature].split.pack('H*')
-      
-      account = if pub == Bitcoin::OpenSSL_EC.recover_compact(digest, signature)
+      account = if hive_keychain_signature_valid?(account_name, public_key, params[:digest], params[:signature])
         Account.find_or_create_by(name: account_name)
       end
     end
@@ -98,5 +94,24 @@ private
     store.set_default_paths
     store.flags = 0 if store.respond_to?(:flags=)
     store
+  end
+
+  def hive_keychain_signature_valid?(account_name, public_key, digest_hex, signature_hex)
+    return false unless Account.public_keys(account_name).include?(public_key)
+
+    expected_public_key = [Bitcoin.decode_base58(public_key[3..-1])[0, 66]].pack('H*')
+    digest = [digest_hex.to_s].pack('H*')
+    signature = [signature_hex.to_s].pack('H*')
+
+    return false unless digest.bytesize == 32
+    return false unless signature.bytesize == 65
+
+    recovery_id = (signature.bytes.first - 27) & 3
+    compact_signature = signature.byteslice(1, 64)
+    recoverable_signature = Secp256k1::Context.new.recoverable_signature_from_compact(compact_signature, recovery_id)
+
+    recoverable_signature.recover_public_key(digest).compressed == expected_public_key
+  rescue ArgumentError, TypeError, NoMethodError, Secp256k1::Error
+    false
   end
 end

@@ -34,6 +34,7 @@ gem 'bootsnap', '>= 1.4.2', require: false
 gem 'haml-rails', '~> 2.0'
 
 gem 'hive-ruby', '1.0.6', require: 'hive'
+gem 'rbsecp256k1', '~> 6.0', '>= 6.0.0'
 
 gem 'kramdown'
 
