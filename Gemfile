@@ -17,6 +17,7 @@ gem 'puma', '~> 6.4'
 gem 'jsbundling-rails'
 gem 'cssbundling-rails'
 gem 'sprockets-rails'
+gem 'vite_rails'
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.7'
 # Use Redis adapter to run Action Cable in production

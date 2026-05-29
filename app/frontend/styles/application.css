@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  min-height: 100%;
+  background: #f6f7f9;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: #f6f7f9;
+  color: #1f2937;
+}
+
+body.mobile-preview-open {
+  overflow: hidden;
+}
+
+.post-body {
+  color: #1f2937;
+  line-height: 1.6;
+}
+
+.post-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+.post-body a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.post-body pre {
+  overflow-x: auto;
+  background: #111827;
+  color: #f9fafb;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+}
+
+.safe-area-shell {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.mobile-preview-sheet {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 1280px) {
+  .curation-desktop-layout {
+    grid-template-columns: minmax(0, 1fr) 12px minmax(420px, var(--desktop-preview-width, 65%));
+  }
+
+  .desktop-resize-handle {
+    align-items: stretch;
+    cursor: col-resize;
+    justify-content: center;
+    touch-action: none;
+  }
+
+  .desktop-resize-handle span {
+    width: 2px;
+    border-radius: 9999px;
+    background: #cbd5e1;
+  }
+
+  .desktop-resize-handle:hover span,
+  .desktop-resize-handle:focus-visible span {
+    background: #3b82f6;
+  }
+}

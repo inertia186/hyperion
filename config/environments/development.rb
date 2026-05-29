@@ -65,4 +65,5 @@ Rails.application.configure do
 
   config.hosts << 'hyperion.test'
   config.hosts << 'toto.local'
+  config.hosts << 'toto.tail1b9f02.ts.net'
 end

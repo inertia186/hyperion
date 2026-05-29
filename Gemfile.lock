@@ -123,6 +123,7 @@ GEM
       reline (>= 0.3.8)
     debug_inspector (1.1.0)
     drb (2.2.3)
+    dry-cli (1.4.1)
     erb (6.0.4)
     erubi (1.13.1)
     erubis (2.7.0)
@@ -203,6 +204,7 @@ GEM
     minitest (5.22.3)
     msgpack (1.8.0)
     multi_json (1.21.1)
+    mutex_m (0.3.0)
     net-imap (0.6.4)
       date
       net-protocol
@@ -239,6 +241,8 @@ GEM
     rack (2.2.23)
     rack-mini-profiler (2.3.2)
       rack (>= 1.2.0)
+    rack-proxy (0.8.2)
+      rack
     rack-session (1.0.2)
       rack (< 3)
     rack-test (2.2.0)
@@ -326,6 +330,15 @@ GEM
     tzinfo-data (1.2021.1)
       tzinfo (>= 1.0.0)
     useragent (0.16.11)
+    vite_rails (3.11.0)
+      railties (>= 5.1, < 9)
+      vite_ruby (~> 3.0, >= 3.2.2)
+    vite_ruby (3.10.2)
+      dry-cli (>= 0.7, < 2)
+      logger (~> 1.6)
+      mutex_m
+      rack-proxy (~> 0.6, >= 0.6.1)
+      zeitwerk (~> 2.2)
     web-console (4.1.0)
       actionview (>= 6.0.0)
       activemodel (>= 6.0.0)
@@ -374,6 +387,7 @@ DEPENDENCIES
   sprockets-rails
   stackprof
   tzinfo-data
+  vite_rails
   web-console (>= 3.3.0)
 
 RUBY VERSION

@@ -1,0 +1,49 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT=$(dirname "$SCRIPT_DIR")
+cd "$ROOT"
+
+pids=""
+
+cleanup() {
+  trap - INT TERM EXIT
+
+  if [ -n "$pids" ]; then
+    kill $pids 2>/dev/null || true
+    wait $pids 2>/dev/null || true
+  fi
+}
+
+trap cleanup INT TERM EXIT
+
+if [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  . "$NVM_DIR/nvm.sh"
+  nvm use
+fi
+
+bind_host="${BIND:-0.0.0.0}"
+rails_port="${PORT:-3000}"
+
+echo "Starting Hyperion development servers"
+echo "Rails: http://${bind_host}:${rails_port}"
+echo "Vite:  http://0.0.0.0:3036"
+
+rbenv exec bundle exec rails server -b "$bind_host" -p "$rails_port" &
+pids="$pids $!"
+
+yarn vite:dev &
+pids="$pids $!"
+
+while true; do
+  for pid in $pids; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      wait "$pid"
+      exit $?
+    fi
+  done
+
+  sleep 1
+done
