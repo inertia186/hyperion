@@ -5,7 +5,7 @@ ruby '3.3.11'
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
 #gem 'rails', github: 'rails/rails'
-gem 'rails', '~> 7.2.3', '>= 7.2.3.1'
+gem 'rails', '~> 8.1', '>= 8.1.3'
 gem 'activerecord-session_store'
 gem 'responders'
 gem 'stackprof'
@@ -63,6 +63,7 @@ end
 group :test do
   # Adds support for Capybara system testing and selenium driver
   gem 'capybara', '>= 2.15'
+  gem 'minitest-mock'
   gem 'selenium-webdriver'
 end
 
