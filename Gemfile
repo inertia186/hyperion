@@ -12,7 +12,7 @@ gem 'stackprof'
 # Use sqlite3 as the database for Active Record
 gem 'pg', '~> 1.5'
 # Use Puma as the app server
-gem 'puma', '~> 7.0', '>= 7.0.3'
+gem 'puma', '~> 8.0', '>= 8.0.2'
 # Build JavaScript and CSS with modern bundlers while keeping the asset pipeline.
 gem 'jsbundling-rails'
 gem 'cssbundling-rails'
@@ -31,7 +31,7 @@ gem 'jbuilder', '~> 2.7'
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', '>= 1.4.2', require: false
 
-gem 'haml-rails', '~> 2.0'
+gem 'haml-rails', '~> 3.0'
 
 gem 'hive-ruby', '1.0.6', require: 'hive'
 gem 'rbsecp256k1', '~> 6.0', '>= 6.0.0'

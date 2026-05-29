@@ -142,7 +142,7 @@ GEM
       temple (>= 0.8.2)
       thor
       tilt
-    haml-rails (2.1.0)
+    haml-rails (3.0.0)
       actionpack (>= 5.1)
       activesupport (>= 5.1)
       haml (>= 4.0.6)
@@ -238,7 +238,7 @@ GEM
       date
       stringio
     public_suffix (7.0.5)
-    puma (7.2.1)
+    puma (8.0.2)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.6)
@@ -375,7 +375,7 @@ DEPENDENCIES
   debug
   fast_stack
   flamegraph
-  haml-rails (~> 2.0)
+  haml-rails (~> 3.0)
   hive-ruby (= 1.0.6)
   jbuilder (~> 2.7)
   jsbundling-rails
@@ -387,7 +387,7 @@ DEPENDENCIES
   pagy
   pg (~> 1.5)
   pry
-  puma (~> 7.0, >= 7.0.3)
+  puma (~> 8.0, >= 8.0.2)
   rack-mini-profiler
   rails (~> 8.1, >= 8.1.3)
   rbsecp256k1 (~> 6.0, >= 6.0.0)
