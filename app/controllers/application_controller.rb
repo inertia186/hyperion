@@ -75,7 +75,11 @@ private
   end
   
   def post_body(post)
-    original_body = post.display_body
+    render_post_body(post)
+  end
+  
+  def render_post_body(post, body_override = Post::DISPLAY_BODY_UNSET)
+    original_body = body_override.equal?(Post::DISPLAY_BODY_UNSET) ? post.display_body : post.display_body(body_override)
     sanitized_body = ActionController::Base.helpers.sanitize(original_body, tags: ALLOWED_TAGS, attributes: ALLOWED_ATTRIBUTES)
     markdown_ready_body = sanitized_body.gsub('>', " markdown=\"span\">\n")
     markdown_ready_body = markdown_ready_body.gsub(/<\/(.*) markdown="span">/, "\n</\\1>")

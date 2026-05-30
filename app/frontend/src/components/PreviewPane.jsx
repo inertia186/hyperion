@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react'
-import { tagLabel } from '../format'
-import CommunityLabel from './CommunityLabel'
+import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, FileDiff, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react'
+import { api } from '../api'
+import { closeOnBackdropClick, useModalDismiss } from '../useModalDismiss'
+import CategoryTagsControl from './CategoryTagsControl'
 
 export default function PreviewPane({
   post,
@@ -32,11 +33,18 @@ export default function PreviewPane({
 
     return {...post, ...detail.display_post, id: post.id, tags: post.tags}
   }, [detail?.display_post, post])
+  const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost), [displayPost, urls])
   const [stats, setStats] = useState({status: 'idle', votes: null, replies: null, payout: null, currentVote: null})
   const [votePanel, setVotePanel] = useState(null)
   const [voteWeight, setVoteWeight] = useState(100)
   const [voteBusy, setVoteBusy] = useState(false)
   const [hivesignerModal, setHivesignerModal] = useState(null)
+  const [diffModal, setDiffModal] = useState(null)
+  const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
+
+  useEffect(() => {
+    setPreviewTagsExpanded(false)
+  }, [post?.id])
 
   useEffect(() => {
     if (!displayPost) return
@@ -117,6 +125,8 @@ export default function PreviewPane({
     if (refresh) refreshStatsAfterVote()
   }
 
+  useModalDismiss(!!hivesignerModal, () => closeHivesignerModal())
+
   const castVote = (direction) => {
     if (!displayPost || !accountName) return
 
@@ -144,6 +154,25 @@ export default function PreviewPane({
     window.alert('Hive Keychain is not available.')
   }
 
+  const openDiffModal = () => {
+    if (!post) return
+
+    setDiffModal({status: 'loading', payload: null, error: null, selectedIndex: null})
+    api.postRevisions(post.id)
+      .then((payload) => setDiffModal({
+        status: 'ready',
+        payload,
+        error: null,
+        selectedIndex: Math.max((payload.revisions || []).length - 2, 0)
+      }))
+      .catch((error) => setDiffModal({
+        status: 'error',
+        payload: null,
+        error: error.message || 'Diff failed to load.',
+        selectedIndex: null
+      }))
+  }
+
   if (!post) {
     return (
       <div className="flex h-full min-h-[280px] items-center justify-center px-4 text-center text-sm text-slate-500">
@@ -159,19 +188,22 @@ export default function PreviewPane({
           <img className="h-10 w-10 rounded-full" src={`https://images.hive.blog/u/${displayPost.author}/avatar`} alt="" />
           <div className="min-w-0 flex-1">
             <h1 className="text-base font-semibold leading-snug text-slate-900">{displayPost.title}</h1>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-start gap-1 text-xs text-slate-500">
               <button className="font-medium text-slate-700 hover:text-blue-700 hover:underline" type="button" onClick={() => onSelectAuthor(displayPost.author)} aria-label={`Focus author @${displayPost.author}`}>@{displayPost.author}</button>
-              {' '}in <CommunityLabel name={displayPost.category_name} imageUrl={displayPost.category_image_url} className="align-middle" /> using {displayPost.app}
+              <span className="pt-1">in</span>
+              <CategoryTagsControl
+                post={displayPost}
+                expanded={previewTagsExpanded}
+                onToggle={() => setPreviewTagsExpanded((expanded) => !expanded)}
+                onSelectTag={onSelectTag}
+                className="inline-flex min-w-[9rem] max-w-full flex-col align-middle"
+                buttonClassName="inline-flex max-w-full items-center gap-1 rounded border border-slate-200 px-1.5 py-0.5 text-left text-xs text-slate-700 hover:bg-slate-50"
+                menuClassName="mt-1 flex max-w-full flex-wrap gap-1"
+                testId={`preview-tags-${displayPost.id}`}
+                label={`preview ${displayPost.title}`}
+              />
+              <span className="pt-1">using {displayPost.app}</span>
             </div>
-            {post.tags?.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {post.tags.slice(0, 8).map(({tag, name, image_url}) => (
-                  <button key={tag} className="rounded border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50" type="button" onClick={() => onSelectTag(tag)} aria-label={`Focus tag ${tag}`}>
-                    <CommunityLabel name={tagLabel(tag, displayPost, name)} imageUrl={image_url} />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           {onClose && (
             <button className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close preview">
@@ -195,12 +227,12 @@ export default function PreviewPane({
             {previewActive ? 'List focus' : 'Preview focus'}
           </button>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <ExternalLinkButton href={urls.canonical || displayPost.canonical_url} label="Canonical" />
-            <ExternalLinkButton href={urls.hive_blog} label="hive.blog" />
-            <ExternalLinkButton href={urls.peakd} label="peakd" />
-            <ExternalLinkButton href={urls.hiveblocks} label="hiveblocks" />
-            <ExternalLinkButton href={urls.hive_db} label="hive-db" />
-            <ExternalLinkButton href={urls.scribe} label="scribe" />
+            {externalLinks.map((link) => (
+              <ExternalLinkButton key={link.key} href={link.href} label={link.label} />
+            ))}
+            <button className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline" type="button" onClick={openDiffModal}>
+              <FileDiff size={12} /> Diff
+            </button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -244,7 +276,7 @@ export default function PreviewPane({
         )}
       </div>
       {hivesignerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Hivesigner vote">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Hivesigner vote" onClick={closeOnBackdropClick(() => closeHivesignerModal())}>
           <div className="flex h-[min(760px,calc(100vh-24px))] w-[min(520px,calc(100vw-24px))] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="flex min-h-12 items-center gap-3 border-b border-slate-200 px-3">
               <div className="min-w-0 flex-1 text-sm font-semibold text-slate-900">Hivesigner vote</div>
@@ -259,6 +291,13 @@ export default function PreviewPane({
           </div>
         </div>
       )}
+      {diffModal && (
+        <DiffModal
+          modal={diffModal}
+          onClose={() => setDiffModal(null)}
+          onSelectPair={(selectedIndex) => setDiffModal((current) => ({...current, selectedIndex}))}
+        />
+      )}
     </div>
   )
 }
@@ -270,6 +309,29 @@ function blacklistReasonText(reasons) {
   return `Blacklisted: author is muted by ${communities.join(', ')}.`
 }
 
+function previewExternalLinks(urls, displayPost) {
+  const builtInLinks = [
+    {key: 'hive_blog', href: urls.hive_blog, label: 'hive.blog'},
+    {key: 'peakd', href: urls.peakd, label: 'peakd'},
+    {key: 'hiveblocks', href: urls.hiveblocks, label: 'hiveblocks'},
+    {key: 'hive_db', href: urls.hive_db, label: 'hivehub.dev'}
+  ]
+  const builtInHosts = new Set(builtInLinks.map((link) => normalizedHost(link.href)).filter(Boolean))
+  const canonicalHref = urls.canonical || displayPost?.canonical_url
+  const canonicalHost = normalizedHost(canonicalHref)
+  const canonicalLink = canonicalHref && canonicalHost && !builtInHosts.has(canonicalHost) ? [{key: 'canonical', href: canonicalHref, label: canonicalHost}] : []
+
+  return [...canonicalLink, ...builtInLinks]
+}
+
+function normalizedHost(href) {
+  try {
+    return new URL(href).host.toLowerCase().replace(/^www\./, '')
+  } catch (_error) {
+    return null
+  }
+}
+
 function ExternalLinkButton({href, label}) {
   if (!href) return null
 
@@ -278,6 +340,148 @@ function ExternalLinkButton({href, label}) {
       <ExternalLink size={12} /> {label}
     </a>
   )
+}
+
+function DiffModal({modal, onClose, onSelectPair}) {
+  useModalDismiss(true, onClose)
+  const revisions = modal.payload?.revisions || []
+  const pairCount = Math.max(revisions.length - 1, 0)
+  const selectedIndex = Math.min(modal.selectedIndex ?? Math.max(pairCount - 1, 0), Math.max(pairCount - 1, 0))
+  const previousRevision = pairCount > 0 ? revisions[selectedIndex] : null
+  const currentRevision = pairCount > 0 ? revisions[selectedIndex + 1] : revisions[0]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Revision diff" onClick={closeOnBackdropClick(onClose)}>
+      <div className="flex h-[min(860px,calc(100vh-24px))] w-[min(1120px,calc(100vw-24px))] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+        <div className="flex min-h-12 items-center gap-3 border-b border-slate-200 px-3">
+          <div className="min-w-0 flex-1 text-sm font-semibold text-slate-900">Revision diff</div>
+          {pairCount > 1 && (
+            <select
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700"
+              aria-label="Revision pair"
+              value={selectedIndex}
+              onChange={(event) => onSelectPair(Number(event.target.value))}
+            >
+              {Array.from({length: pairCount}, (_item, index) => (
+                <option key={index} value={index}>{revisions[index].label} {'->'} {revisions[index + 1].label}</option>
+              ))}
+            </select>
+          )}
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close revision diff">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3">
+          {modal.status === 'loading' ? (
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">Loading revisions...</div>
+          ) : modal.status === 'error' ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{modal.error || 'Diff failed to load.'}</div>
+          ) : revisions.length === 0 ? (
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No revisions were found for this post.</div>
+          ) : revisions.length === 1 ? (
+            <CodeRevision revision={currentRevision} />
+          ) : (
+            <CodeDiff previousRevision={previousRevision} currentRevision={currentRevision} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CodeRevision({revision}) {
+  if (!revision) return null
+
+  return (
+    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
+      <div className="border-b border-slate-800 bg-slate-900 px-3 py-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Only revision</div>
+        <div className="mt-0.5 text-sm font-medium text-slate-100">{revision.label}</div>
+        <div className="mt-0.5 text-xs text-slate-400">{revisionDetail(revision)}</div>
+      </div>
+      <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed">{revision.body || ''}</pre>
+    </section>
+  )
+}
+
+function CodeDiff({previousRevision, currentRevision}) {
+  const lines = lineDiff(previousRevision?.body || '', currentRevision?.body || '')
+
+  return (
+    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
+      <div className="grid border-b border-slate-800 bg-slate-900 text-xs text-slate-300 sm:grid-cols-2">
+        <div className="border-b border-slate-800 px-3 py-2 sm:border-b-0 sm:border-r">
+          <div className="font-semibold">{previousRevision?.label || 'Before'}</div>
+          <div className="mt-0.5 text-slate-400">{revisionDetail(previousRevision || {})}</div>
+        </div>
+        <div className="px-3 py-2">
+          <div className="font-semibold">{currentRevision?.label || 'After'}</div>
+          <div className="mt-0.5 text-slate-400">{revisionDetail(currentRevision || {})}</div>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto font-mono text-xs leading-relaxed">
+        {lines.map((line, index) => (
+          <div key={`${index}-${line.type}`} className={`grid grid-cols-[3rem_1fr] px-2 ${lineClassName(line.type)}`}>
+            <span className="select-none pr-3 text-right text-slate-500">{line.number || ''}</span>
+            <code className="whitespace-pre-wrap break-words">{line.prefix}{line.text}</code>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function lineClassName(type) {
+  if (type === 'added') return 'bg-emerald-950/70 text-emerald-100'
+  if (type === 'removed') return 'bg-red-950/70 text-red-100'
+
+  return 'text-slate-200'
+}
+
+function lineDiff(before, after) {
+  const beforeLines = before.split(/\r?\n/)
+  const afterLines = after.split(/\r?\n/)
+  const table = Array.from({length: beforeLines.length + 1}, () => Array(afterLines.length + 1).fill(0))
+
+  for (let i = beforeLines.length - 1; i >= 0; i -= 1) {
+    for (let j = afterLines.length - 1; j >= 0; j -= 1) {
+      table[i][j] = beforeLines[i] === afterLines[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1])
+    }
+  }
+
+  const diff = []
+  let i = 0
+  let j = 0
+  while (i < beforeLines.length && j < afterLines.length) {
+    if (beforeLines[i] === afterLines[j]) {
+      diff.push({type: 'same', prefix: ' ', text: beforeLines[i], number: j + 1})
+      i += 1
+      j += 1
+    } else if (table[i + 1][j] >= table[i][j + 1]) {
+      diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1})
+      i += 1
+    } else {
+      diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1})
+      j += 1
+    }
+  }
+
+  while (i < beforeLines.length) {
+    diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1})
+    i += 1
+  }
+
+  while (j < afterLines.length) {
+    diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1})
+    j += 1
+  }
+
+  return diff
+}
+
+function revisionDetail(revision) {
+  const parts = [revision.published_at, revision.block_num ? `block ${revision.block_num}` : null].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : 'No chain metadata'
 }
 
 function PreviewSkeleton() {

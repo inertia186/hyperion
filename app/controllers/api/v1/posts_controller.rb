@@ -40,6 +40,31 @@ class Api::V1::PostsController < Api::V1::BaseController
     render json: post_detail_json(post, post.display_post)
   end
 
+  def revisions
+    post = Post.find(params[:id])
+    post.load_body!
+    display_post = post.display_post
+    display_post.load_body! if display_post.persisted?
+
+    revisions = HafbePostRevisions.new.call(
+      post: display_post,
+      local_body: display_post.display_body,
+      render_body: ->(body) { render_post_body(display_post, body) }
+    )
+
+    render json: {
+      post_id: post.id,
+      author: display_post.author,
+      permlink: display_post.permlink,
+      title: display_post.title,
+      revisions: revisions
+    }
+  rescue HafbePostRevisions::MissingBaseUrl
+    render json: {error: 'Diff service is not configured.'}, status: :service_unavailable
+  rescue HafbePostRevisions::FetchError => e
+    render json: {error: e.message}, status: :bad_gateway
+  end
+
   def mark_read
     current_account.mark_post_as_read!(params[:id])
 
@@ -155,8 +180,7 @@ private
         hive_blog: "https://hive.blog/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
         peakd: "https://peakd.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
         hiveblocks: display_post.deleted? ? "https://hiveblocks.com/tx/#{display_post.trx_id}" : "https://hiveblocks.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        hive_db: "https://hive-db.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        scribe: "http://scribe.hivekings.com/?url=#{CGI.escape("http://hive.blog/@#{display_post.author}/#{display_post.permlink}")}"
+        hive_db: "https://hivehub.dev/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}"
       }
     }
   end

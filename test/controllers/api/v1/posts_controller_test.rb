@@ -277,7 +277,60 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal content_sandbox_post_path(post, pp: :skip), response_json.fetch('content_sandbox_url')
     assert_equal "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_blog')
     assert_equal "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('peakd')
-    assert_equal "https://hive-db.com/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_db')
+    assert_equal "https://hivehub.dev/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_db')
+    assert_not response_json.fetch('urls').key?('scribe')
+  end
+
+  test 'revisions returns rendered HAFBE revisions and local fallback' do
+    post = posts(:allowed_unread)
+    post.update!(body: 'Current **local** body')
+    payload = {
+      'operations_result' => [
+        {'op' => {'type' => 'comment_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink, 'title' => 'Old title', 'body' => "Hello world\nBye"}}, 'timestamp' => '2026-01-01T00:00:00', 'block' => 10, 'trx_id' => 'old-trx'},
+        {'op' => {'type' => 'comment_operation', 'value' => {'author' => 'someone-else', 'permlink' => post.permlink, 'body' => 'Wrong body'}}, 'block' => 11},
+        {'op' => {'type' => 'vote_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink}}, 'block' => 12},
+        {'op' => {'type' => 'comment_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink, 'body' => "Hello world\nBye"}}, 'block' => 13},
+        {'op' => {'type' => 'comment_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink, 'body' => "@@ -1,15 +1,21 @@\n Hello \n+brave \n world%0ABye\n"}}, 'block' => 14},
+        {'op' => {'type' => 'comment_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink, 'body' => 'New body'}}, 'timestamp' => '2026-01-02T00:00:00', 'block' => 14}
+      ]
+    }
+    response = Struct.new(:code, :body).new('200', payload.to_json)
+
+    with_env('HAFBE_BASE_URL' => 'https://hafbe.example') do
+      Net::HTTP.stub(:get_response, response) do
+        get :revisions, params: {id: post.id}
+      end
+    end
+
+    assert_response :success
+    revisions = response_json.fetch('revisions')
+    assert_equal 4, revisions.size
+    assert_equal ['Revision 1', 'Revision 2', 'Revision 3', 'Revision 4'], revisions.map { |revision| revision.fetch('label') }
+    assert_equal 10, revisions.first.fetch('block_num')
+    assert_equal "Hello world\nBye", revisions.first.fetch('body')
+    assert_equal "Hello brave world\nBye", revisions.second.fetch('body')
+    assert_includes revisions.second.fetch('body_html'), 'Hello brave world'
+    assert_includes revisions.last.fetch('body_html'), '<strong>local</strong>'
+    assert_equal post.author, response_json.fetch('author')
+    assert_equal post.permlink, response_json.fetch('permlink')
+  end
+
+  test 'revisions uses the default HAFBE URL when not configured' do
+    posts(:allowed_unread).update!(body: 'Existing body')
+    response = Struct.new(:code, :body).new('200', {'operations' => []}.to_json)
+    captured_uri = nil
+
+    with_env('HAFBE_BASE_URL' => nil) do
+      Net::HTTP.stub(:get_response, ->(uri) {
+        captured_uri = uri
+        response
+      }) do
+        get :revisions, params: {id: posts(:allowed_unread).id}
+      end
+    end
+
+    assert_response :success
+    assert_equal 'https://api.hive.blog/hafbe-api/accounts/visible-author/operations/comments/allowed-unread', captured_uri.to_s
   end
 
   test 'preview payload includes blacklist reasons' do

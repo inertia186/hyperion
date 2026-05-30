@@ -53,12 +53,12 @@
                 = link_to hiveblocks_url, target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
                   = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
                   hiveblocks.com
-                = link_to "https://hive-db.com/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
+                = link_to "https://hivehub.dev/#{post.category}/@#{post.author}/#{post.permlink}", target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
                   = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
-                  hive-db.com
-                = link_to "http://scribe.hivekings.com/?url=" + CGI.escape("http://hive.blog/@#{post.author}/#{post.permlink}"), target: '_new', class: 'btn btn-outline-primary btn-sm dropdown-item' do
-                  = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 24px;', data: {src: 'https://hiveblocks.com/favicon-hive.png'}
-                  scribe.hivekings.com
+                  hivehub.dev
+            %button.btn.btn-outline-primary.btn-sm{type: 'button', data: {action: 'posts#diffShow'}}
+              = icon('file-diff')
+              Diff
         .p-2
           .btn-group.btn-group-sm
             .btn-group
@@ -75,3 +75,13 @@
   .modal-dialog
     .modal-content
       .modal-body= render partial: 'downvote'
+
+.modal{id: "diff-#{post_id}", data: {posts: {target: 'diffModal'}}}
+  .modal-dialog.modal-xl
+    .modal-content
+      .modal-header
+        %h5.modal-title Revision diff
+        .ml-auto.mr-2{data: {posts: {target: 'diffPair'}}}
+        %button.close{type: 'button', data: {dismiss: 'modal'}}
+          %span &times;
+      .modal-body.bg-light{data: {posts: {target: 'diffBody'}}}

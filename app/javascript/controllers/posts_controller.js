@@ -19,7 +19,7 @@ export default class extends Controller {
     author: String,
     permlink: String
   }
-  static targets = ['row', 'pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout']
+  static targets = ['row', 'pendingPayout', 'preview', 'previewVoteCount', 'previewReplyCount', 'previewPendingPayout', 'diffModal', 'diffBody', 'diffPair']
   
   connect() {
     this.refreshPendingPayout(this.pendingPayoutTarget);
@@ -289,6 +289,148 @@ export default class extends Controller {
     document.removeEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
     document.removeEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
     document.removeEventListener('click', bindingPreviewDismissOutsideModal);
+  }
+
+  diffShow(e) {
+    e.preventDefault();
+
+    this.diffBodyTarget.innerHTML = '<div class="alert alert-secondary">Loading revisions...</div>';
+    this.diffPairTarget.innerHTML = '';
+    $(this.diffModalTarget).modal('show');
+
+    fetch(`/api/v1/posts/${this.idValue}/revisions`, {
+      credentials: 'same-origin',
+      headers: {Accept: 'application/json'}
+    }).then((response) => response.json().then((payload) => {
+      if (!response.ok) throw new Error(payload.error || response.statusText);
+      this.renderDiff(payload.revisions || []);
+    })).catch((error) => {
+      this.diffBodyTarget.innerHTML = `<div class="alert alert-danger">${this.escapeHtml(error.message || 'Diff failed to load.')}</div>`;
+    });
+  }
+
+  diffPairChanged(e) {
+    this.renderDiff(this.currentDiffRevisions || [], parseInt(e.target.value));
+  }
+
+  renderDiff(revisions, selectedIndex = null) {
+    this.currentDiffRevisions = revisions;
+
+    if (revisions.length === 0) {
+      this.diffPairTarget.innerHTML = '';
+      this.diffBodyTarget.innerHTML = '<div class="alert alert-secondary">No revisions were found for this post.</div>';
+      return;
+    }
+
+    if (revisions.length === 1) {
+      this.diffPairTarget.innerHTML = '';
+      this.diffBodyTarget.innerHTML = this.renderCodeRevision(revisions[0]);
+      return;
+    }
+
+    var pairCount = revisions.length - 1;
+    var pairIndex = selectedIndex === null || isNaN(selectedIndex) ? pairCount - 1 : selectedIndex;
+    pairIndex = Math.min(Math.max(pairIndex, 0), pairCount - 1);
+
+    if (pairCount > 1) {
+      this.diffPairTarget.innerHTML = `<select class="custom-select custom-select-sm w-auto" data-action="posts#diffPairChanged">${Array.from({length: pairCount}, (_item, index) => {
+        var selected = index === pairIndex ? ' selected' : '';
+        return `<option value="${index}"${selected}>${this.escapeHtml(revisions[index].label)} -&gt; ${this.escapeHtml(revisions[index + 1].label)}</option>`;
+      }).join('')}</select>`;
+    } else {
+      this.diffPairTarget.innerHTML = '';
+    }
+
+    this.diffBodyTarget.innerHTML = this.renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
+  }
+
+  renderCodeRevision(revision) {
+    return `
+      <section class="border rounded bg-dark text-light">
+        <pre class="m-0 p-3 overflow-auto" style="max-height: 65vh;"><code>${this.escapeHtml(revision.body || '')}</code></pre>
+      </section>
+    `;
+  }
+
+  renderCodeDiff(previousRevision, currentRevision) {
+    var rows = this.lineDiff(previousRevision.body || '', currentRevision.body || '').map((line) => {
+      var rowClass = line.type === 'added' ? 'bg-success text-white' : line.type === 'removed' ? 'bg-danger text-white' : 'text-light';
+      return `<div class="d-flex ${rowClass}"><span class="text-right text-monospace px-2 text-muted" style="width: 4rem;">${line.number || ''}</span><code class="text-monospace flex-fill px-2" style="white-space: pre-wrap;">${this.escapeHtml(line.prefix + line.text)}</code></div>`;
+    }).join('');
+
+    return `
+      <section class="border rounded bg-dark overflow-hidden">
+        <div class="row no-gutters border-bottom border-secondary text-light small">
+          <div class="col-sm-6 border-right border-secondary p-2">
+            <strong>${this.escapeHtml(previousRevision.label || 'Before')}</strong>
+            <div class="text-muted">${this.escapeHtml(this.revisionDetail(previousRevision))}</div>
+          </div>
+          <div class="col-sm-6 p-2">
+            <strong>${this.escapeHtml(currentRevision.label || 'After')}</strong>
+            <div class="text-muted">${this.escapeHtml(this.revisionDetail(currentRevision))}</div>
+          </div>
+        </div>
+        <div class="overflow-auto" style="max-height: 65vh;">${rows}</div>
+      </section>
+    `;
+  }
+
+  lineDiff(before, after) {
+    var beforeLines = before.split(/\r?\n/);
+    var afterLines = after.split(/\r?\n/);
+    var table = Array.from({length: beforeLines.length + 1}, () => Array(afterLines.length + 1).fill(0));
+
+    for (var i = beforeLines.length - 1; i >= 0; i--) {
+      for (var j = afterLines.length - 1; j >= 0; j--) {
+        table[i][j] = beforeLines[i] === afterLines[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      }
+    }
+
+    var diff = [];
+    i = 0;
+    j = 0;
+    while (i < beforeLines.length && j < afterLines.length) {
+      if (beforeLines[i] === afterLines[j]) {
+        diff.push({type: 'same', prefix: ' ', text: beforeLines[i], number: j + 1});
+        i++;
+        j++;
+      } else if (table[i + 1][j] >= table[i][j + 1]) {
+        diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
+        i++;
+      } else {
+        diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
+        j++;
+      }
+    }
+
+    while (i < beforeLines.length) {
+      diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
+      i++;
+    }
+
+    while (j < afterLines.length) {
+      diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
+      j++;
+    }
+
+    return diff;
+  }
+
+  revisionDetail(revision) {
+    var parts = [];
+    if (revision.published_at) parts.push(revision.published_at);
+    if (revision.block_num) parts.push(`block ${revision.block_num}`);
+    return parts.length > 0 ? parts.join(' · ') : 'No chain metadata';
+  }
+
+  escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
   }
   
   markRowAsRead(e) {

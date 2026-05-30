@@ -28,6 +28,7 @@ export const api = {
   session: () => request('/api/v1/session'),
   posts: (params) => request(`/api/v1/posts?${params.toString()}`),
   post: (id) => request(`/api/v1/posts/${id}`),
+  postRevisions: (id) => request(`/api/v1/posts/${id}/revisions`),
   markRead: (id) => request(`/api/v1/posts/${id}/read`, {method: 'PATCH', body: '{}'}),
   markUnread: (id) => request(`/api/v1/posts/${id}/read`, {method: 'DELETE', body: '{}'}),
   markManyRead: (payload) => request('/api/v1/posts/read', {method: 'PATCH', body: JSON.stringify(Array.isArray(payload) ? {post_ids: payload} : payload)}),

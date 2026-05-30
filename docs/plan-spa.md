@@ -109,7 +109,7 @@ Implemented endpoints:
   - Returns preview/detail data for a post.
   - Loads missing bodies lazily through `Post#load_body!`, preserving the
     HafSQL/RPC fallback behavior.
-  - Returns canonical, Hive, PeakD, Hiveblocks, hive-db, and scribe links for
+- Returns canonical, Hive, PeakD, Hiveblocks, HiveHub, and scribe links for
     preview actions.
 - `PATCH /api/v1/posts/:id/read`
   - Marks one post as read.
