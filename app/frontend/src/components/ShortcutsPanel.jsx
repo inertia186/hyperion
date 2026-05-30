@@ -1,6 +1,8 @@
 import { X } from 'lucide-react'
+import { closeOnBackdropClick, useModalDismiss } from '../useModalDismiss'
 
 export default function ShortcutsPanel({visible, onClose}) {
+  useModalDismiss(visible, onClose)
   if (!visible) return null
 
   const shortcuts = [
@@ -18,7 +20,7 @@ export default function ShortcutsPanel({visible, onClose}) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-950/20 p-4" role="dialog" aria-label="Keyboard shortcuts">
+    <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-950/20 p-4" role="dialog" aria-label="Keyboard shortcuts" onClick={closeOnBackdropClick(onClose)}>
       <div className="w-full max-w-sm rounded-md border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900">Keyboard shortcuts</h2>

@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react'
-import { Star, StarOff, Tag, Trash2, X } from 'lucide-react'
+import { Eye, Skull, Star, StarOff, Tag, Trash2, X } from 'lucide-react'
 import CommunityLabel from './CommunityLabel'
 
-export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredTags, updateQuery, toggleFavorite, removePastTag, clearPastTags, clearIgnoredTags, compact = false}) {
+export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredTags, poisonedPillTags = [], activeTag = '', updateQuery, toggleFavorite, togglePoisonedPill, removePastTag, clearPastTags, clearIgnoredTags, compact = false}) {
   const hasIgnoredPastTags = pastTags.some(({tag}) => ignoredTags.includes(tag))
   const [relatedMode, setRelatedMode] = useState('list')
   const displayedRelatedTags = relatedTags.slice(0, 80)
+  const activeTags = activeTag.split(/[ +]/).filter((tag) => tag && !tag.startsWith('-') && !tag.startsWith('@') && !tag.startsWith('app:'))
+  const tagDetailsByTag = useMemo(() => {
+    const details = new Map()
+
+    const knownTags = [...relatedTags, ...pastTags]
+    knownTags.forEach(({tag, name, image_url}) => {
+      if (!tag || details.has(tag)) return
+      details.set(tag, {name: name || tag, imageUrl: image_url})
+    })
+
+    return details
+  }, [pastTags, relatedTags])
   const cloudAverage = useMemo(() => {
     if (displayedRelatedTags.length === 0) return 1
     const total = displayedRelatedTags.reduce((sum, item) => sum + Math.max(Number(item.count) || 1, 1), 0)
@@ -29,7 +41,7 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
         {relatedMode === 'cloud' ? (
           <div className="max-h-56 overflow-auto rounded-md border border-slate-100 bg-white px-3 py-2 leading-loose">
             {displayedRelatedTags.map(({name, tag, count, image_url}) => (
-              <button key={tag} className={`mx-1 align-middle hover:text-blue-700 hover:underline ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} style={{fontSize: cloudFontSize(count, cloudAverage)}} type="button" onClick={() => updateQuery({tag})} title={`${count || 0} posts`}>
+              <button key={tag} className={`mx-1 align-middle hover:text-blue-700 hover:underline ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} style={{fontSize: cloudFontSize(count, cloudAverage)}} type="button" onClick={() => updateQuery({tag: relatedTagQuery(activeTag, tag)})} title={`${count || 0} posts`}>
                 <CommunityLabel name={name} imageUrl={image_url} />
               </button>
             ))}
@@ -37,7 +49,7 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
         ) : (
           <div className="flex max-h-44 flex-wrap gap-2 overflow-auto">
             {displayedRelatedTags.map(({name, tag, image_url}) => (
-              <button key={tag} className={`min-h-9 rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50 sm:min-h-0 ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} type="button" onClick={() => updateQuery({tag})}>
+              <button key={tag} className={`min-h-9 rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50 sm:min-h-0 ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} type="button" onClick={() => updateQuery({tag: relatedTagQuery(activeTag, tag)})}>
                 <CommunityLabel name={name} imageUrl={image_url} />
               </button>
             ))}
@@ -75,6 +87,35 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
           ))}
         </div>
       </section>
+      <section className={compact ? '' : 'md:col-span-2'}>
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Skull size={16} /> Poisoned Pill</h2>
+          {activeTags.some((tag) => !poisonedPillTags.includes(tag)) && (
+            <div className="ml-auto flex flex-wrap justify-end gap-1">
+              {activeTags.filter((tag) => !poisonedPillTags.includes(tag)).map((tag) => (
+                <button key={tag} className="inline-flex h-9 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-xs text-red-700 hover:bg-red-50 sm:h-7" type="button" onClick={() => togglePoisonedPill(tag)}>
+                  <Skull size={13} /> Set <CommunityLabel name={tagDetailsByTag.get(tag)?.name || tag} imageUrl={tagDetailsByTag.get(tag)?.imageUrl} /> as Poison
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="mb-2 text-xs text-slate-500">Tip: Setting a tag as poison will ignore all posts by authors that have used a poisoned tag (until they stop).</p>
+        <div className="flex max-h-44 flex-wrap gap-2 overflow-auto">
+          {poisonedPillTags.length === 0 ? (
+            <div className="rounded-md border border-slate-100 bg-white px-3 py-2 text-xs text-slate-500">No poisoned-pill tags.</div>
+          ) : poisonedPillTags.map((tag) => (
+            <span key={tag} className="inline-flex items-center rounded-md border bg-white text-xs text-red-700">
+              <button className="min-h-9 px-2 py-1 sm:min-h-0" type="button" onClick={() => updateQuery({tag})}>
+                <CommunityLabel name={tagDetailsByTag.get(tag)?.name || tag} imageUrl={tagDetailsByTag.get(tag)?.imageUrl} />
+              </button>
+              <button className="min-h-9 border-l px-2 py-1 sm:min-h-0 sm:px-1" type="button" onClick={() => togglePoisonedPill(tag)} title="Remove poisoned pill" aria-label={`Remove poisoned pill ${tag}`}>
+                <Eye size={13} />
+              </button>
+            </span>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -84,4 +125,10 @@ function cloudFontSize(count, average) {
   const size = Math.min(Math.max(0.75 + ratio * 0.35, 0.75), 1.8)
 
   return `${size.toFixed(2)}rem`
+}
+
+function relatedTagQuery(activeTag, relatedTag) {
+  if (!activeTag || activeTag === relatedTag) return relatedTag
+
+  return `${activeTag}+${relatedTag}`
 }

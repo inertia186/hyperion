@@ -4,6 +4,7 @@ import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
+import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
 import PostList from './components/PostList'
 import PreviewPane from './components/PreviewPane'
 import ShortcutsPanel from './components/ShortcutsPanel'
@@ -32,7 +33,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
   const [loadMoreError, setLoadMoreError] = useState(null)
   const [previewActive, setPreviewActive] = useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
-  const [mobileTagsOpen, setMobileTagsOpen] = useState(false)
+  const [tagsOpen, setTagsOpen] = useState(false)
   const [shortcutsVisible, setShortcutsVisible] = useState(false)
   const [desktopPreviewPercent, setDesktopPreviewPercent] = useState(readDesktopPreviewPercent)
   const desktopLayoutRef = useRef(null)
@@ -47,10 +48,10 @@ export default function CurationInbox({session, refreshKey = 0}) {
   const selectedIndex = posts.findIndex((post) => post.id === selectedId)
   const selectedPost = posts[selectedIndex] || null
   const ignoredTags = postsPayload?.ignored_tags || session.ignored_tags || []
+  const poisonedPillTags = postsPayload?.poisoned_pill_tags || session.poisoned_pill_tags || []
   const favoriteTags = postsPayload?.favorite_tags || session.favorite_tags || []
   const pastTags = postsPayload?.past_tags || session.past_tags || []
   const activeTag = postsPayload?.query?.tag || ''
-  const activeAuthor = postsPayload?.query?.author || ''
   const activeTagIgnored = activeTag && ignoredTags.includes(activeTag)
   const pagination = postsPayload?.pagination
   const totalPosts = pagination?.total_count || 0
@@ -65,7 +66,6 @@ export default function CurationInbox({session, refreshKey = 0}) {
     '--desktop-preview-width': `${desktopPreviewPercent}%`
   }), [desktopPreviewPercent])
   const compactModeSelector = isMobilePreviewLayout || desktopPreviewPercent >= COMPACT_MODE_SELECTOR_PREVIEW_PERCENT
-
   const handleError = useCallback((err) => {
     if (err.status === 401 && err.payload?.login_url) {
       window.location.assign(err.payload.login_url)
@@ -87,7 +87,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
         setSelectedPostIds(new Set())
         setAllMatchingSelected(false)
         setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
-        setDraftTag(payload.query.tag_pattern || '')
+        setDraftTag(queryInputValue(payload.query))
       })
       .catch(handleError)
       .finally(() => setLoading(false))
@@ -173,15 +173,14 @@ export default function CurationInbox({session, refreshKey = 0}) {
   useEffect(() => {
     if (!isMobilePreviewLayout) {
       setMobilePreviewOpen(false)
-      setMobileTagsOpen(false)
     }
   }, [isMobilePreviewLayout])
 
   useEffect(() => {
-    document.body.classList.toggle('mobile-preview-open', (mobilePreviewOpen || mobileTagsOpen) && isMobilePreviewLayout)
+    document.body.classList.toggle('mobile-preview-open', mobilePreviewOpen && isMobilePreviewLayout)
 
     return () => document.body.classList.remove('mobile-preview-open')
-  }, [isMobilePreviewLayout, mobilePreviewOpen, mobileTagsOpen])
+  }, [isMobilePreviewLayout, mobilePreviewOpen])
 
   const updateQuery = (updates) => {
     setQuery((current) => ({...current, ...updates, page: updates.page || '1'}))
@@ -226,7 +225,12 @@ export default function CurationInbox({session, refreshKey = 0}) {
 
   const submitQuery = (event) => {
     event.preventDefault()
-    updateQuery({tag: draftTag.trim() || ''})
+    updateQuery(parseQueryInput(draftTag))
+  }
+
+  const resetQueryInput = () => {
+    setDraftTag('')
+    updateQuery({tag: '', author: ''})
   }
 
   const selectedPostRef = useRef(null)
@@ -285,16 +289,17 @@ export default function CurationInbox({session, refreshKey = 0}) {
       })
       setPostsPayload((payload) => {
         const markedPosts = payload.posts.map((item) => item.id === post.id ? {...item, read: result.read} : item)
+        const nextPayload = adjustReadCounts(payload, query, post.read ? 0 : 1)
 
         if (query.only_read) {
           const currentIndex = payload.posts.findIndex((item) => item.id === post.id)
           const nextIndex = direction > 0 ? Math.min(currentIndex + 1, payload.posts.length - 1) : Math.max(currentIndex - 1, 0)
           if (payload.posts[nextIndex]) setSelectedId(payload.posts[nextIndex].id)
 
-          return {...payload, posts: markedPosts}
+          return {...nextPayload, posts: markedPosts}
         }
 
-        return {...payload, posts: selectAfterRemoval(post.id, direction, markedPosts)}
+        return {...nextPayload, posts: selectAfterRemoval(post.id, direction, markedPosts)}
       })
     } catch (err) {
       handleError(err)
@@ -350,17 +355,19 @@ export default function CurationInbox({session, refreshKey = 0}) {
 
     setBusy(true)
     try {
-      await api.markManyRead(allMatchingSelected ? {all_matching: true, query} : postIds)
+      const result = await api.markManyRead(allMatchingSelected ? {all_matching: true, query} : postIds)
       clearSelection()
       setPostsPayload((payload) => {
         const markedPostIds = allMatchingSelected ? payload.posts.map((post) => post.id) : postIds
         const markedPosts = payload.posts.map((post) => postIds.includes(post.id) ? {...post, read: true} : post)
+        const readDelta = allMatchingSelected ? result.marked_count ?? markedPostIds.length : markedPostIds.length
+        const nextPayload = adjustReadCounts(payload, query, readDelta)
 
         if (query.only_read) {
-          return {...payload, posts: markedPosts.map((post) => markedPostIds.includes(post.id) ? {...post, read: true} : post)}
+          return {...nextPayload, posts: markedPosts.map((post) => markedPostIds.includes(post.id) ? {...post, read: true} : post)}
         }
 
-        return {...payload, posts: selectAfterRemovingIds(markedPostIds, markedPosts)}
+        return {...nextPayload, posts: selectAfterRemovingIds(markedPostIds, markedPosts)}
       })
     } catch (err) {
       handleError(err)
@@ -402,7 +409,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
     setBusy(true)
     try {
       const payload = activeTagIgnored ? await api.unignoreTag(activeTag) : await api.ignoreTag(activeTag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
@@ -414,7 +421,19 @@ export default function CurationInbox({session, refreshKey = 0}) {
     setBusy(true)
     try {
       const payload = favoriteTags.includes(tag) ? await api.unfavoriteTag(tag) : await api.favoriteTag(tag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+    } catch (err) {
+      handleError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const togglePoisonedPill = async (tag) => {
+    setBusy(true)
+    try {
+      const payload = poisonedPillTags.includes(tag) ? await api.unpoisonTag(tag) : await api.poisonTag(tag)
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
@@ -426,7 +445,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
     setBusy(true)
     try {
       const payload = await api.removePastTag(tag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
@@ -440,7 +459,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
     setBusy(true)
     try {
       const payload = onlyIgnored ? await api.clearIgnoredPastTags() : await api.clearPastTags()
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
@@ -454,7 +473,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
     setBusy(true)
     try {
       const payload = await api.clearIgnoredTags()
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
+      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
@@ -501,13 +520,13 @@ export default function CurationInbox({session, refreshKey = 0}) {
   const focusTag = (tag) => {
     updateQuery({tag})
     if (isMobilePreviewLayout) closePreview()
-    setMobileTagsOpen(false)
+    setTagsOpen(false)
   }
 
   const focusAuthor = (author) => {
     updateQuery({author})
     if (isMobilePreviewLayout) closePreview()
-    setMobileTagsOpen(false)
+    setTagsOpen(false)
   }
 
   const markSelectedReadAndMove = useCallback((direction) => {
@@ -569,8 +588,11 @@ export default function CurationInbox({session, refreshKey = 0}) {
     pastTags,
     favoriteTags,
     ignoredTags,
+    poisonedPillTags,
+    activeTag,
     updateQuery: updateTagPanelQuery,
     toggleFavorite,
+    togglePoisonedPill,
     removePastTag,
     clearPastTags,
     clearIgnoredTags
@@ -585,36 +607,24 @@ export default function CurationInbox({session, refreshKey = 0}) {
             draftTag={draftTag}
             setDraftTag={setDraftTag}
             submitQuery={submitQuery}
+            resetQueryInput={resetQueryInput}
             updateQuery={updateQuery}
             markSelectedRead={markSelectedRead}
             selectedCount={visibleSelectionCount}
             toggleIgnoredTag={toggleIgnoredTag}
             activeTag={activeTag}
-            activeAuthor={activeAuthor}
             activeTagIgnored={activeTagIgnored}
             loading={loading || busy}
             payload={postsPayload}
             toggleMute={toggleMute}
             toggleOnlyFavorites={toggleOnlyFavorites}
-            onOpenTags={() => setMobileTagsOpen((open) => !open)}
+            onOpenTags={() => setTagsOpen(true)}
             compactModeSelector={compactModeSelector}
           />
 
-          {mobileTagsOpen && !isMobilePreviewLayout && (
-            <div className="mb-3 rounded-md border border-slate-200 bg-white p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-800">Tags</div>
-                <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={() => setMobileTagsOpen(false)} aria-label="Close tags">
-                  <X size={15} />
-                </button>
-              </div>
-              <TagPanels {...tagPanelProps} compact />
-            </div>
-          )}
-
           {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-          <div ref={listScrollRef} className="overflow-hidden rounded-md border border-slate-200 bg-white">
+          <div ref={listScrollRef} className="post-list-shell overflow-hidden rounded-md border border-slate-200 bg-white">
             <div className="flex items-center gap-3 border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
               <span>{loading ? 'Loading posts' : resultCountLabel}</span>
             </div>
@@ -715,9 +725,9 @@ export default function CurationInbox({session, refreshKey = 0}) {
         hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
       />
 
-      <MobileTagsDrawer
-        open={mobileTagsOpen && isMobilePreviewLayout}
-        onClose={() => setMobileTagsOpen(false)}
+      <TagsModal
+        open={tagsOpen}
+        onClose={() => setTagsOpen(false)}
         tagPanelProps={tagPanelProps}
       />
 
@@ -726,22 +736,21 @@ export default function CurationInbox({session, refreshKey = 0}) {
   )
 }
 
-function MobileTagsDrawer({open, onClose, tagPanelProps}) {
+function TagsModal({open, onClose, tagPanelProps}) {
+  useModalDismiss(open, onClose)
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden" role="dialog" aria-modal="true" aria-label="Tag discovery">
-      <div className="safe-area-shell safe-area-top mobile-preview-sheet flex flex-col bg-white">
-        <div className="flex min-h-[56px] items-center gap-3 border-b border-slate-200 px-3">
-          <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 text-slate-700" type="button" onClick={onClose} aria-label="Close tags">
-            <X size={18} />
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-16 sm:pt-24" role="dialog" aria-modal="true" aria-label="Tags" onClick={closeOnBackdropClick(onClose)}>
+      <div className="flex max-h-[calc(100vh-5rem)] w-full max-w-4xl flex-col rounded-md border border-slate-200 bg-white shadow-xl sm:max-h-[calc(100vh-7rem)]">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="text-sm font-semibold text-slate-900">Tags</div>
+          <button className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close tags">
+            <X size={15} />
           </button>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-slate-900">Tags</div>
-          </div>
         </div>
-        <div className="safe-area-bottom min-h-0 flex-1 overflow-auto p-3">
-          <TagPanels {...tagPanelProps} compact />
+        <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
+          <TagPanels {...tagPanelProps} />
         </div>
       </div>
     </div>
@@ -818,7 +827,7 @@ function MobilePreviewDrawer({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden" role="dialog" aria-modal="true" aria-label="Post preview">
+    <div className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden" role="dialog" aria-modal="true" aria-label="Post preview" onClick={closeOnBackdropClick(onClose)}>
       <div className="safe-area-shell safe-area-top mobile-preview-sheet flex flex-col bg-white">
         <div className="min-h-0 flex-1 overflow-hidden">
           <PreviewPane
@@ -899,6 +908,60 @@ function writeDesktopPreviewPercent(value) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
+}
+
+function queryInputValue(query = {}) {
+  return [query.tag_pattern, query.author ? `@${query.author}` : ''].filter(Boolean).join(' ')
+}
+
+function parseQueryInput(value) {
+  const tokens = value.trim().split(/\s+/).filter(Boolean)
+  let author = ''
+  const tagTokens = []
+
+  tokens.forEach((token) => {
+    if (token.startsWith('@') && token.length > 1) {
+      author = token.slice(1)
+    } else {
+      tagTokens.push(token)
+    }
+  })
+
+  return {
+    tag: tagTokens.join(' '),
+    author
+  }
+}
+
+function adjustReadCounts(payload, query, readDelta) {
+  if (!readDelta || query.only_read) return payload
+
+  const counts = payload.counts ? {
+    ...payload.counts,
+    read_posts: Math.max((payload.counts.read_posts || 0) + readDelta, 0)
+  } : payload.counts
+
+  if (query.only_ignored || query.only_deleted || query.only_blacklisted) {
+    return {...payload, counts}
+  }
+
+  const totalCount = Math.max((payload.pagination?.total_count || 0) - readDelta, 0)
+  const limit = Math.max(payload.pagination?.limit || 1, 1)
+
+  return {
+    ...payload,
+    counts,
+    mode_counts: {
+      ...payload.mode_counts,
+      unread: Math.max((payload.mode_counts?.unread || 0) - readDelta, 0),
+      read: Math.max((payload.mode_counts?.read || 0) + readDelta, 0)
+    },
+    pagination: payload.pagination ? {
+      ...payload.pagination,
+      total_count: totalCount,
+      total_pages: Math.max(Math.ceil(totalCount / limit), 1)
+    } : payload.pagination
+  }
 }
 
 function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {

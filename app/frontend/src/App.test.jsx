@@ -143,8 +143,11 @@ const pointerEvent = (type, target, properties = {}) => {
 let currentPosts
 let detailResponses
 let detailFailures
+let revisionResponses
+let revisionFailures
 let hivesignerAvailable
 let emptyTags
+let onlyFavoriteTagsEnabled
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
@@ -160,7 +163,7 @@ const postsPayload = (params = new URLSearchParams()) => {
       tag_pattern: tag,
       author,
       muted_authors_enabled: false,
-      only_favorite_tags: false,
+      only_favorite_tags: onlyFavoriteTagsEnabled,
       sort: params.get('sort') || 'latest',
       limit,
       only_read: params.get('only_read') === 'true',
@@ -174,9 +177,10 @@ const postsPayload = (params = new URLSearchParams()) => {
     related_tags: [{name: 'haf', tag: 'haf', count: 24}, {name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png', count: 6}],
     related_authors: ['visible-author'],
     ignored_tags: ['spam'],
+    poisoned_pill_tags: [],
     favorite_tags: ['haf'],
     past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}],
-    counts: {read_posts: 1, ignored_tags: 1, tags: 3}
+    counts: {read_posts: 1, ignored_tags: 1, poisoned_pill_tags: 0, muted_posts: 2, tags: 3}
   }
 }
 
@@ -194,8 +198,11 @@ describe('App', () => {
     currentPosts = posts
     detailResponses = new Map()
     detailFailures = new Set()
+    revisionResponses = new Map()
+    revisionFailures = new Set()
     hivesignerAvailable = false
     emptyTags = new Set()
+    onlyFavoriteTagsEnabled = false
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
@@ -215,14 +222,15 @@ describe('App', () => {
         return jsonResponse({
           authenticated: true,
           account: {name: 'fixture-curator', avatar_url: 'avatar.png'},
-          preferences: {muted_authors_enabled: false, only_favorite_tags: false, enabled_blacklist_sources: [], hivesigner_available: hivesignerAvailable},
+          preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, enabled_blacklist_sources: [], hivesigner_available: hivesignerAvailable},
           blacklist_sources: [
             {community: 'hive-163399', name: 'Trusted Safety', enabled: false},
             {community: 'hive-136001', name: 'Ban Hammer', enabled: false}
           ],
-          counts: {read_posts: 1, ignored_tags: 1, favorite_tags: 1, past_tags: 1, tags: 3},
+          counts: {read_posts: 1, ignored_tags: 1, poisoned_pill_tags: 0, favorite_tags: 1, past_tags: 1, muted_posts: 2, tags: 3},
           muted_authors: ['muted-author'],
           ignored_tags: ['spam'],
+          poisoned_pill_tags: [],
           favorite_tags: ['haf'],
           past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]
         })
@@ -251,9 +259,34 @@ describe('App', () => {
             hive_blog: `https://hive.blog/hive-13323/@visible-author/post-${id}`,
             peakd: `https://peakd.com/hive-13323/@visible-author/post-${id}`,
             hiveblocks: `https://hiveblocks.com/hive-13323/@visible-author/post-${id}`,
-            hive_db: `https://hive-db.com/hive-13323/@visible-author/post-${id}`,
+            hive_db: `https://hivehub.dev/hive-13323/@visible-author/post-${id}`,
             scribe: `http://scribe.hivekings.com/?url=post-${id}`
           }
+        })
+      }
+
+      const revisionsMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/revisions$/)
+      if (revisionsMatch) {
+        const id = Number(revisionsMatch[1])
+
+        if (revisionFailures.has(id)) {
+          return jsonError({error: 'Diff service is not configured.'}, 503)
+        }
+
+        if (revisionResponses.has(id)) {
+          return revisionResponses.get(id).promise.then((payload) => jsonResponse(payload))
+        }
+
+        return jsonResponse({
+          post_id: id,
+          author: 'visible-author',
+          permlink: 'post-1',
+          title: 'First Post',
+          revisions: [
+            {index: 0, label: 'Revision 1', published_at: '2026-01-01T00:00:00', block_num: 10, body: 'shared line\nold source line', body_html: '<p>Old rendered body</p>'},
+            {index: 1, label: 'Revision 2', published_at: '2026-01-02T00:00:00', block_num: 20, body: 'shared line\nmiddle source line', body_html: '<p>Middle rendered body</p>'},
+            {index: 2, label: 'Revision 3', published_at: '2026-01-03T00:00:00', block_num: 30, body: 'shared line\ncurrent source line', body_html: '<p>Current rendered body</p>'}
+          ]
         })
       }
 
@@ -263,17 +296,41 @@ describe('App', () => {
       }
 
       if (url === '/api/v1/posts/read' && options.method === 'PATCH') {
-        return jsonResponse({read_posts_count: currentPosts.length})
+        const body = JSON.parse(options.body)
+        return jsonResponse({
+          marked_count: body.all_matching ? currentPosts.length : body.post_ids.length,
+          read_posts_count: currentPosts.length
+        })
       }
 
       const ignoreMatch = url.toString().match(/\/api\/v1\/tags\/([^/]+)\/ignored$/)
       if (ignoreMatch && options.method === 'POST') {
         const tag = decodeURIComponent(ignoreMatch[1])
-        return jsonResponse({ignored_tags: ['spam', tag], favorite_tags: ['haf'], past_tags: [{name: tag, tag}]})
+        return jsonResponse({ignored_tags: ['spam', tag], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: tag, tag}]})
       }
 
       if (ignoreMatch && options.method === 'DELETE') {
-        return jsonResponse({ignored_tags: ['spam'], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
+      }
+
+      const poisonMatch = url.toString().match(/\/api\/v1\/tags\/([^/]+)\/poisoned_pill$/)
+      if (poisonMatch && options.method === 'POST') {
+        const tag = decodeURIComponent(poisonMatch[1])
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [tag], favorite_tags: ['haf'], past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]})
+      }
+
+      if (poisonMatch && options.method === 'DELETE') {
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]})
+      }
+
+      const favoriteMatch = url.toString().match(/\/api\/v1\/tags\/([^/]+)\/favorite$/)
+      if (favoriteMatch && options.method === 'POST') {
+        const tag = decodeURIComponent(favoriteMatch[1])
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf', tag], past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]})
+      }
+
+      if (favoriteMatch && options.method === 'DELETE') {
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]})
       }
 
       if (url === '/api/v1/preferences/mute' && options.method === 'PATCH') {
@@ -281,7 +338,8 @@ describe('App', () => {
       }
 
       if (url === '/api/v1/preferences/only_favorite_tags' && options.method === 'PATCH') {
-        return jsonResponse({only_favorite_tags: JSON.parse(options.body).enabled})
+        onlyFavoriteTagsEnabled = JSON.parse(options.body).enabled
+        return jsonResponse({only_favorite_tags: onlyFavoriteTagsEnabled})
       }
 
       if (url === '/api/v1/preferences/blacklists' && options.method === 'PATCH') {
@@ -296,15 +354,15 @@ describe('App', () => {
       }
 
       if (url === '/api/v1/past_tags?only_ignored=true' && options.method === 'DELETE') {
-        return jsonResponse({ignored_tags: ['spam'], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
       }
 
       if (url === '/api/v1/past_tags' && options.method === 'DELETE') {
-        return jsonResponse({ignored_tags: ['spam'], favorite_tags: ['haf'], past_tags: []})
+        return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: []})
       }
 
       if (url === '/api/v1/ignored_tags' && options.method === 'DELETE') {
-        return jsonResponse({ignored_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
+        return jsonResponse({ignored_tags: [], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
       }
 
       throw new Error(`Unhandled fetch ${url}`)
@@ -333,9 +391,24 @@ describe('App', () => {
     expect(screen.getByRole('dialog', {name: 'Settings'})).toBeInTheDocument()
     expect(screen.getByLabelText(/Trusted Safety/)).not.toBeChecked()
     expect(screen.getByLabelText(/Ban Hammer/)).not.toBeChecked()
+    expect(screen.getByRole('link', {name: 'Tag management'})).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', {name: 'Legacy Inbox'})).toHaveAttribute('href', '/posts')
 
     fireEvent.click(screen.getByRole('button', {name: 'Close settings'}))
+    expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
+  })
+
+  test('dismisses settings with Escape and click-away', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
+    expect(screen.getByRole('dialog', {name: 'Settings'})).toBeInTheDocument()
+    fireEvent.keyDown(document, {key: 'Escape'})
+    expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
+    const dialog = screen.getByRole('dialog', {name: 'Settings'})
+    fireEvent.click(dialog)
     expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
   })
 
@@ -495,7 +568,7 @@ describe('App', () => {
     currentPosts = [...posts, ...Array.from({length: 28}, (_item, index) => makePost(index + 4))]
     await renderApp()
 
-    fireEvent.change(screen.getByPlaceholderText('haf @author app:peakd -spam'), {target: {value: 'haf'}})
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'haf'}})
     fireEvent.click(screen.getByRole('button', {name: 'Search'}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
 
@@ -541,9 +614,121 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
     expect(screen.getByText('Replies: 2')).toBeInTheDocument()
-    expect(screen.getByText('1.234 HBD')).toBeInTheDocument()
+    expect(screen.getAllByText('1.234 HBD').length).toBeGreaterThan(1)
+    expect(screen.getByRole('link', {name: /canonical.example/i})).toHaveAttribute('href', 'https://canonical.example/1')
+    expect(screen.queryByRole('link', {name: /^Canonical$/i})).not.toBeInTheDocument()
     expect(screen.getByRole('link', {name: /hive.blog/i})).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/post-1')
-    expect(screen.getByRole('link', {name: /hive-db/i})).toHaveAttribute('href', 'https://hive-db.com/hive-13323/@visible-author/post-1')
+    expect(screen.getByRole('link', {name: /hivehub.dev/i})).toHaveAttribute('href', 'https://hivehub.dev/hive-13323/@visible-author/post-1')
+    expect(screen.getByRole('button', {name: /Diff/i})).toBeInTheDocument()
+    expect(screen.queryByRole('link', {name: /scribe/i})).not.toBeInTheDocument()
+  })
+
+  test('uses Bootstrap-style post list columns with expandable tags', async () => {
+    await renderApp()
+
+    const row = document.querySelector('[data-post-list-row="1"]')
+    expect(row).toHaveClass('post-list-row')
+    expect(within(row).getByRole('button', {name: 'Select First Post'})).toBeInTheDocument()
+    expect(within(row).getByText('1.234 HBD')).toBeInTheDocument()
+    expect(within(row).getByText('1.234 HBD').closest('.post-row-payout')).toBeInTheDocument()
+    expect(within(row).getByTestId('post-thumbnail-1')).toHaveClass('post-row-thumbnail')
+    expect(within(row).getAllByRole('button', {name: 'Focus author @visible-author'}).length).toBeGreaterThan(0)
+
+    const tagsColumn = within(row).getByTestId('post-tags-1')
+    expect(tagsColumn).toHaveClass('post-row-tags')
+    expect(within(tagsColumn).getByRole('button', {name: 'Focus tag hive-13323'})).toHaveTextContent('Hive')
+    expect(within(tagsColumn).getByRole('button', {name: 'Expand tags for First Post'})).toHaveAttribute('aria-expanded', 'false')
+    expect(within(tagsColumn).queryByRole('button', {name: 'Focus tag hive-19999'})).not.toBeInTheDocument()
+    fireEvent.click(within(tagsColumn).getByRole('button', {name: 'Expand tags for First Post'}))
+
+    expect(within(tagsColumn).getByRole('button', {name: 'Collapse tags for First Post'})).toHaveAttribute('aria-expanded', 'true')
+    expect(within(tagsColumn).getByRole('button', {name: 'Focus tag hive-19999'})).toHaveTextContent('Side Community')
+    expect(within(tagsColumn).getByRole('button', {name: 'Focus tag haf'})).toHaveTextContent('haf')
+  })
+
+  test('opens a rendered revision diff modal', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
+    expect(within(dialog).getByText('-middle source line')).toBeInTheDocument()
+    expect(within(dialog).getByText('+current source line')).toBeInTheDocument()
+    expect(within(dialog).queryByText('-old source line')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Current rendered body')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', {name: 'Revision pair'})).toHaveValue('1')
+
+    fireEvent.change(within(dialog).getByRole('combobox', {name: 'Revision pair'}), {target: {value: '0'}})
+
+    expect(within(dialog).getByText('-old source line')).toBeInTheDocument()
+    expect(within(dialog).getByText('+middle source line')).toBeInTheDocument()
+    expect(within(dialog).queryByText('+current source line')).not.toBeInTheDocument()
+  })
+
+  test('dismisses the revision diff modal with Escape and click-away', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    expect(await screen.findByRole('dialog', {name: 'Revision diff'})).toBeInTheDocument()
+    fireEvent.keyDown(document, {key: 'Escape'})
+    expect(screen.queryByRole('dialog', {name: 'Revision diff'})).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
+    fireEvent.click(dialog)
+    expect(screen.queryByRole('dialog', {name: 'Revision diff'})).not.toBeInTheDocument()
+  })
+
+  test('shows revision diff errors', async () => {
+    revisionFailures.add(1)
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
+    expect(within(dialog).getByText('Diff service is not configured.')).toBeInTheDocument()
+  })
+
+  test('hides canonical links when the host is already shown', async () => {
+    detailResponses.set(1, {
+      promise: Promise.resolve({
+        id: 1,
+        title: 'First Post',
+        body_html: '<p>Preview 1</p>',
+        urls: {
+          canonical: 'https://www.hive.blog/hive-13323/@visible-author/first-post',
+          hive_blog: 'https://hive.blog/hive-13323/@visible-author/first-post',
+          peakd: 'https://peakd.com/hive-13323/@visible-author/first-post'
+        }
+      })
+    })
+
+    await renderApp()
+
+    const hiveBlogLinks = screen.getAllByRole('link', {name: /hive.blog/i})
+    expect(hiveBlogLinks).toHaveLength(1)
+    expect(hiveBlogLinks[0]).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/first-post')
+  })
+
+  test('hides canonical peakd links when peakd is already shown', async () => {
+    detailResponses.set(1, {
+      promise: Promise.resolve({
+        id: 1,
+        title: 'First Post',
+        body_html: '<p>Preview 1</p>',
+        urls: {
+          canonical: 'https://peakd.com/hive-13323/@visible-author/first-post',
+          hive_blog: 'https://hive.blog/hive-13323/@visible-author/first-post',
+          peakd: 'https://peakd.com/hive-13323/@visible-author/first-post'
+        }
+      })
+    })
+
+    await renderApp()
+
+    const peakdLinks = screen.getAllByRole('link', {name: /peakd/i})
+    expect(peakdLinks).toHaveLength(1)
+    expect(peakdLinks[0]).toHaveTextContent('peakd')
   })
 
   test('renders blacklist reasons in the preview header', async () => {
@@ -631,6 +816,23 @@ describe('App', () => {
     vi.useRealTimers()
   })
 
+  test('dismisses the hivesigner vote modal with Escape and click-away', async () => {
+    hivesignerAvailable = true
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
+    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    expect(screen.getByRole('dialog', {name: 'Hivesigner vote'})).toBeInTheDocument()
+    fireEvent.keyDown(document, {key: 'Escape'})
+    expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
+    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
+    fireEvent.click(dialog)
+    expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
+  })
+
   test('clears past and ignored tag groups', async () => {
     currentPosts = []
     await renderApp({waitForPreview: false})
@@ -648,13 +850,57 @@ describe('App', () => {
   test('submits the compact query field with the existing tag pattern syntax', async () => {
     await renderApp()
 
-    fireEvent.change(screen.getByPlaceholderText('haf @author app:peakd -spam'), {target: {value: 'haf @author app:peakd -spam'}})
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'photography @author app:peakd -contests'}})
     fireEvent.click(screen.getByRole('button', {name: 'Search'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('tag=haf+%40author+app%3Apeakd+-spam'),
+      expect.stringContaining('tag=photography+app%3Apeakd+-contests'),
       expect.any(Object)
     ))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('author=author'),
+      expect.any(Object)
+    ))
+  })
+
+  test('supports the Hyperion Goes Live tag discovery and favorites workflow', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'haf'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('haf')
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+
+    let relatedSection = screen.getByRole('heading', {name: 'Related Tags'}).closest('section')
+    fireEvent.click(within(relatedSection).getByRole('button', {name: 'Hive'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf%2Bhive-13323'), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('haf+hive-13323')
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+
+    expect(within(relatedSection).queryByTitle('Poison tag')).not.toBeInTheDocument()
+
+    const poisonSection = screen.getByRole('heading', {name: 'Poisoned Pill'}).closest('section')
+    expect(within(poisonSection).getByText('No poisoned-pill tags.')).toBeInTheDocument()
+    expect(within(poisonSection).getByText('Tip: Setting a tag as poison will ignore all posts by authors that have used a poisoned tag (until they stop).')).toBeInTheDocument()
+    fireEvent.click(within(poisonSection).getByRole('button', {name: 'Set Hive as Poison'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/tags/hive-13323/poisoned_pill', expect.objectContaining({method: 'POST'})))
+    await waitFor(() => expect(within(poisonSection).getByRole('button', {name: 'Remove poisoned pill hive-13323'})).toBeInTheDocument())
+    expect(within(poisonSection).getByRole('button', {name: 'Hive'})).toBeInTheDocument()
+
+    const pastSection = screen.getByRole('heading', {name: 'Past'}).closest('section')
+    expect(within(pastSection).queryByTitle('Poison tag')).not.toBeInTheDocument()
+
+    fireEvent.click(within(pastSection).getByTitle('Favorite tag'))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/tags/hive-13323/favorite', expect.objectContaining({method: 'POST'})))
+    await waitFor(() => expect(within(pastSection).getByTitle('Remove favorite')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', {name: 'Favorites'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/only_favorite_tags', expect.objectContaining({method: 'PATCH'})))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('tag=haf%2Bhive-13323'), expect.any(Object)))
+    expect(screen.getByRole('button', {name: 'Favorites'})).toHaveAttribute('aria-pressed', 'true')
   })
 
   test('focuses the query from a post list tag without changing the preview selection', async () => {
@@ -672,7 +918,7 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', {name: 'Focus author @visible-author'})[0])
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('author=visible-author'), expect.any(Object)))
-    expect(screen.getByRole('button', {name: 'Clear author @visible-author'})).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('@visible-author')
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
@@ -688,10 +934,22 @@ describe('App', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=hive-19999'), expect.any(Object)))
   })
 
+  test('focuses the query from a category tag without expanding the tag control', async () => {
+    await renderApp()
+
+    const tagsColumn = within(document.querySelector('[data-post-list-row="1"]')).getByTestId('post-tags-1')
+    fireEvent.click(within(tagsColumn).getByRole('button', {name: 'Focus tag hive-13323'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=hive-13323'), expect.any(Object)))
+    expect(within(tagsColumn).getByRole('button', {name: 'Expand tags for First Post'})).toHaveAttribute('aria-expanded', 'false')
+  })
+
   test('focuses the query from a preview tag', async () => {
     await renderApp()
 
-    fireEvent.click(screen.getAllByRole('button', {name: 'Focus tag haf'})[1])
+    const previewTags = screen.getByTestId('preview-tags-1')
+    fireEvent.click(within(previewTags).getByRole('button', {name: 'Expand tags for preview First Post'}))
+    fireEvent.click(within(previewTags).getByRole('button', {name: 'Focus tag haf'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
   })
@@ -702,7 +960,7 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', {name: 'Focus author @visible-author'})[1])
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('author=visible-author'), expect.any(Object)))
-    expect(screen.getByRole('button', {name: 'Clear author @visible-author'})).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('@visible-author')
   })
 
   test('clears an active author query back to all authors', async () => {
@@ -711,9 +969,10 @@ describe('App', () => {
     fireEvent.click(screen.getAllByRole('button', {name: 'Focus author @visible-author'})[0])
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('author=visible-author'), expect.any(Object)))
 
-    fireEvent.click(screen.getByRole('button', {name: 'Clear author @visible-author'}))
+    fireEvent.click(screen.getByRole('button', {name: 'Reset'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('author='), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('')
   })
 
   test('clears an active tag query back to all tags', async () => {
@@ -721,12 +980,12 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', {name: 'Focus tag curation'}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
-    expect(screen.getByRole('button', {name: 'Clear tag curation'})).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('curation')
 
-    fireEvent.click(screen.getByRole('button', {name: 'Clear tag curation'}))
+    fireEvent.click(screen.getByRole('button', {name: 'Reset'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('tag='), expect.any(Object)))
-    expect(screen.getByRole('button', {name: 'All tags'})).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('')
   })
 
   test('updates sort and mutually exclusive desktop mode selector', async () => {
@@ -784,7 +1043,7 @@ describe('App', () => {
   test('enables tag ignore actions when the query has an active tag', async () => {
     await renderApp()
 
-    fireEvent.change(screen.getByPlaceholderText('haf @author app:peakd -spam'), {target: {value: 'haf'}})
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'haf'}})
     fireEvent.click(screen.getByRole('button', {name: 'Search'}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
     await waitFor(() => expect(screen.getByRole('button', {name: 'Ignore tag'})).toBeEnabled())
@@ -810,6 +1069,7 @@ describe('App', () => {
   })
 
   test('marks only selected rows read and removes them from the unread list', async () => {
+    window.localStorage.setItem('hyperion.desktopPreviewPercent', '45')
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Select First Post'}))
@@ -825,6 +1085,9 @@ describe('App', () => {
     expect(screen.queryByText('Last Post')).not.toBeInTheDocument()
     expect(screen.getAllByText('Middle Post').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', {name: 'Mark selected read'})).toBeDisabled()
+    expect(screen.getByText('1 unread posts')).toBeInTheDocument()
+    expect(screen.getByRole('button', {name: /Unread/})).toHaveTextContent('1')
+    expect(screen.getByRole('button', {name: /Read/})).toHaveTextContent('3')
   })
 
   test('keeps selected rows visible when marking read in read mode', async () => {
@@ -865,7 +1128,7 @@ describe('App', () => {
   test('ignores global shortcuts while the query input is focused', async () => {
     await renderApp()
 
-    fireEvent.keyDown(screen.getByPlaceholderText('haf @author app:peakd -spam'), {key: 'j'})
+    fireEvent.keyDown(screen.getByPlaceholderText('photography @author app:peakd -contests'), {key: 'j'})
 
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
@@ -1030,6 +1293,7 @@ describe('App', () => {
     const dialog = await screen.findByRole('dialog', {name: 'Post preview'})
     await waitFor(() => expect(within(dialog).getByText('Preview 2')).toBeInTheDocument())
 
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Expand tags for preview Middle Post'}))
     fireEvent.click(within(dialog).getByRole('button', {name: 'Focus tag curation'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
@@ -1048,17 +1312,31 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Post preview'})).not.toBeInTheDocument())
   })
 
-  test('opens mobile tag discovery and focuses a tag', async () => {
+  test('opens the tags modal on mobile and focuses a tag', async () => {
     setMobileLayout(true)
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
 
-    const dialog = await screen.findByRole('dialog', {name: 'Tag discovery'})
+    const dialog = await screen.findByRole('dialog', {name: 'Tags'})
     fireEvent.click(within(dialog).getAllByRole('button', {name: 'haf'})[0])
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
-    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Tag discovery'})).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Tags'})).not.toBeInTheDocument())
+  })
+
+  test('dismisses the tags modal with Escape and click-away', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+    expect(await screen.findByRole('dialog', {name: 'Tags'})).toBeInTheDocument()
+    fireEvent.keyDown(document, {key: 'Escape'})
+    expect(screen.queryByRole('dialog', {name: 'Tags'})).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+    const dialog = await screen.findByRole('dialog', {name: 'Tags'})
+    fireEvent.click(dialog)
+    expect(screen.queryByRole('dialog', {name: 'Tags'})).not.toBeInTheDocument()
   })
 
   test('switches related tags into word cloud mode', async () => {
@@ -1075,7 +1353,7 @@ describe('App', () => {
     expect(cloudTag.style.fontSize).toMatch(/rem$/)
   })
 
-  test('focuses a related tag from the collapsed desktop tag panel', async () => {
+  test('focuses a related tag from the tags modal', async () => {
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
@@ -1086,6 +1364,20 @@ describe('App', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
     await waitFor(() => expect(screen.queryByRole('heading', {name: 'Related Tags'})).not.toBeInTheDocument())
     expect(screen.getByText('Hyperion')).toBeInTheDocument()
+  })
+
+  test('appends a related tag to the active tag query', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'curation'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+    const relatedSection = screen.getByRole('heading', {name: 'Related Tags'}).closest('section')
+    fireEvent.click(within(relatedSection).getByRole('button', {name: 'haf'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation%2Bhaf'), expect.any(Object)))
   })
 
   test('keeps rendering when a related tag query returns no posts', async () => {

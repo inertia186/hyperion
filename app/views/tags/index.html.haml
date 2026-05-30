@@ -32,6 +32,6 @@
           %td
             = link_to 'Clear', tag_path(tag, sort: @sort, limit: @limit, type: @type), method: :delete, data: {confirm: 'Are you sure?'}
             - if tag.type == AccountTag::IGNORED_TYPE && also.where(type: AccountTag::POISONED_PILL_TYPE).none?
-              = link_to 'Add Poistoned Pill', create_poisoned_pill_tag_path(tag.tag, sort: @sort, limit: @limit, type: @type), method: :post
+              = link_to 'Add Poisoned Pill', create_poisoned_pill_tag_path(tag.tag, sort: @sort, limit: @limit, type: @type), method: :post
             - if tag.type == AccountTag::PAST_TYPE && also.where(type: AccountTag::FAVORITE_TYPE).none?
               = link_to 'Add Favorite', create_favorite_tag_path(tag.tag, sort: @sort, limit: @limit, type: @type), method: :post

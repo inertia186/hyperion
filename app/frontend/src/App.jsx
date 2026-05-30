@@ -3,6 +3,7 @@ import { LogOut, Settings, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
+import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -88,6 +89,7 @@ function SettingsModal({session, onClose, onSave}) {
   const [selectedSources, setSelectedSources] = useState(() => new Set(session.preferences.enabled_blacklist_sources || []))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  useModalDismiss(true, onClose)
 
   const toggleSource = (community) => {
     setSelectedSources((current) => {
@@ -115,7 +117,7 @@ function SettingsModal({session, onClose, onSave}) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-16 sm:pt-24" role="dialog" aria-modal="true" aria-label="Settings">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-16 sm:pt-24" role="dialog" aria-modal="true" aria-label="Settings" onClick={closeOnBackdropClick(onClose)}>
       <div className="w-full max-w-lg rounded-md border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <div className="text-sm font-semibold text-slate-900">Settings</div>
@@ -142,6 +144,7 @@ function SettingsModal({session, onClose, onSave}) {
           {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
         </div>
         <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
+          <a className="text-sm text-blue-700 hover:underline" href="/tags">Tag management</a>
           <a className="text-sm text-blue-700 hover:underline" href="/posts">Legacy Inbox</a>
           <div className="ml-auto flex items-center gap-2">
             <button className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50" type="button" onClick={onClose} disabled={saving}>Cancel</button>

@@ -1,4 +1,4 @@
-import { CheckSquare, Eye, Filter, Search, Star, StarOff, Tags, Volume2, VolumeX, X } from 'lucide-react'
+import { CheckSquare, Eye, Filter, RotateCcw, Search, Star, StarOff, Tags, Volume2, VolumeX, X } from 'lucide-react'
 import { SORTS } from '../constants'
 import ModeSelector from './ModeSelector'
 
@@ -7,12 +7,12 @@ export default function Toolbar({
   draftTag,
   setDraftTag,
   submitQuery,
+  resetQueryInput,
   updateQuery,
   markSelectedRead,
   selectedCount,
   toggleIgnoredTag,
   activeTag,
-  activeAuthor,
   activeTagIgnored,
   loading,
   payload,
@@ -28,36 +28,21 @@ export default function Toolbar({
           <span className="sr-only">Tag, author, app, excluded tags</span>
           <div className="flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
             <Search size={16} className="text-slate-400" />
-            <input className="min-w-0 flex-1 bg-transparent text-sm outline-none" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="haf @author app:peakd -spam" />
+            <input className="min-w-0 flex-1 bg-transparent text-sm outline-none" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
           </div>
         </label>
         <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-w-24" type="submit" disabled={loading} aria-label="Search">
           <Filter size={16} />
           <span className="hidden sm:inline">Search</span>
         </button>
+        <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:min-w-24" type="button" onClick={resetQueryInput} disabled={loading} aria-label="Reset">
+          <RotateCcw size={16} />
+          <span className="hidden sm:inline">Reset</span>
+        </button>
       </form>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <ModeSelector query={query} counts={payload?.mode_counts} compact={compactModeSelector} onChange={updateQuery} />
-        <ChipButton
-          active={!activeTag}
-          label="All tags"
-          onClick={() => updateQuery({tag: ''})}
-        />
-        {activeTag && (
-          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 text-sm text-blue-800 hover:bg-blue-100" type="button" onClick={() => updateQuery({tag: ''})} aria-label={`Clear tag ${activeTag}`}>
-            {activeTag}
-            <X size={14} />
-            <span className="sr-only">Clear active tag</span>
-          </button>
-        )}
-        {activeAuthor && (
-          <button className="inline-flex h-10 items-center gap-2 rounded-md border border-blue-300 bg-blue-50 px-3 text-sm text-blue-800 hover:bg-blue-100" type="button" onClick={() => updateQuery({author: ''})} aria-label={`Clear author @${activeAuthor}`}>
-            @{activeAuthor}
-            <X size={14} />
-            <span className="sr-only">Clear active author</span>
-          </button>
-        )}
         <label className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm">
           <span className="text-xs font-medium text-slate-500">Sort</span>
           <select className="min-w-0 bg-transparent text-sm outline-none" value={query.sort} onChange={(event) => updateQuery({sort: event.target.value})} aria-label="Sort posts">
@@ -84,15 +69,6 @@ export default function Toolbar({
         </button>
       </div>
     </div>
-  )
-}
-
-function ChipButton({active, label, count, onClick}) {
-  return (
-    <button className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm ${active ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-300 bg-white'}`} type="button" onClick={onClick} aria-pressed={active}>
-      {label}
-      {count != null && <span className={`rounded px-1.5 py-0.5 text-[11px] ${active ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>{count}</span>}
-    </button>
   )
 }
 

@@ -16,4 +16,14 @@ class TagsControllerTest < ActionController::TestCase
 
     assert_redirected_to tags_url(sort: 'name_asc', limit: 10, type: :favorite)
   end
+
+  test 'index supports post count sorts' do
+    get :index, params: {limit: 30, type: '', sort: 'most_posts'}
+
+    assert_response :success
+
+    get :index, params: {limit: 30, type: '', sort: 'least_posts'}
+
+    assert_response :success
+  end
 end

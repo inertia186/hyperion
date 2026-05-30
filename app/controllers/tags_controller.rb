@@ -13,8 +13,8 @@ class TagsController < ApplicationController
     when 'tag_desc' then @tags.order(tag: :desc)
     when 'latest' then @tags.order(created_at: :desc)
     when 'oldest' then @tags.order(created_at: :asc)
-    when 'most_posts' then @tags.order('(SELECT DISTINCT count(post_id) FROM tags WHERE tags.tag = account_tags.tag) DESC')
-    when 'least_posts' then @tags.order('(SELECT DISTINCT count(post_id) FROM tags WHERE tags.tag = account_tags.tag) ASC')
+    when 'most_posts' then @tags.order(Arel.sql('(SELECT DISTINCT count(post_id) FROM tags WHERE tags.tag = account_tags.tag) DESC'))
+    when 'least_posts' then @tags.order(Arel.sql('(SELECT DISTINCT count(post_id) FROM tags WHERE tags.tag = account_tags.tag) ASC'))
     else
       @tags
     end
