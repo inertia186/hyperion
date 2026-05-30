@@ -24,12 +24,14 @@ class Api::V1::SessionsController < Api::V1::BaseController
       counts: {
         read_posts: current_account.read_posts.count,
         ignored_tags: ignored_tags.size,
+        poisoned_pill_tags: poisoned_pill_tags.size,
         favorite_tags: favorite_tags.size,
         past_tags: past_tags.size,
         tags: tags_count
       },
       muted_authors: current_account.muted_authors,
       ignored_tags: ignored_tags,
+      poisoned_pill_tags: poisoned_pill_tags,
       favorite_tags: favorite_tags,
       past_tags: current_account.past_tags.left_outer_joins(:community).select('account_tags.tag', 'communities.title', 'communities.community_account').map { |tag| {name: tag.title || tag.tag, tag: tag.tag, image_url: Community.profile_image_from_account(tag.community_account)} }
     }

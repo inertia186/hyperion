@@ -15,11 +15,14 @@ class Api::V1::PostsController < Api::V1::BaseController
       related_tags: result.related_tags,
       related_authors: result.related_authors,
       ignored_tags: result.ignored_tags,
+      poisoned_pill_tags: result.poisoned_pill_tags,
       favorite_tags: result.favorite_tag_set.to_a,
       past_tags: result.past_tags,
       counts: {
         read_posts: current_account.read_posts.count,
         ignored_tags: result.ignored_tags.size,
+        poisoned_pill_tags: result.poisoned_pill_tags.size,
+        muted_posts: result.muted_posts_count,
         tags: TagCount.count
       }
     }

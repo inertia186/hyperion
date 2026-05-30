@@ -35,7 +35,8 @@ class PostsController < ApplicationController
     end
     
     @posts = if @only_ignored
-      @posts.where(id: Tag.where(tag: ignored_tags).select(:post_id))
+      @posts.where(id: Tag.where(tag: ignored_tags).select(:post_id)).
+        or(@posts.where(author: current_account.poisoned_authors))
     elsif @only_read
       @posts.where(id: current_account.read_posts.select(:post_id))
     elsif !!@author
@@ -45,7 +46,8 @@ class PostsController < ApplicationController
     elsif @only_blacklisted
       @posts
     else
-      @posts.unread(by: current_account, include_muted: true)
+      @posts.unread(by: current_account, include_muted: true).
+        where.not(author: current_account.poisoned_authors)
     end
     
     @posts = @posts.where("body ILIKE ?", "%#{@query}%") if !!@query
@@ -215,7 +217,6 @@ class PostsController < ApplicationController
     
     if allow_tag.any?
       current_account.ignored_tags.where(tag: allow_tag).destroy_all
-      current_account.poisoned_pill_tags.where(tag: allow_tag).destroy_all
     else
       current_account.ignored_tags.destroy_all
     end

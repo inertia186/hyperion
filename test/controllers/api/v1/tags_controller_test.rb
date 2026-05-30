@@ -19,6 +19,24 @@ class Api::V1::TagsControllerTest < ActionController::TestCase
     assert_not_includes response_json.fetch('ignored_tags'), 'new-spam'
   end
 
+  test 'poisoned pill mutations update separate tag state' do
+    post :create_poisoned_pill, params: {tag: 'deplorable'}
+
+    assert_response :created
+    assert_includes response_json.fetch('poisoned_pill_tags'), 'deplorable'
+    assert_not_includes response_json.fetch('ignored_tags'), 'deplorable'
+
+    delete :destroy_ignored, params: {tag: 'deplorable'}
+
+    assert_response :success
+    assert_includes response_json.fetch('poisoned_pill_tags'), 'deplorable'
+
+    delete :destroy_poisoned_pill, params: {tag: 'deplorable'}
+
+    assert_response :success
+    assert_not_includes response_json.fetch('poisoned_pill_tags'), 'deplorable'
+  end
+
   test 'favorite and past tag mutations update current account state' do
     post :create_favorite, params: {tag: 'new-favorite'}
 

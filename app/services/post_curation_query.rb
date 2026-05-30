@@ -9,7 +9,7 @@ class PostCurationQuery
   attr_reader :account, :params, :session, :query_state, :relation, :all_posts,
     :posts, :post_ids, :read_post_ids, :post_tags, :post_communities,
     :post_bodies, :related_tags, :related_authors, :related_communities, :past_tags,
-    :favorite_tag_set, :mode_counts, :total_count, :page, :limit
+    :favorite_tag_set, :mode_counts, :muted_posts_count, :total_count, :page, :limit
 
   def initialize(account:, params:, session:, track_past_tags: true)
     @account = account
@@ -27,7 +27,7 @@ class PostCurationQuery
   end
 
   def ignored_tags
-    @ignored_tags ||= account.ignored_tags.pluck(:tag) + poisoned_pill_tags
+    @ignored_tags ||= account.ignored_tags.pluck(:tag)
   end
 
   def poisoned_pill_tags
@@ -112,6 +112,7 @@ private
 
   def build_relation
     @mode_counts = build_mode_counts
+    @muted_posts_count = build_muted_posts_count
     @all_posts = relation_for_mode(selected_mode)
     @relation = apply_sort(@all_posts.select(Post::LIST_COLUMNS))
   end
@@ -124,6 +125,16 @@ private
       deleted: relation_for_mode(:deleted).count,
       blacklisted: relation_for_mode(:blacklisted).count
     }
+  end
+
+  def build_muted_posts_count
+    relation = base_filter_relation(apply_muted_filter: false).
+      active.
+      unread(by: account, include_muted: true)
+
+    without_enabled_blacklist_sources(relation).
+      where(author: account.reload.muted_authors).
+      count
   end
 
   def selected_mode
@@ -142,13 +153,17 @@ private
     when :read
       without_enabled_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
     when :ignored
-      without_enabled_blacklist_sources(relation.active).where(id: Tag.where(tag: ignored_tags).select(:post_id))
+      ignored_relation = without_enabled_blacklist_sources(relation.active)
+      ignored_relation.where(id: Tag.where(tag: ignored_tags).select(:post_id)).
+        or(ignored_relation.where(author: account.poisoned_authors))
     when :deleted
       relation.deleted
     when :blacklisted
       with_enabled_blacklist_sources(relation.active)
     else
-      without_enabled_blacklist_sources(relation.active).unread(by: account, include_muted: true)
+      without_enabled_blacklist_sources(relation.active).
+        unread(by: account, include_muted: true).
+        where.not(author: account.poisoned_authors)
     end
   end
 
@@ -168,7 +183,7 @@ private
     "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'community' IN (?))"
   end
 
-  def base_filter_relation
+  def base_filter_relation(apply_muted_filter: true)
     relation = Post.tagged_any(@tag)
     relation = relation.tagged_all(@other_tags) if @other_tags.any?
     relation = relation.where.not(id: Tag.where(tag: @without_tags).select(:post_id)) if @without_tags.any?
@@ -183,7 +198,7 @@ private
     end
 
     relation = relation.where('body ILIKE ?', "%#{@query}%") if @query
-    relation = relation.where.not(author: account.reload.muted_authors) if muted_authors_enabled?
+    relation = relation.where.not(author: account.reload.muted_authors) if apply_muted_filter && muted_authors_enabled?
     relation = relation.where(id: Tag.where(tag: account.favorite_tags.select(:tag)).select(:post_id)) if only_favorite_tags?
 
     relation

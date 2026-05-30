@@ -16,6 +16,8 @@ Rails.application.routes.draw do
 
       post '/tags/:tag/ignored', to: 'tags#create_ignored', as: :tag_ignored, constraints: { tag: /[^\/]+/ }, format: false
       delete '/tags/:tag/ignored', to: 'tags#destroy_ignored', constraints: { tag: /[^\/]+/ }, format: false
+      post '/tags/:tag/poisoned_pill', to: 'tags#create_poisoned_pill', as: :tag_poisoned_pill, constraints: { tag: /[^\/]+/ }, format: false
+      delete '/tags/:tag/poisoned_pill', to: 'tags#destroy_poisoned_pill', constraints: { tag: /[^\/]+/ }, format: false
       post '/tags/:tag/favorite', to: 'tags#create_favorite', as: :tag_favorite, constraints: { tag: /[^\/]+/ }, format: false
       delete '/tags/:tag/favorite', to: 'tags#destroy_favorite', constraints: { tag: /[^\/]+/ }, format: false
       delete '/past_tags/:tag', to: 'tags#destroy_past', as: :past_tag, constraints: { tag: /[^\/]+/ }, format: false

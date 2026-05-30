@@ -1,6 +1,12 @@
 require 'test_helper'
 
-class PostsControllerTest < ActionDispatch::IntegrationTest
+class PostsControllerTest < ActionController::TestCase
+  tests PostsController
+
+  setup do
+    @request.session[:current_account] = accounts(:curated)
+  end
+
   def test_routings
     assert_routing 'posts', controller: 'posts', action: 'index'
     assert_routing posts_tagged_path(tag: 'tag', sort: 'latest', limit: '30'), controller: 'posts', action: 'index', tag: 'tag', sort: 'latest', limit: '30'

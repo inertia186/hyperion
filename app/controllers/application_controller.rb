@@ -158,7 +158,7 @@ private
   end
   
   def ignored_tags
-    @ignored_tags ||= current_account.ignored_tags.pluck(:tag) + poisoned_pill_tags
+    @ignored_tags ||= current_account.ignored_tags.pluck(:tag)
   end
   
   def past_tags

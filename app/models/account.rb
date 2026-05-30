@@ -93,6 +93,13 @@ class Account < ApplicationRecord
       Post.where.not(id: Tag.where(tag: poisoned_pill_tags.select(:tag)).select(:post_id))
     end
   end
+
+  def poisoned_authors
+    Post.active.
+      where(id: Tag.where(tag: poisoned_pill_tags.select(:tag)).select(:post_id)).
+      distinct.
+      select(:author)
+  end
   
   # TODO make this into "refresh_follows" and track both 'ignore' and 'blog'
   # which also requires a new DB field called 'followed_authors'

@@ -55,6 +55,55 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     )
   end
 
+  test 'counts include muted posts for the current filter' do
+    get :index, params: {sort: 'latest', limit: 30}
+
+    assert_response :success
+    assert_equal 1, response_json.fetch('counts').fetch('muted_posts')
+    assert_equal 0, response_json.fetch('counts').fetch('poisoned_pill_tags')
+    assert_empty response_json.fetch('poisoned_pill_tags')
+  end
+
+  test 'poisoned pill tags suppress active authors from normal inbox' do
+    account = accounts(:curated)
+    account.poisoned_pill_tags.create!(tag: 'deplorable')
+    bob_pill = create_post_with_tag(author: 'bob', permlink: 'deplorable-post', title: 'Bob Used Deplorable', tag: 'deplorable')
+    bob_noise = create_post_with_tag(author: 'bob', permlink: 'ordinary-post', title: 'Bob Ordinary Noise', tag: 'haf')
+    carol_expired_pill = create_post_with_tag(author: 'carol', permlink: 'expired-deplorable-post', title: 'Carol Old Deplorable', tag: 'deplorable', created_at: 8.days.ago)
+    carol_noise = create_post_with_tag(author: 'carol', permlink: 'ordinary-post', title: 'Carol Ordinary Post', tag: 'haf')
+
+    get :index, params: {sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_not_includes titles, bob_pill.title
+    assert_not_includes titles, bob_noise.title
+    assert_not_includes titles, carol_expired_pill.title
+    assert_includes titles, carol_noise.title
+    assert_includes response_json.fetch('poisoned_pill_tags'), 'deplorable'
+    assert_equal 4, response_json.fetch('mode_counts').fetch('unread')
+    assert_equal 3, response_json.fetch('mode_counts').fetch('ignored')
+  end
+
+  test 'ignored view includes active posts by poisoned authors' do
+    account = accounts(:curated)
+    account.poisoned_pill_tags.create!(tag: 'deplorable')
+    create_post_with_tag(author: 'bob', permlink: 'deplorable-post', title: 'Bob Used Deplorable', tag: 'deplorable')
+    create_post_with_tag(author: 'bob', permlink: 'ordinary-post', title: 'Bob Ordinary Noise', tag: 'haf')
+    create_post_with_tag(author: 'carol', permlink: 'expired-deplorable-post', title: 'Carol Old Deplorable', tag: 'deplorable', created_at: 8.days.ago)
+    create_post_with_tag(author: 'carol', permlink: 'ordinary-post', title: 'Carol Ordinary Post', tag: 'haf')
+
+    get :index, params: {only_ignored: true, sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, 'Ignored Unread'
+    assert_includes titles, 'Bob Used Deplorable'
+    assert_includes titles, 'Bob Ordinary Noise'
+    assert_not_includes titles, 'Carol Old Deplorable'
+    assert_not_includes titles, 'Carol Ordinary Post'
+  end
+
   test 'community names are included for secondary hive tags' do
     get :index, params: {sort: 'latest', limit: 30}
 
@@ -275,6 +324,23 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
 private
+  def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current)
+    post = Post.create!(
+      author: author,
+      permlink: permlink,
+      title: title,
+      body: "#{title} body",
+      category: tag,
+      metadata: {tags: [tag]},
+      block_num: 1000 + Post.count,
+      trx_id: "#{author}-#{permlink}",
+      created_at: created_at,
+      updated_at: created_at
+    )
+    post.tags.create!(tag: tag, category: true)
+    post
+  end
+
   def response_json
     JSON.parse(response.body)
   end
