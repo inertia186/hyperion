@@ -19,6 +19,7 @@ export default function PreviewPane({
   onFocusList,
   onSelectTag,
   onSelectAuthor,
+  theme = 'light',
   readBusy,
   hasPrevious,
   hasNext
@@ -26,6 +27,8 @@ export default function PreviewPane({
   const detail = previewState.postId === post?.id ? previewState.detail : null
   const urls = detail?.urls || {}
   const sandboxUrl = detail?.content_sandbox_url
+  const themedSandboxUrl = sandboxUrl ? sandboxUrlWithTheme(sandboxUrl, theme) : null
+  const [sandboxLoaded, setSandboxLoaded] = useState(false)
   const previewReady = !!post && previewState.status === 'ready' && previewState.postId === post.id
   const blacklistReasons = detail?.blacklist_reasons || post?.blacklist_reasons || []
   const displayPost = useMemo(() => {
@@ -45,6 +48,10 @@ export default function PreviewPane({
   useEffect(() => {
     setPreviewTagsExpanded(false)
   }, [post?.id])
+
+  useEffect(() => {
+    setSandboxLoaded(false)
+  }, [themedSandboxUrl])
 
   useEffect(() => {
     if (!displayPost) return
@@ -256,17 +263,22 @@ export default function PreviewPane({
         )}
         <div className="mt-2 text-[11px] text-slate-500">? shortcuts · j/k move · Enter preview · Esc list · &gt; mark read + next · Space scroll</div>
       </div>
-      <div ref={previewScrollRef} className={`touch-scroll min-h-0 flex-1 overflow-auto ${previewReady && sandboxUrl ? 'p-0.5' : 'safe-area-bottom p-4'}`} tabIndex={-1}>
-        {previewReady && sandboxUrl ? (
-          <iframe
-            key={`${post.id}-${sandboxUrl}`}
-            className="block h-full min-h-[360px] w-full border-0 bg-white"
-            data-preview-frame="true"
-            loading="eager"
-            sandbox="allow-same-origin allow-scripts allow-popups"
-            src={sandboxUrl}
-            title={`Rendered post: ${displayPost.title}`}
-          />
+      <div ref={previewScrollRef} className={`touch-scroll min-h-0 flex-1 overflow-auto ${previewReady && sandboxUrl ? 'bg-white p-0.5 dark:bg-slate-900' : 'safe-area-bottom p-4'}`} tabIndex={-1}>
+        {previewReady && themedSandboxUrl ? (
+          <div className="relative h-full min-h-[360px]">
+            {!sandboxLoaded && <SandboxLoadingPlaceholder theme={theme} />}
+            <iframe
+              key={`${post.id}-${themedSandboxUrl}`}
+              className={`block h-full min-h-[360px] w-full border-0 bg-white dark:bg-slate-900 ${sandboxLoaded ? 'opacity-100' : 'opacity-0'}`}
+              style={{colorScheme: theme === 'dark' ? 'dark' : 'light'}}
+              data-preview-frame="true"
+              loading="eager"
+              onLoad={() => setSandboxLoaded(true)}
+              sandbox="allow-same-origin allow-scripts allow-popups"
+              src={themedSandboxUrl}
+              title={`Rendered post: ${displayPost.title}`}
+            />
+          </div>
         ) : previewReady ? (
           <article className="post-body text-sm" dangerouslySetInnerHTML={{__html: previewState.html}} />
         ) : previewState.status === 'error' && previewState.postId === post.id ? (
@@ -300,6 +312,29 @@ export default function PreviewPane({
       )}
     </div>
   )
+}
+
+function SandboxLoadingPlaceholder({theme}) {
+  const dark = theme === 'dark'
+
+  return (
+    <div className={`absolute inset-0 flex min-h-[360px] items-center justify-center px-4 text-center text-sm ${dark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`}>
+      <div className="w-full max-w-xl space-y-3" aria-label="Loading rendered post">
+        <div className={`mx-auto h-4 w-40 rounded ${dark ? 'bg-slate-700' : 'bg-slate-200'}`} />
+        <div className={`h-3 w-full rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
+        <div className={`h-3 w-11/12 rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
+        <div className={`h-3 w-3/4 rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
+        <div className="pt-2">Loading rendered post...</div>
+      </div>
+    </div>
+  )
+}
+
+function sandboxUrlWithTheme(url, theme) {
+  const [path, query = ''] = url.split('?')
+  const params = new URLSearchParams(query)
+  params.set('theme', theme === 'dark' ? 'dark' : 'light')
+  return `${path}?${params.toString()}`
 }
 
 function blacklistReasonText(reasons) {

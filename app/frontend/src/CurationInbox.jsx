@@ -18,7 +18,7 @@ const MIN_DESKTOP_PREVIEW_PERCENT = 28
 const MAX_DESKTOP_PREVIEW_PERCENT = 65
 const COMPACT_MODE_SELECTOR_PREVIEW_PERCENT = 50
 
-export default function CurationInbox({session, refreshKey = 0}) {
+export default function CurationInbox({session, refreshKey = 0, theme = 'light'}) {
   const [query, setQuery] = useState(initialQuery)
   const [draftTag, setDraftTag] = useState('')
   const [postsPayload, setPostsPayload] = useState(null)
@@ -689,6 +689,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
               previewScrollRef={desktopPreviewScrollRef}
               accountName={session.account.name}
               hivesignerAvailable={session.preferences.hivesigner_available}
+              theme={theme}
               onPrevious={() => moveSelection(-1)}
               onNext={() => moveSelection(1)}
               onMarkReadNext={markSelectedReadAndMoveNext}
@@ -712,6 +713,7 @@ export default function CurationInbox({session, refreshKey = 0}) {
         previewScrollRef={mobilePreviewScrollRef}
         accountName={session.account.name}
         hivesignerAvailable={session.preferences.hivesigner_available}
+        theme={theme}
         onClose={closePreview}
         onPrevious={() => moveSelection(-1)}
         onNext={() => moveSelection(1)}
@@ -812,6 +814,7 @@ function MobilePreviewDrawer({
   previewScrollRef,
   accountName,
   hivesignerAvailable,
+  theme,
   onClose,
   onPrevious,
   onNext,
@@ -837,6 +840,7 @@ function MobilePreviewDrawer({
             previewScrollRef={previewScrollRef}
             accountName={accountName}
             hivesignerAvailable={hivesignerAvailable}
+            theme={theme}
             onClose={onClose}
             onPrevious={onPrevious}
             onNext={onNext}

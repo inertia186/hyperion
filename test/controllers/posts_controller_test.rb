@@ -35,6 +35,21 @@ class PostsControllerTest < ActionController::TestCase
     assert_not_includes response.body, 'scribe.hivekings.com'
   end
 
+  test 'content sandbox accepts dark theme parameter' do
+    post = posts(:allowed_unread)
+    post.body = 'Sandbox body'
+
+    post.stub(:load_body!, -> {}) do
+      Post.stub(:find, post) do
+        get :content_sandbox, params: {id: post.id, theme: 'dark'}
+      end
+    end
+
+    assert_response :success
+    assert_includes response.body, 'class="theme-dark"'
+    assert_includes response.body, 'background: #0f172a'
+  end
+
   test 'legacy index hides active posts by poisoned pill authors' do
     accounts(:curated).poisoned_pill_tags.create!(tag: 'deplorable')
     create_post_with_tag(author: 'bob', permlink: 'deplorable-post', title: 'Bob Used Deplorable', tag: 'deplorable')

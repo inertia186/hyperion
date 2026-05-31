@@ -30,6 +30,12 @@ class Api::V1::PreferencesController < Api::V1::BaseController
     }
   end
 
+  def theme
+    current_account.update_theme!(params[:theme])
+
+    render json: {theme: current_account.theme}
+  end
+
 private
   def boolean_param(name)
     return nil unless params.key?(name)

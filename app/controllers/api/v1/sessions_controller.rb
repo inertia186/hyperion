@@ -18,6 +18,7 @@ class Api::V1::SessionsController < Api::V1::BaseController
         muted_authors_enabled: !!session[:muted_authors_enabled],
         only_favorite_tags: !!session[:only_favorite_tags],
         enabled_blacklist_sources: current_account.enabled_blacklist_sources,
+        theme: current_account.theme,
         hivesigner_available: session[:hivesigner_access_token].present?
       },
       blacklist_sources: current_account.blacklist_source_catalog,

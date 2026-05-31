@@ -108,15 +108,37 @@ const deferred = () => {
   return {promise, resolve, reject}
 }
 
-const setMobileLayout = (matches) => {
-  window.matchMedia = vi.fn(() => ({
-    matches,
-    media: '(max-width: 1279px)',
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn()
+let mobileLayoutMatches
+let systemDarkMatches
+let mediaListeners
+
+const installMatchMedia = () => {
+  mediaListeners = new Map()
+  window.matchMedia = vi.fn((query) => ({
+    matches: query === '(prefers-color-scheme: dark)' ? systemDarkMatches : mobileLayoutMatches,
+    media: query,
+    addEventListener: vi.fn((_event, listener) => {
+      if (!mediaListeners.has(query)) mediaListeners.set(query, new Set())
+      mediaListeners.get(query).add(listener)
+    }),
+    removeEventListener: vi.fn((_event, listener) => mediaListeners.get(query)?.delete(listener)),
+    addListener: vi.fn((listener) => {
+      if (!mediaListeners.has(query)) mediaListeners.set(query, new Set())
+      mediaListeners.get(query).add(listener)
+    }),
+    removeListener: vi.fn((listener) => mediaListeners.get(query)?.delete(listener))
   }))
+}
+
+const setMobileLayout = (matches) => {
+  mobileLayoutMatches = matches
+  installMatchMedia()
+}
+
+const setSystemDark = (matches) => {
+  systemDarkMatches = matches
+  const listeners = mediaListeners?.get('(prefers-color-scheme: dark)') || new Set()
+  listeners.forEach((listener) => listener({matches, media: '(prefers-color-scheme: dark)'}))
 }
 
 const installLocalStorage = () => {
@@ -148,6 +170,7 @@ let revisionFailures
 let hivesignerAvailable
 let emptyTags
 let onlyFavoriteTagsEnabled
+let sessionTheme
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
@@ -203,10 +226,12 @@ describe('App', () => {
     hivesignerAvailable = false
     emptyTags = new Set()
     onlyFavoriteTagsEnabled = false
+    sessionTheme = 'system'
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
     installLocalStorage()
+    systemDarkMatches = false
     setMobileLayout(false)
     window.hive_keychain = {requestVote: vi.fn((_voter, _permlink, _author, _weight, callback) => callback({success: true}))}
     window.hive = {
@@ -222,7 +247,7 @@ describe('App', () => {
         return jsonResponse({
           authenticated: true,
           account: {name: 'fixture-curator', avatar_url: 'avatar.png'},
-          preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, enabled_blacklist_sources: [], hivesigner_available: hivesignerAvailable},
+          preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, enabled_blacklist_sources: [], theme: sessionTheme, hivesigner_available: hivesignerAvailable},
           blacklist_sources: [
             {community: 'hive-163399', name: 'Trusted Safety', enabled: false},
             {community: 'hive-136001', name: 'Ban Hammer', enabled: false}
@@ -353,6 +378,12 @@ describe('App', () => {
         })
       }
 
+      if (url === '/api/v1/preferences/theme' && options.method === 'PATCH') {
+        const theme = JSON.parse(options.body).theme
+        sessionTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system'
+        return jsonResponse({theme: sessionTheme})
+      }
+
       if (url === '/api/v1/past_tags?only_ignored=true' && options.method === 'DELETE') {
         return jsonResponse({ignored_tags: ['spam'], poisoned_pill_tags: [], favorite_tags: ['haf'], past_tags: [{name: 'haf', tag: 'haf'}]})
       }
@@ -371,6 +402,8 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup()
+    document.documentElement.classList.remove('dark')
+    document.documentElement.style.colorScheme = ''
     window.localStorage?.clear?.()
     vi.restoreAllMocks()
   })
@@ -396,6 +429,47 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', {name: 'Close settings'}))
     expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
+  })
+
+  test('saves dark theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'dark'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'dark'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('dark')
+  })
+
+  test('saves light theme and removes dark class', async () => {
+    window.localStorage.setItem('hyperion.theme', 'dark')
+    document.documentElement.classList.add('dark')
+
+    await renderApp()
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'light'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'light'})
+    })))
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('light')
+  })
+
+  test('system theme follows color scheme changes', async () => {
+    setSystemDark(true)
+
+    await renderApp()
+
+    expect(screen.getByRole('combobox', {name: 'Theme'})).toHaveValue('system')
+    expect(document.documentElement).toHaveClass('dark')
+
+    act(() => setSystemDark(false))
+
+    expect(document.documentElement).not.toHaveClass('dark')
   })
 
   test('dismisses settings with Escape and click-away', async () => {
@@ -1450,9 +1524,26 @@ describe('App', () => {
     await renderApp({waitForPreview: false})
 
     const frame = await screen.findByTitle('Rendered post: First Post')
-    expect(frame).toHaveAttribute('src', '/posts/1/content_sandbox?pp=skip')
+    expect(frame).toHaveAttribute('src', '/posts/1/content_sandbox?pp=skip&theme=light')
     expect(frame).toHaveAttribute('sandbox', 'allow-same-origin allow-scripts allow-popups')
     expect(screen.queryByText('Fallback preview')).not.toBeInTheDocument()
+  })
+
+  test('passes the matching dark theme to the sandbox iframe', async () => {
+    sessionTheme = 'dark'
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_html: '<p>Fallback preview</p>',
+      content_sandbox_url: '/posts/1/content_sandbox?pp=skip',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    expect(await screen.findByTitle('Rendered post: First Post')).toHaveAttribute('src', '/posts/1/content_sandbox?pp=skip&theme=dark')
   })
 
   test('shows an inline preview failure without replacing the list', async () => {

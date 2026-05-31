@@ -25,6 +25,24 @@ class Api::V1::PreferencesControllerTest < ActionController::TestCase
     assert_equal %w(hive-196037), accounts(:curated).reload.enabled_blacklist_sources
   end
 
+  test 'updates theme preference' do
+    %w(light dark system).each do |theme|
+      patch :theme, params: {theme: theme}
+
+      assert_response :success
+      assert_equal theme, response_json.fetch('theme')
+      assert_equal theme, accounts(:curated).reload.theme
+    end
+  end
+
+  test 'normalizes unknown theme preference to system' do
+    patch :theme, params: {theme: 'neon'}
+
+    assert_response :success
+    assert_equal 'system', response_json.fetch('theme')
+    assert_equal 'system', accounts(:curated).reload.theme
+  end
+
 private
   def response_json
     JSON.parse(response.body)

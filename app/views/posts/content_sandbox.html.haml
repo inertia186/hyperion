@@ -1,5 +1,5 @@
 !!!
-%html
+%html{class: @theme == 'dark' ? 'theme-dark' : nil}
   %head
     %base{href: 'https://hive.blog/'}
     %base{target: '_new'}
@@ -50,6 +50,29 @@
       }
       #output img {
         max-width: 100%;
+      }
+      .theme-dark {
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .theme-dark body {
+        background: #0f172a;
+        color: #f8fafc;
+        text-shadow: 0 1px 0 #334155;
+      }
+      .theme-dark #input,
+      .theme-dark #output,
+      .theme-dark #source {
+        color: #f8fafc;
+        text-shadow: 0 1px 0 #334155;
+      }
+      .theme-dark #output code {
+        background: #1e293b;
+        color: #f8fafc;
+      }
+      .theme-dark #output a {
+        border-bottom-color: #93c5fd;
+        color: #93c5fd;
       }
   %body{onkeydown: "keyPressed(event)"}
     %header

@@ -3,6 +3,8 @@ class Account < ApplicationRecord
   extend Memoist
 
   ENABLED_BLACKLIST_SOURCES_SETTING = 'enabled_blacklist_sources'
+  THEME_SETTING = 'theme'
+  THEMES = %w(light dark system).freeze
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
   has_many :account_tags, dependent: :destroy, counter_cache: :account_tags_count
@@ -69,6 +71,14 @@ class Account < ApplicationRecord
     update!(settings: (settings || {}).merge(ENABLED_BLACKLIST_SOURCES_SETTING => normalize_blacklist_sources(sources)))
   end
 
+  def theme
+    normalize_theme((settings || {})[THEME_SETTING])
+  end
+
+  def update_theme!(theme)
+    update!(settings: (settings || {}).merge(THEME_SETTING => normalize_theme(theme)))
+  end
+
   def blacklist_source_catalog
     enabled = enabled_blacklist_sources
 
@@ -130,5 +140,9 @@ class Account < ApplicationRecord
 private
   def normalize_blacklist_sources(sources)
     Array(sources).map(&:to_s).select { |source| PostIndexJob::TRUSTED_COMMUNITIES.include?(source) }.uniq
+  end
+
+  def normalize_theme(theme)
+    THEMES.include?(theme.to_s) ? theme.to_s : 'system'
   end
 end

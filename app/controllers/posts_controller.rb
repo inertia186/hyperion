@@ -112,6 +112,7 @@ class PostsController < ApplicationController
   def content_sandbox
     @post = Post.find params[:id]
     @post.load_body!
+    @theme = %w(light dark).include?(params[:theme].to_s) ? params[:theme].to_s : 'light'
     
     if @post.body.to_s =~ Post::DIFF_MATCH_PATCH_PATTERN
       # Detecting edit just in time.

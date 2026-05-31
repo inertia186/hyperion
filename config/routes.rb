@@ -28,6 +28,7 @@ Rails.application.routes.draw do
       patch '/preferences/mute', to: 'preferences#mute'
       patch '/preferences/only_favorite_tags', to: 'preferences#only_favorite_tags'
       patch '/preferences/blacklists', to: 'preferences#blacklists'
+      patch '/preferences/theme', to: 'preferences#theme'
     end
   end
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { LogOut, Settings, X } from 'lucide-react'
+import { Laptop, LogOut, Moon, Settings, Sun, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
+import { applyTheme, normalizeTheme, storedTheme, writeStoredTheme } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
 
 export default function App() {
@@ -10,6 +11,29 @@ export default function App() {
   const [error, setError] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [theme, setTheme] = useState(() => storedTheme())
+  const [effectiveTheme, setEffectiveTheme] = useState(() => applyTheme(storedTheme()))
+  const [themeSaving, setThemeSaving] = useState(false)
+
+  useEffect(() => {
+    setEffectiveTheme(applyTheme(theme))
+    writeStoredTheme(theme)
+
+    if (theme !== 'system' || !window.matchMedia) return undefined
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = () => setEffectiveTheme(applyTheme('system'))
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange)
+      return () => mediaQuery.removeEventListener('change', handleChange)
+    }
+
+    mediaQuery.addListener?.(handleChange)
+
+    return () => {
+      mediaQuery.removeListener?.(handleChange)
+    }
+  }, [theme])
 
   useEffect(() => {
     api.session()
@@ -19,7 +43,15 @@ export default function App() {
           return
         }
 
-        setSession(payload)
+        const nextTheme = normalizeTheme(payload.preferences?.theme)
+        setTheme(nextTheme)
+        setSession({
+          ...payload,
+          preferences: {
+            ...payload.preferences,
+            theme: nextTheme
+          }
+        })
       })
       .catch((err) => {
         if (err.status === 401 && err.payload?.login_url) {
@@ -39,21 +71,62 @@ export default function App() {
     return <FullPageState label="Loading" />
   }
 
+  const updateTheme = async (nextTheme) => {
+    const normalizedTheme = normalizeTheme(nextTheme)
+    const previousTheme = theme
+
+    setTheme(normalizedTheme)
+    setSession((current) => current ? {
+      ...current,
+      preferences: {
+        ...current.preferences,
+        theme: normalizedTheme
+      }
+    } : current)
+    setThemeSaving(true)
+
+    try {
+      const payload = await api.setTheme(normalizedTheme)
+      const savedTheme = normalizeTheme(payload.theme)
+      setTheme(savedTheme)
+      setSession((current) => current ? {
+        ...current,
+        preferences: {
+          ...current.preferences,
+          theme: savedTheme
+        }
+      } : current)
+    } catch (err) {
+      setTheme(previousTheme)
+      setSession((current) => current ? {
+        ...current,
+        preferences: {
+          ...current.preferences,
+          theme: previousTheme
+        }
+      } : current)
+      setError(err.message || 'Request failed')
+    } finally {
+      setThemeSaving(false)
+    }
+  }
+
   return (
-    <div className="safe-area-shell min-h-screen bg-[#f6f7f9] text-slate-800 [min-height:100dvh]">
-      <header className="safe-area-top border-b border-slate-200 bg-white">
+    <div className="safe-area-shell min-h-screen bg-[#f6f7f9] text-slate-800 [min-height:100dvh] dark:bg-slate-950 dark:text-slate-200">
+      <header className="safe-area-top border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
           <div className="text-xl font-semibold tracking-normal">Hyperion</div>
           <div className="ml-auto flex min-w-0 items-center gap-3">
             <img className="h-8 w-8 rounded-full" src={session.account.avatar_url} alt="" />
             <span className="hidden truncate text-sm font-medium sm:inline">{session.account.name}</span>
-            <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+            <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
+            <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
               <Settings size={16} />
             </button>
             <form action={`/sessions/${session.account.name}`} method="post">
               <input type="hidden" name="_method" value="delete" />
               <input type="hidden" name="authenticity_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
-              <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 sm:h-9" type="submit">
+              <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 sm:h-9 dark:border-slate-700 dark:hover:bg-slate-800" type="submit">
                 <LogOut size={16} />
                 <span className="hidden sm:inline">Log out</span>
               </button>
@@ -62,7 +135,7 @@ export default function App() {
         </div>
       </header>
 
-      <CurationInbox session={session} refreshKey={refreshKey} />
+      <CurationInbox session={session} refreshKey={refreshKey} theme={effectiveTheme} />
       {settingsOpen && (
         <SettingsModal
           session={session}
@@ -82,6 +155,22 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+function ThemeSelector({theme, onChange, disabled}) {
+  const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Laptop
+
+  return (
+    <label className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 dark:border-slate-700 dark:hover:bg-slate-800" title={`Theme: ${theme}`}>
+      <span className="sr-only">Theme</span>
+      <Icon size={16} aria-hidden="true" />
+      <select className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" value={theme} onChange={(event) => onChange(event.target.value)} disabled={disabled} aria-label="Theme">
+        <option value="system">System</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
   )
 }
 

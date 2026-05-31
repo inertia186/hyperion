@@ -1,4 +1,5 @@
 module.exports = {
+  darkMode: 'class',
   content: [
     './app/frontend/**/*.{js,jsx}',
     './app/views/spa/**/*.haml'
