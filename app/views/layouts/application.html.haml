@@ -8,6 +8,7 @@
     %title= best_title
     = csrf_meta_tags
     = csp_meta_tag
+    %meta{content: ENV.fetch('HYPERION_BROWSER_NODE_URL', 'https://api.openhive.network'), name: 'hive-api-url'}
     %script{src: "https://cdn.jsdelivr.net/npm/@hiveio/hive-js/dist/hive.min.js"}
     -# %script{src: "https://cdn.jsdelivr.net/npm/hivesigner"}
     :javascript

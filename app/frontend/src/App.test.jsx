@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from './App'
+import { imageProxy } from './format'
 
 const posts = [
   {
@@ -97,6 +98,16 @@ const jsonError = (payload, status = 500) => Promise.resolve({
   json: () => Promise.resolve(payload)
 })
 
+const proxiedImage = (url, size) => {
+  const params = new URLSearchParams({url})
+  if (size) params.set('size', size)
+  return `/api/v1/images/proxy?${params.toString()}`
+}
+
+test('imageProxy normalizes protocol-relative image URLs', () => {
+  expect(imageProxy('//example.com/body.png')).toBe(proxiedImage('https://example.com/body.png'))
+})
+
 const deferred = () => {
   let resolve
   let reject
@@ -162,6 +173,53 @@ const pointerEvent = (type, target, properties = {}) => {
   fireEvent(target, event)
 }
 
+const installIntersectionObserverMock = () => {
+  const observers = []
+
+  class MockIntersectionObserver {
+    constructor(callback, options = {}) {
+      this.callback = callback
+      this.options = options
+      this.targets = new Set()
+      observers.push(this)
+    }
+
+    observe(target) {
+      this.targets.add(target)
+    }
+
+    unobserve(target) {
+      this.targets.delete(target)
+    }
+
+    disconnect() {
+      this.targets.clear()
+    }
+  }
+
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    writable: true,
+    value: MockIntersectionObserver
+  })
+  Object.defineProperty(globalThis, 'IntersectionObserver', {
+    configurable: true,
+    writable: true,
+    value: MockIntersectionObserver
+  })
+
+  return {
+    observers,
+    trigger: (target, isIntersecting = true) => {
+      act(() => {
+        observers
+          .filter((observer) => observer.targets.has(target))
+          .forEach((observer) => observer.callback([{target, isIntersecting}], observer))
+      })
+    }
+  }
+}
+
 let currentPosts
 let detailResponses
 let detailFailures
@@ -173,6 +231,10 @@ let onlyFavoriteTagsEnabled
 let sessionTheme
 let minimumReputation
 let hivewatchersBlacklistEnabled
+let votingPowerPayload
+let votingPowerFailure
+let chainStatsPayload
+let chainStatsResponses
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
@@ -232,6 +294,10 @@ describe('App', () => {
     sessionTheme = 'system'
     minimumReputation = 25
     hivewatchersBlacklistEnabled = false
+    votingPowerPayload = {status: 'ready', value: 9730, percent: 97.3, fetched_at: '2026-06-01T12:00:00Z'}
+    votingPowerFailure = false
+    chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 10000}
+    chainStatsResponses = new Map()
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
@@ -267,6 +333,11 @@ describe('App', () => {
           favorite_tags: ['haf'],
           past_tags: [{name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png'}]
         })
+      }
+
+      if (url === '/api/v1/session/voting_power') {
+        if (votingPowerFailure) return jsonResponse({status: 'unavailable', value: null, percent: null, fetched_at: '2026-06-01T12:00:00Z'})
+        return jsonResponse(votingPowerPayload)
       }
 
       if (url.toString().startsWith('/api/v1/posts?')) return jsonResponse(postsPayload(new URLSearchParams(url.toString().split('?')[1])))
@@ -321,6 +392,21 @@ describe('App', () => {
             {index: 2, label: 'Revision 3', published_at: '2026-01-03T00:00:00', block_num: 30, body: 'shared line\ncurrent source line', body_html: '<p>Current rendered body</p>'}
           ]
         })
+      }
+
+      const chainStatsMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/chain_stats(?:\?(.*))?$/)
+      if (chainStatsMatch) {
+        const id = Number(chainStatsMatch[1])
+        if (chainStatsResponses.has(id)) {
+          return chainStatsResponses.get(id).promise.then((payload) => jsonResponse(payload))
+        }
+
+        return jsonResponse(chainStatsPayload)
+      }
+
+      const payoutMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/payout(?:\?(.*))?$/)
+      if (payoutMatch) {
+        return jsonResponse({status: 'ready', payout: '1.234 HBD'})
       }
 
       const readMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/read$/)
@@ -421,6 +507,8 @@ describe('App', () => {
     document.documentElement.classList.remove('dark')
     document.documentElement.style.colorScheme = ''
     window.localStorage?.clear?.()
+    delete window.IntersectionObserver
+    delete globalThis.IntersectionObserver
     vi.restoreAllMocks()
   })
 
@@ -430,6 +518,56 @@ describe('App', () => {
     await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
     expect(screen.queryByRole('link', {name: 'Legacy inbox'})).not.toBeInTheDocument()
+  })
+
+  test('displays current voting power beside the avatar', async () => {
+    await renderApp()
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/session/voting_power', expect.anything()))
+    expect(screen.getByText('VP 97.3%')).toBeInTheDocument()
+    expect(screen.getByLabelText('Current voting power')).toHaveAttribute('title', 'Current voting power')
+  })
+
+  test('polls current voting power periodically', async () => {
+    let poll
+    const originalSetInterval = window.setInterval
+    const setIntervalSpy = vi.spyOn(window, 'setInterval').mockImplementation((callback, delay, ...args) => {
+      if (delay === 60000) {
+        poll = callback
+        return 123
+      }
+
+      return originalSetInterval(callback, delay, ...args)
+    })
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval').mockImplementation(() => {})
+
+    await renderApp()
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/session/voting_power', expect.anything()))
+    await waitFor(() => expect(screen.getByText('VP 97.3%')).toBeInTheDocument())
+
+    votingPowerPayload = {status: 'ready', value: 9840, percent: 98.4, fetched_at: '2026-06-01T12:01:00Z'}
+    await act(async () => {
+      poll()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(global.fetch.mock.calls.filter(([url]) => url === '/api/v1/session/voting_power')).toHaveLength(2)
+    await waitFor(() => expect(screen.getByText('VP 98.4%')).toBeInTheDocument())
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 60000)
+
+    cleanup()
+    expect(clearIntervalSpy).toHaveBeenCalledWith(123)
+  })
+
+  test('keeps rendering when current voting power is unavailable', async () => {
+    votingPowerFailure = true
+
+    await renderApp()
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/session/voting_power', expect.anything()))
+    expect(screen.getByText('VP --')).toBeInTheDocument()
+    expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
   test('opens settings with Hive blacklist sources', async () => {
@@ -627,10 +765,10 @@ describe('App', () => {
     await renderApp()
 
     const firstThumbnail = screen.getByTestId('post-thumbnail-1')
-    expect(firstThumbnail).toHaveAttribute('src', 'https://images.hive.blog/0x96/https://example.com/first-post.jpg')
+    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg', '0x96'))
 
     const middleThumbnail = screen.getByTestId('post-thumbnail-2')
-    expect(middleThumbnail).toHaveAttribute('src', 'https://images.hive.blog/0x96/https://images.hive.blog/u/middle-author/avatar')
+    expect(middleThumbnail).toHaveAttribute('src', proxiedImage('https://images.hive.blog/u/middle-author/avatar', '0x96'))
 
     fireEvent.error(middleThumbnail)
     expect(middleThumbnail).toHaveAttribute('src', 'data:image/gif;base64,R0lGODdhAQABAAAAACw=')
@@ -739,6 +877,93 @@ describe('App', () => {
     expect(screen.getByRole('link', {name: /hivehub.dev/i})).toHaveAttribute('href', 'https://hivehub.dev/hive-13323/@visible-author/post-1')
     expect(screen.getByRole('button', {name: /Diff/i})).toBeInTheDocument()
     expect(screen.queryByRole('link', {name: /scribe/i})).not.toBeInTheDocument()
+  })
+
+  test('loads chain stats for the preview without fanning out across list rows', async () => {
+    await renderApp()
+
+    await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/chain_stats')).map(([url]) => url)).toEqual([
+      '/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post'
+    ])
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)).toEqual([
+      '/api/v1/posts/1/payout?author=visible-author&permlink=first-post',
+      '/api/v1/posts/2/payout?author=middle-author&permlink=middle-post',
+      '/api/v1/posts/3/payout?author=last-author&permlink=last-post'
+    ])
+  })
+
+  test('loads preview body before requesting preview chain stats', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+
+    await renderApp({waitForPreview: false})
+    await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
+
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/chain_stats'))).toEqual([])
+
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_html: '<p>Body first</p>',
+      urls: {}
+    })
+
+    expect(await screen.findByText('Body first')).toBeInTheDocument()
+    await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/chain_stats')).map(([url]) => url)).toEqual([
+      '/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post'
+    ]))
+  })
+
+  test('ignores stale preview chain stats after selection changes without aborting the request', async () => {
+    const firstStats = deferred()
+    chainStatsResponses.set(1, firstStats)
+
+    await renderApp()
+    await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => url.toString().includes('/api/v1/posts/1/chain_stats'))).toBe(true))
+
+    fireEvent.keyDown(document, {key: 'j'})
+    await waitFor(() => expect(screen.getByText('Preview 2')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
+
+    firstStats.resolve({status: 'ready', votes: 99, replies: 99, payout: '99.999 HBD', current_vote: null})
+
+    await waitFor(() => expect(screen.queryByText('Votes: 99')).not.toBeInTheDocument())
+    expect(screen.queryByText('99.999 HBD')).not.toBeInTheDocument()
+  })
+
+  test('lazy-loads list payout and thumbnails only after they intersect the viewport', async () => {
+    const visibility = installIntersectionObserverMock()
+
+    await renderApp()
+
+    const payoutUrls = () => global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)
+    const firstPayout = screen.getByTestId('post-payout-1')
+    const secondPayout = screen.getByTestId('post-payout-2')
+    const firstThumbnail = screen.getByTestId('post-thumbnail-1')
+    const secondThumbnail = screen.getByTestId('post-thumbnail-2')
+
+    await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
+    expect(payoutUrls()).toEqual([])
+    expect(firstPayout).toHaveTextContent('...')
+    expect(firstThumbnail).not.toHaveAttribute('src')
+    expect(secondThumbnail).not.toHaveAttribute('src')
+    expect(visibility.observers.every((observer) => observer.options.root === null && observer.options.rootMargin === '0px')).toBe(true)
+
+    visibility.trigger(firstPayout)
+    await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/1/payout?author=visible-author&permlink=first-post']))
+    await waitFor(() => expect(firstPayout).toHaveTextContent('1.234 HBD'))
+    expect(secondPayout).toHaveTextContent('...')
+
+    visibility.trigger(firstThumbnail)
+    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg', '0x96'))
+    expect(secondThumbnail).not.toHaveAttribute('src')
+
+    visibility.trigger(secondThumbnail)
+    expect(secondThumbnail).toHaveAttribute('src', proxiedImage('https://images.hive.blog/u/middle-author/avatar', '0x96'))
+
+    fireEvent.error(secondThumbnail)
+    expect(secondThumbnail).toHaveAttribute('src', 'data:image/gif;base64,R0lGODdhAQABAAAAACw=')
   })
 
   test('uses Bootstrap-style post list columns with expandable tags', async () => {
@@ -890,8 +1115,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', {name: 'Original Post'})).toBeInTheDocument()
     expect(screen.getByRole('button', {name: 'Focus author @original-author'})).toBeInTheDocument()
-    await waitFor(() => expect(window.hive.api.getActiveVotes).toHaveBeenCalledWith('original-author', 'original-post', expect.any(Function)))
-    expect(window.hive.api.getContent).toHaveBeenCalledWith('original-author', 'original-post', expect.any(Function))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=original-author&permlink=original-post', expect.objectContaining({credentials: 'same-origin'})))
   })
 
   test('casts keychain upvotes with the selected weight', async () => {
@@ -902,6 +1126,35 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
 
     expect(window.hive_keychain.requestVote).toHaveBeenCalledWith('fixture-curator', 'first-post', 'visible-author', 4200, expect.any(Function))
+  })
+
+  test('retries preview stats after keychain vote until the vote appears', async () => {
+    await renderApp()
+    await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
+    vi.useFakeTimers()
+
+    chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 0}
+    fireEvent.click(screen.getByText('Votes: 2'))
+    fireEvent.change(screen.getByRole('slider'), {target: {value: '42'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+
+    act(() => vi.advanceTimersByTime(2500))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    chainStatsPayload = {status: 'ready', votes: 3, replies: 2, payout: '2.000 HBD', current_vote: 4200}
+    act(() => vi.advanceTimersByTime(7000))
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('Votes: 3')).toBeInTheDocument()
+    expect(screen.getByText('2.000 HBD')).toBeInTheDocument()
+    expect(screen.getByText('Preview 1')).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   test('casts hivesigner downvotes in a signing modal', async () => {
@@ -930,7 +1183,11 @@ describe('App', () => {
 
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(3000))
-    expect(window.hive.api.getActiveVotes).toHaveBeenCalledTimes(2)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().startsWith('/api/v1/posts/1/chain_stats')).length).toBeGreaterThanOrEqual(2)
     vi.useRealTimers()
   })
 
@@ -1045,7 +1302,7 @@ describe('App', () => {
 
     expect(screen.getAllByRole('button', {name: 'Focus tag hive-13323'})[0]).toHaveTextContent('Hive')
     expect(screen.getAllByRole('button', {name: 'Focus tag hive-19999'})[0]).toHaveTextContent('Side Community')
-    expect(screen.getAllByTestId('community-profile-image')[0]).toHaveAttribute('src', 'https://images.hive.blog/0x32/https://example.com/hive-community.png')
+    expect(screen.getAllByTestId('community-profile-image')[0]).toHaveAttribute('src', proxiedImage('https://example.com/hive-community.png', '0x32'))
 
     fireEvent.click(screen.getAllByRole('button', {name: 'Focus tag hive-19999'})[0])
 
@@ -1566,6 +1823,7 @@ describe('App', () => {
     })
 
     await renderApp({waitForPreview: false})
+    await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
 
     expect(await screen.findByText('Fallback preview')).toBeInTheDocument()
     expect(screen.queryByTitle('Rendered post: First Post')).not.toBeInTheDocument()
@@ -1588,6 +1846,26 @@ describe('App', () => {
     expect(screen.getByRole('link', {name: '#c-c-c'})).toBeInTheDocument()
     expect(screen.getByRole('link', {name: '#hivegc'})).toBeInTheDocument()
     expect(screen.queryByRole('heading', {name: 'c-c-c #hivegc'})).not.toBeInTheDocument()
+  })
+
+  test('proxies and lazy-loads rendered post body images', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '![Alt text](https://example.com/body.png)',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    const image = await screen.findByRole('img', {name: 'Alt text'})
+    expect(image).toHaveAttribute('src', new URL(proxiedImage('https://example.com/body.png'), window.location.origin).toString().replace(/^http:/, ''))
+    expect(image).toHaveAttribute('loading', 'lazy')
+    expect(image).toHaveAttribute('decoding', 'async')
+    expect(image).toHaveAttribute('referrerpolicy', 'no-referrer')
   })
 
   test('renders YouTube embeds without sandboxing the player iframe', async () => {
@@ -1716,6 +1994,7 @@ describe('App', () => {
     })
 
     await renderApp({waitForPreview: false})
+    await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
 
     expect(await screen.findByText('Fallback preview')).toBeInTheDocument()
     expect(screen.queryByTitle('Rendered post: First Post')).not.toBeInTheDocument()

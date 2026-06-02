@@ -31,6 +31,11 @@ class BootErrorBoundary extends React.Component {
 registerServiceWorker()
 applyTheme(storedTheme())
 
+const hiveApiUrl = document.querySelector('meta[name="hive-api-url"]')?.content
+if (hiveApiUrl && window.hive?.api?.setOptions) {
+  window.hive.api.setOptions({url: hiveApiUrl})
+}
+
 const root = document.getElementById('root')
 
 if (root) {

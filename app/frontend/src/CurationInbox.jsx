@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckSquare, Square, X } from 'lucide-react'
+import { CheckSquare, Loader2, Square, X } from 'lucide-react'
 import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
@@ -625,8 +625,15 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
           {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
           <div ref={listScrollRef} className="post-list-shell overflow-hidden rounded-md border border-slate-200 bg-white">
-            <div className="flex items-center gap-3 border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
-              <span>{loading ? 'Loading posts' : resultCountLabel}</span>
+            <div className={`flex items-center gap-3 border-b px-3 py-2 text-xs ${loading ? 'border-blue-100 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-500'}`}>
+              {loading ? (
+                <span className="inline-flex items-center gap-2 font-semibold" role="status" aria-live="polite">
+                  <Loader2 className="animate-spin" size={14} aria-hidden="true" />
+                  Loading posts...
+                </span>
+              ) : (
+                <span>{resultCountLabel}</span>
+              )}
             </div>
             {!loading && posts.length > 0 && (
               <SelectionBar
@@ -970,7 +977,7 @@ function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts
 
 function PostListSkeleton() {
   return (
-    <div className="divide-y divide-slate-100" aria-label="Loading posts">
+    <div className="divide-y divide-slate-100" aria-label="Loading posts" aria-busy="true">
       {[0, 1, 2, 3, 4].map((index) => (
         <div key={index} className="grid grid-cols-[40px_minmax(0,1fr)_96px] items-center gap-3 px-3 py-3 md:grid-cols-[40px_56px_minmax(220px,1fr)_minmax(120px,180px)_minmax(120px,160px)_90px]">
           <div className="h-5 w-5 rounded bg-slate-200" />

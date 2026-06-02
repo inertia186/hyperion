@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckSquare, Square } from 'lucide-react'
+import { api } from '../api'
 import { imageProxy, relativeAge, tagLabel } from '../format'
 import CategoryTagsControl from './CategoryTagsControl'
 import CommunityLabel from './CommunityLabel'
@@ -74,41 +75,37 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
 }
 
 function PostPayout({post}) {
-  const [payout, setPayout] = useState('00.000 HBD')
+  const payoutRef = useRef(null)
+  const visible = useVisibleOnce(payoutRef)
+  const [payout, setPayout] = useState('...')
 
   useEffect(() => {
-    let cancelled = false
+    if (!visible) return undefined
+
+    const abortController = new AbortController()
     setPayout('...')
 
-    const hiveApi = window.hive?.api
-    if (!hiveApi) {
-      setPayout('00.000 HBD')
-      return undefined
-    }
-
-    hiveApi.getContent(post.author, post.permlink, (err, response) => {
-      if (cancelled) return
-      if (err || !response) {
-        setPayout('00.000 HBD')
-        return
-      }
-
-      setPayout(response.cashout_time === '1969-12-31T23:59:59' ? response.total_payout_value : response.pending_payout_value)
-    })
+    api.postPayout(post.id, {author: post.author, permlink: post.permlink}, {signal: abortController.signal})
+      .then((payload) => setPayout(payload.payout || '...'))
+      .catch(() => {
+        if (!abortController.signal.aborted) setPayout('...')
+      })
 
     return () => {
-      cancelled = true
+      abortController.abort()
     }
-  }, [post.author, post.permlink])
+  }, [post.id, post.author, post.permlink, visible])
 
   return (
-    <span className="post-row-payout hidden h-7 min-w-0 items-center justify-center rounded bg-slate-100 px-2 text-center text-[11px] font-medium text-slate-600 md:inline-flex">
+    <span ref={payoutRef} data-testid={`post-payout-${post.id}`} className="post-row-payout hidden h-7 min-w-0 items-center justify-center rounded bg-slate-100 px-2 text-center text-[11px] font-medium text-slate-600 md:inline-flex">
       <span className="truncate">{payout}</span>
     </span>
   )
 }
 
 function PostThumbnail({post}) {
+  const thumbnailRef = useRef(null)
+  const visible = useVisibleOnce(thumbnailRef)
   const sources = useMemo(() => {
     const values = [post.thumbnail_url, post.author_avatar_url, post.placeholder_image_url]
     return values.filter((value, index) => value && values.indexOf(value) === index)
@@ -123,11 +120,39 @@ function PostThumbnail({post}) {
 
   return (
     <img
+      ref={thumbnailRef}
       data-testid={`post-thumbnail-${post.id}`}
       className="post-row-thumbnail hidden h-12 w-12 rounded-md object-cover md:block"
-      src={imageProxy(source, '0x96')}
+      src={visible ? imageProxy(source, '0x96') : undefined}
       alt=""
-      onError={() => setSourceIndex((current) => Math.min(current + 1, sources.length - 1))}
+      onError={visible ? () => setSourceIndex((current) => Math.min(current + 1, sources.length - 1)) : undefined}
     />
   )
+}
+
+function useVisibleOnce(ref) {
+  const [visible, setVisible] = useState(() => typeof IntersectionObserver === 'undefined')
+
+  useEffect(() => {
+    if (visible) return undefined
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true)
+      return undefined
+    }
+
+    const target = ref.current
+    if (!target) return undefined
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+
+      setVisible(true)
+      observer.disconnect()
+    }, {root: null, rootMargin: '0px'})
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [ref, visible])
+
+  return visible
 }

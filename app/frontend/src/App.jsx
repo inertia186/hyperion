@@ -3,12 +3,14 @@ import { Laptop, LogOut, Moon, Settings, Sun, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
+import { imageProxy } from './format'
 import { applyTheme, normalizeTheme, storedTheme, writeStoredTheme } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
 
 export default function App() {
   const [session, setSession] = useState(null)
   const [error, setError] = useState(null)
+  const [votingPower, setVotingPower] = useState({status: 'loading', percent: null})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [theme, setTheme] = useState(() => storedTheme())
@@ -62,6 +64,33 @@ export default function App() {
         setError(err.message || 'Request failed')
       })
   }, [])
+
+  useEffect(() => {
+    if (!session?.authenticated) return undefined
+
+    let cancelled = false
+    let intervalId
+
+    const refreshVotingPower = () => {
+      api.votingPower()
+        .then((payload) => {
+          if (cancelled) return
+          setVotingPower(payload.status === 'ready' ? {status: 'ready', percent: payload.percent} : {status: 'unavailable', percent: null})
+        })
+        .catch(() => {
+          if (cancelled) return
+          setVotingPower({status: 'unavailable', percent: null})
+        })
+    }
+
+    refreshVotingPower()
+    intervalId = window.setInterval(refreshVotingPower, 60_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [session?.authenticated])
 
   if (error) {
     return <FullPageState label={error} />
@@ -117,7 +146,8 @@ export default function App() {
         <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
           <div className="text-xl font-semibold tracking-normal">Hyperion</div>
           <div className="ml-auto flex min-w-0 items-center gap-3">
-            <img className="h-8 w-8 rounded-full" src={session.account.avatar_url} alt="" />
+            <img className="h-8 w-8 rounded-full" src={imageProxy(session.account.avatar_url, '0x64')} alt="" />
+            <VotingPowerBadge votingPower={votingPower} />
             <span className="hidden truncate text-sm font-medium sm:inline">{session.account.name}</span>
             <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
             <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
@@ -156,6 +186,23 @@ export default function App() {
       )}
     </div>
   )
+}
+
+function VotingPowerBadge({votingPower}) {
+  const label = votingPower.status === 'ready' && Number.isFinite(Number(votingPower.percent))
+    ? `VP ${formatVotingPowerPercent(votingPower.percent)}`
+    : 'VP --'
+
+  return (
+    <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-slate-200 bg-slate-50 px-2 text-xs font-semibold tabular-nums text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Current voting power" aria-label="Current voting power">
+      {label}
+    </span>
+  )
+}
+
+function formatVotingPowerPercent(percent) {
+  const rounded = Number(percent).toFixed(1)
+  return `${rounded.endsWith('.0') ? rounded.slice(0, -2) : rounded}%`
 }
 
 function ThemeSelector({theme, onChange, disabled}) {

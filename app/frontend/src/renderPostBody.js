@@ -1,4 +1,5 @@
 import { DefaultRenderer } from '@hive/hive-content-renderer'
+import { imageProxy } from './format'
 
 export function renderPostBody(markdown, post = {}) {
   const renderer = new DefaultRenderer({
@@ -11,7 +12,7 @@ export function renderPostBody(markdown, post = {}) {
     ipfsPrefix: '',
     assetsWidth: 640,
     assetsHeight: 480,
-    imageProxyFn: (url) => url,
+    imageProxyFn: (url) => absoluteImageProxy(url),
     usertagUrlFn: (account) => `/@${account}`,
     hashtagUrlFn: (hashtag) => `/${post.category || 'trending'}/@${post.author || ''}/${post.permlink || ''}#${hashtag}`,
     isLinkSafeFn: () => true
@@ -42,5 +43,18 @@ function hardenRenderedEmbeds(html) {
     iframe.setAttribute('loading', 'lazy')
   })
 
+  doc.querySelectorAll('img').forEach((image) => {
+    image.setAttribute('loading', 'lazy')
+    image.setAttribute('decoding', 'async')
+    image.setAttribute('referrerpolicy', 'no-referrer')
+  })
+
   return doc.body.innerHTML
+}
+
+function absoluteImageProxy(url) {
+  const proxiedUrl = imageProxy(url)
+  if (typeof window === 'undefined') return proxiedUrl
+
+  return new URL(proxiedUrl, window.location.origin).toString()
 }

@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, FileDiff, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { api } from '../api'
+import { imageProxy } from '../format'
 import { renderPostBody } from '../renderPostBody'
 import { closeOnBackdropClick, useModalDismiss } from '../useModalDismiss'
 import CategoryTagsControl from './CategoryTagsControl'
+
+const emptyStats = {status: 'idle', votes: null, replies: null, payout: null, currentVote: null}
+const loadingStats = {status: 'loading', votes: null, replies: null, payout: null, currentVote: null}
+const voteRefreshDelays = [2500, 7000, 15000]
 
 export default function PreviewPane({
   post,
@@ -44,89 +49,97 @@ export default function PreviewPane({
       return previewState.html
     }
   }, [detail?.body_markdown, displayPost, previewState.html])
-  const [stats, setStats] = useState({status: 'idle', votes: null, replies: null, payout: null, currentVote: null})
+  const previewHtmlMarkup = useMemo(() => ({__html: previewHtml}), [previewHtml])
+  const [stats, setStats] = useState(emptyStats)
   const [votePanel, setVotePanel] = useState(null)
   const [voteWeight, setVoteWeight] = useState(100)
   const [voteBusy, setVoteBusy] = useState(false)
   const [hivesignerModal, setHivesignerModal] = useState(null)
   const [diffModal, setDiffModal] = useState(null)
   const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
+  const voteRefreshRef = useRef({id: 0, timeoutId: null})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)
   }, [post?.id])
 
   useEffect(() => {
-    if (!displayPost) return
-
-    let cancelled = false
-    setStats({status: 'loading', votes: null, replies: null, payout: null, currentVote: null})
-
-    const hiveApi = window.hive?.api
-
-    if (!hiveApi) {
-      setStats({status: 'unavailable', votes: null, replies: null, payout: null, currentVote: null})
-      return
-    }
-
-    const nextStats = {status: 'ready', votes: null, replies: null, payout: null, currentVote: null}
-    const publish = () => {
-      if (!cancelled) setStats({...nextStats})
-    }
-
-    hiveApi.getActiveVotes(displayPost.author, displayPost.permlink, (err, response) => {
-      if (cancelled) return
-      if (!err && response) {
-        nextStats.votes = response.filter((vote) => vote.percent > 0).length
-        nextStats.currentVote = response.find((vote) => vote.voter === accountName)?.percent || null
-      }
-      publish()
-    })
-
-    hiveApi.getContentReplies(displayPost.author, displayPost.permlink, (err, response) => {
-      if (cancelled) return
-      if (!err && response) nextStats.replies = response.length
-      publish()
-    })
-
-    hiveApi.getContent(displayPost.author, displayPost.permlink, (err, response) => {
-      if (cancelled) return
-      if (!err && response) {
-        nextStats.payout = response.cashout_time === '1969-12-31T23:59:59' ? response.total_payout_value : response.pending_payout_value
-      }
-      publish()
-    })
+    setStats(post ? loadingStats : emptyStats)
+    voteRefreshRef.current.id += 1
+    window.clearTimeout(voteRefreshRef.current.timeoutId)
 
     return () => {
-      cancelled = true
+      voteRefreshRef.current.id += 1
+      window.clearTimeout(voteRefreshRef.current.timeoutId)
     }
-  }, [accountName, displayPost])
+  }, [post?.id])
 
-  const refreshStatsAfterVote = () => {
+  useEffect(() => {
+    if (!displayPost) return undefined
+    if (!previewReady) return undefined
+
+    let active = true
+
+    api.postChainStats(displayPost.id, {author: displayPost.author, permlink: displayPost.permlink})
+      .then((payload) => {
+        if (!active) return
+        setStats({
+          status: payload.status || 'ready',
+          votes: payload.votes ?? null,
+          replies: payload.replies ?? null,
+          payout: payload.payout ?? null,
+          currentVote: payload.current_vote ?? null
+        })
+      })
+      .catch(() => {
+        if (active) setStats({status: 'unavailable', votes: null, replies: null, payout: null, currentVote: null})
+      })
+
+    return () => {
+      active = false
+    }
+  }, [accountName, displayPost?.id, displayPost?.author, displayPost?.permlink, previewReady])
+
+  const refreshStatsAfterVote = ({expectedVote = null} = {}) => {
+    if (!displayPost) return
+
+    const targetPost = displayPost
+    const refreshId = voteRefreshRef.current.id + 1
+    voteRefreshRef.current.id = refreshId
+    window.clearTimeout(voteRefreshRef.current.timeoutId)
     setStats((current) => ({...current, status: 'loading'}))
 
-    window.setTimeout(() => {
-      if (!displayPost || !window.hive?.api) return
+    const scheduleRefresh = (attempt) => {
+      voteRefreshRef.current.timeoutId = window.setTimeout(() => {
+        if (voteRefreshRef.current.id !== refreshId) return
 
-      window.hive.api.getActiveVotes(displayPost.author, displayPost.permlink, (err, response) => {
-        if (err || !response) return
-        setStats((current) => ({
-          ...current,
-          status: 'ready',
-          votes: response.filter((vote) => vote.percent > 0).length,
-          currentVote: response.find((vote) => vote.voter === accountName)?.percent || null
-        }))
-      })
+        api.postChainStats(targetPost.id, {author: targetPost.author, permlink: targetPost.permlink, refresh: true})
+          .then((payload) => {
+            if (voteRefreshRef.current.id !== refreshId) return
+            if (payload.status !== 'ready') return
+            setStats((current) => ({
+              ...current,
+              status: 'ready',
+              votes: payload.votes ?? current.votes,
+              replies: payload.replies ?? current.replies,
+              payout: payload.payout ?? current.payout,
+              currentVote: payload.current_vote ?? current.currentVote
+            }))
 
-      window.hive.api.getContent(displayPost.author, displayPost.permlink, (err, response) => {
-        if (err || !response) return
-        setStats((current) => ({
-          ...current,
-          status: 'ready',
-          payout: response.cashout_time === '1969-12-31T23:59:59' ? response.total_payout_value : response.pending_payout_value
-        }))
-      })
-    }, 3000)
+            const observedVote = payload.current_vote == null ? null : Number(payload.current_vote)
+            if (expectedVote != null && observedVote !== expectedVote && attempt + 1 < voteRefreshDelays.length) {
+              scheduleRefresh(attempt + 1)
+            }
+          })
+          .catch(() => {
+            if (voteRefreshRef.current.id === refreshId && attempt + 1 < voteRefreshDelays.length) {
+              scheduleRefresh(attempt + 1)
+            }
+          })
+      }, voteRefreshDelays[attempt])
+    }
+
+    scheduleRefresh(0)
   }
 
   const closeHivesignerModal = ({refresh = true} = {}) => {
@@ -152,10 +165,10 @@ export default function PreviewPane({
     }
 
     if (window.hive_keychain?.requestVote) {
-      window.hive_keychain.requestVote(accountName, displayPost.permlink, displayPost.author, weight, () => {
+      window.hive_keychain.requestVote(accountName, displayPost.permlink, displayPost.author, weight, (response) => {
         setVotePanel(null)
         setVoteBusy(false)
-        refreshStatsAfterVote()
+        if (response?.success !== false) refreshStatsAfterVote({expectedVote: weight})
       })
       return
     }
@@ -195,7 +208,7 @@ export default function PreviewPane({
     <div className={`flex h-full min-h-[420px] flex-col ${previewActive ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-start gap-3">
-          <img className="h-10 w-10 rounded-full" src={`https://images.hive.blog/u/${displayPost.author}/avatar`} alt="" />
+          <img className="h-10 w-10 rounded-full" src={imageProxy(`https://images.hive.blog/u/${displayPost.author}/avatar`, '0x80')} alt="" />
           <div className="min-w-0 flex-1">
             <h1 className="text-base font-semibold leading-snug text-slate-900">{displayPost.title}</h1>
             <div className="mt-1 flex flex-wrap items-start gap-1 text-xs text-slate-500">
@@ -253,7 +266,7 @@ export default function PreviewPane({
             <ThumbsDown size={14} /> Downvote {votePanel === 'down' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
           <span className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2"><MessageSquare size={14} /> Replies: {stats.replies ?? '...'}</span>
-          <span className="inline-flex h-8 items-center rounded-md border border-slate-300 px-2">{stats.payout || '00.000 HBD'}</span>
+          <span className="inline-flex h-8 items-center rounded-md border border-slate-300 px-2">{stats.payout || '...'}</span>
         </div>
         {votePanel && (
           <div className="mt-3 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs">
@@ -268,7 +281,7 @@ export default function PreviewPane({
       </div>
       <div ref={previewScrollRef} className="safe-area-bottom touch-scroll min-h-0 flex-1 overflow-auto p-4" tabIndex={-1}>
         {previewReady ? (
-          <article className="post-body text-sm" dangerouslySetInnerHTML={{__html: previewHtml}} />
+          <article className="post-body text-sm" dangerouslySetInnerHTML={previewHtmlMarkup} />
         ) : previewState.status === 'error' && previewState.postId === post.id ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Preview failed to load.</div>
         ) : (

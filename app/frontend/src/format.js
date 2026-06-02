@@ -1,6 +1,10 @@
 export function imageProxy(url, size) {
   if (!url || url.startsWith('data:')) return url
-  return `https://images.hive.blog/${size}/${url}`
+  const imageUrl = url.startsWith('//') ? `https:${url}` : url
+  if (!/^https?:\/\//i.test(imageUrl)) return url
+  const params = new URLSearchParams({url: imageUrl})
+  if (size) params.set('size', size)
+  return `/api/v1/images/proxy?${params.toString()}`
 }
 
 export function relativeAge(value) {
