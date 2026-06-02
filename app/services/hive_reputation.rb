@@ -29,7 +29,7 @@ class HiveReputation
       return {} if authors.empty?
 
       scores = authors.index_with { DEFAULT_REPUTATION }
-      fetch_paged_scores(authors, scores, api)
+      fetch_scores(authors, scores, api)
 
       scores
     rescue => e
@@ -101,26 +101,18 @@ class HiveReputation
       end
     end
 
-    def fetch_paged_scores(authors, scores, api)
-      unresolved = authors.sort
-
-      until unresolved.empty?
-        accounts = fetch_reputation_page(api, unresolved.first)
-        break if accounts.empty?
-
+    def fetch_scores(authors, scores, api)
+      authors.each_slice(REPUTATION_BATCH_SIZE) do |batch|
+        accounts = fetch_accounts(api, batch)
         accounts_by_name = accounts.index_by { |account| account_field(account, :account).to_s.downcase }
         accounts_by_name.each do |name, account|
           scores[name] = score(account_field(account, :reputation)) if scores.key?(name)
         end
-
-        last_account = accounts_by_name.keys.compact.max
-        break if last_account.blank?
-        unresolved = unresolved.reject { |author| author <= last_account }
       end
     end
 
-    def fetch_reputation_page(api, start)
-      response = api.rpc_client.rpc_execute(:condenser_api, :get_account_reputations, [start, REPUTATION_BATCH_SIZE])
+    def fetch_accounts(api, authors)
+      response = api.rpc_client.rpc_execute(:condenser_api, :get_accounts, [authors])
       raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
       Array(response.result)

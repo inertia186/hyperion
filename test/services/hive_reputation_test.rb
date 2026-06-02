@@ -19,7 +19,7 @@ class HiveReputationTest < ActiveSupport::TestCase
 
     assert_equal 34, scores.fetch('alice')
     assert_equal 25, scores.fetch('bob')
-    assert_equal [1000, 1000], api.limits
+    assert_equal [%w(alice bob)], api.batches
   end
 
   test 'returns default scores when account lookup fails' do
@@ -40,7 +40,7 @@ class HiveReputationTest < ActiveSupport::TestCase
     scores = HiveReputation.scores_for(authors, api: api)
 
     assert_equal 2, api.calls
-    assert_equal [1000, 1000], api.limits
+    assert_equal [1000, 1], api.batches.map(&:size)
     assert_equal 34, scores.fetch('author-1')
     assert_equal 34, scores.fetch('author-1001')
   end
@@ -123,10 +123,10 @@ private
     def initialize(reputations)
       @reputations = reputations.sort_by(&:account)
       @calls = 0
-      @limits = []
+      @batches = []
     end
 
-    attr_reader :calls, :limits
+    attr_reader :calls, :batches
 
     def rpc_client
       self
@@ -134,12 +134,12 @@ private
 
     def rpc_execute(api, method, args)
       raise "unexpected api: #{api}" unless api == :condenser_api
-      raise "unexpected method: #{method}" unless method == :get_account_reputations
+      raise "unexpected method: #{method}" unless method == :get_accounts
 
-      start, limit = args
+      accounts = args.first
       @calls += 1
-      @limits << limit
-      Response.new(@reputations.select { |account| account.account >= start }.first(limit))
+      @batches << accounts
+      Response.new(@reputations.select { |account| accounts.include?(account.account) })
     end
   end
 
