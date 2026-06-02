@@ -102,6 +102,16 @@ class PostTest < ActiveSupport::TestCase
     assert_equal [low, high], posts.order_by_tag_count(:asc).to_a
   end
 
+  test 'tagged all matches posts with every requested tag' do
+    both = create_post(author: 'alice', permlink: 'ruby-rails', tags: %w(ruby rails))
+    create_post(author: 'alice', permlink: 'ruby-only', tags: %w(ruby))
+    create_post(author: 'alice', permlink: 'rails-only', tags: %w(rails))
+
+    posts = Post.where(permlink: %w(ruby-rails ruby-only rails-only))
+
+    assert_equal [both], posts.tagged_all(%w(ruby rails)).order(:permlink).to_a
+  end
+
   test 'orders by prolific author without raw SQL' do
     create_post(author: 'alice', permlink: 'alice-first')
     create_post(author: 'alice', permlink: 'alice-second')

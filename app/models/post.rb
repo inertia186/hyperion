@@ -75,7 +75,7 @@ class Post < ApplicationRecord
     r = all
     
     tag.each do |t|
-      r = r.where(id: Tag.where(tag: tag).select(:post_id))
+      r = r.where(id: Tag.where(tag: t).select(:post_id))
     end
     
     r
