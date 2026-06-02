@@ -58,6 +58,34 @@ class PostCleanupJobTest < ActiveJob::TestCase
     assert_equal 42, posts(:muted_unread).reload.author_reputation
   end
 
+  test 'refreshes authors with mixed default and stored reputations' do
+    author = posts(:allowed_unread).author
+    posts(:allowed_unread).update!(author_reputation: 41)
+    mixed_default = Post.create!(
+      author: author,
+      permlink: 'mixed-default-reputation',
+      title: 'Mixed default reputation',
+      body: nil,
+      category: 'test',
+      metadata: {},
+      block_num: 123,
+      trx_id: 'mixed-default-reputation',
+      author_reputation: 25,
+      created_at: Time.current
+    )
+    IndexerState.fetch!(PostCleanupJob::AUTHOR_REPUTATION_STATE_NAME).update!(last_indexed_at: 2.days.ago)
+    blacklist = FakeBlacklist.new({})
+
+    with_reputations(author => 42) do
+      PostIndexJob.stub(:new, blacklist) do
+        PostCleanupJob.new.perform
+      end
+    end
+
+    assert_equal 42, posts(:allowed_unread).reload.author_reputation
+    assert_equal 42, mixed_default.reload.author_reputation
+  end
+
   test 'refreshes legacy default reputations not present in the reputation cache' do
     refreshed_authors = nil
     posts(:allowed_unread).update!(author_reputation: 41)
@@ -75,8 +103,9 @@ class PostCleanupJobTest < ActiveJob::TestCase
       end
     end
 
-    assert_not_includes refreshed_authors, posts(:allowed_unread).author
+    assert_includes refreshed_authors, posts(:allowed_unread).author
     assert_includes refreshed_authors, posts(:muted_unread).author
+    assert_equal 42, posts(:allowed_unread).reload.author_reputation
     assert_equal 42, posts(:muted_unread).reload.author_reputation
     assert IndexerState.find_by!(name: PostCleanupJob::AUTHOR_REPUTATION_STATE_NAME).last_indexed_at.present?
   end

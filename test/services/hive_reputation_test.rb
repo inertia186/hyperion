@@ -32,17 +32,17 @@ class HiveReputationTest < ActiveSupport::TestCase
   end
 
   test 'fetches scores in batches' do
-    authors = (1..1001).map { |index| "author-#{index}" }
+    authors = (1..201).map { |index| "author-#{index}" }
     api = FakeApi.new(
       authors.map { |author| Struct.new(:name, :reputation).new(author, 34.8) }
     )
 
     scores = HiveReputation.scores_for(authors, api: api)
 
-    assert_equal 2, api.calls
-    assert_equal [1000, 1], api.batches.map(&:size)
+    assert_equal 3, api.calls
+    assert_equal [100, 100, 1], api.batches.map(&:size)
     assert_equal 34, scores.fetch('author-1')
-    assert_equal 34, scores.fetch('author-1001')
+    assert_equal 34, scores.fetch('author-201')
   end
 
   test 'scores for indexing reuse stored non-default reputations' do

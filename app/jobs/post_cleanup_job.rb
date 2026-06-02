@@ -49,9 +49,7 @@ class PostCleanupJob < ApplicationJob
 private
   def active_author_reputations
     state = IndexerState.fetch!(AUTHOR_REPUTATION_STATE_NAME)
-    scope = Post.active.
-      where(author_reputation: HiveReputation::DEFAULT_REPUTATION).
-      where.not(author: Post.active.where.not(author_reputation: HiveReputation::DEFAULT_REPUTATION).select(:author))
+    scope = Post.active.where(author_reputation: HiveReputation::DEFAULT_REPUTATION)
 
     legacy_scope = scope.where(<<~SQL.squish)
       NOT EXISTS (
