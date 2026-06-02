@@ -35,6 +35,24 @@ class PostCleanupJobTest < ActiveJob::TestCase
     assert_equal 41, post.reload.author_reputation
   end
 
+  test 'logs compact author reputation summary' do
+    logger = CapturingLogger.new
+    blacklist = FakeBlacklist.new({})
+
+    Rails.stub(:logger, logger) do
+      with_reputations(posts(:allowed_unread).author => 41, posts(:muted_unread).author => 25) do
+        PostIndexJob.stub(:new, blacklist) do
+          PostCleanupJob.new.perform
+        end
+      end
+    end
+
+    messages = logger.infos.join("\n")
+    assert_includes messages, 'Author reputation summary:'
+    assert_includes messages, 'default=1'
+    assert_includes messages, 'nondefault=1'
+  end
+
   test 'refreshes only authors still using default reputation' do
     refreshed_authors = nil
     Post.where(author: posts(:allowed_unread).author).update_all(author_reputation: 41)
@@ -164,6 +182,18 @@ private
 
     def blacklist_refresh_failed?
       false
+    end
+  end
+
+  class CapturingLogger
+    attr_reader :infos
+
+    def initialize
+      @infos = []
+    end
+
+    def info(message)
+      @infos << message
     end
   end
 end

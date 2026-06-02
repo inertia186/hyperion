@@ -71,3 +71,34 @@ bundle exec rake index:once
 Post indexing uses the public HafSQL connection by default. Set
 `HAFSQL_DATABASE_URL` or the individual `HAFSQL_*` config vars above if the
 production app should use a different HafSQL endpoint.
+
+## Production diagnostics
+
+Check dynos and recent releases:
+
+```
+heroku ps -a hyperion-zone
+heroku releases -a hyperion-zone -n 5
+```
+
+Check the public health endpoint:
+
+```
+curl https://hyperion-zone-ddb79736a137.herokuapp.com/.well-known/healthcheck.json
+```
+
+Run read-only inbox and reputation diagnostics:
+
+```
+heroku run 'bundle exec rake ops:inbox[inertia]' -a hyperion-zone
+heroku run 'bundle exec rake ops:reputation[inertia]' -a hyperion-zone
+```
+
+Use a narrow error scan when checking Heroku logs:
+
+```
+heroku logs -a hyperion-zone -n 1500 | rg -i '(^|[[:space:]])(at=error|level=error|status=5[0-9][0-9]|code=H10|code=H11|FATAL|Unhandled|ActiveRecord::|ActionController::|NoMethodError|NameError|PG::|RuntimeError)'
+```
+
+Avoid broad searches such as `error|exception` for routine checks. They can
+false-positive on normal SQL text, account names, or blacklist data.

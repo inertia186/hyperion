@@ -105,6 +105,7 @@ class HiveReputation
       authors.each_slice(REPUTATION_BATCH_SIZE) do |batch|
         accounts = fetch_accounts(api, batch)
         accounts_by_name = accounts.index_by { |account| account_name(account) }
+        log_missing_profiles(batch, accounts_by_name.keys)
         accounts_by_name.each do |name, account|
           scores[name] = score_profile_reputation(account_field(account, :reputation)) if scores.key?(name)
         end
@@ -126,6 +127,17 @@ class HiveReputation
       return DEFAULT_REPUTATION if reputation.blank?
 
       reputation.to_f.to_i
+    end
+
+    def log_missing_profiles(authors, returned_authors)
+      missing_authors = authors - returned_authors
+      return if missing_authors.empty?
+
+      Rails.logger.warn(
+        "Hive profile batch returned fewer profiles than requested: " \
+        "requested=#{authors.size} returned=#{returned_authors.size} " \
+        "missing_sample=#{missing_authors.first(5).join(',')}"
+      )
     end
 
     def log10(reputation)

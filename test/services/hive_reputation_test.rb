@@ -45,6 +45,25 @@ class HiveReputationTest < ActiveSupport::TestCase
     assert_equal 34, scores.fetch('author-201')
   end
 
+  test 'warns when profile batch omits requested authors' do
+    api = FakeApi.new([
+      Struct.new(:name, :reputation).new('alice', 34.8)
+    ])
+    logger = CapturingLogger.new
+
+    Rails.stub(:logger, logger) do
+      scores = HiveReputation.scores_for(%w(alice bob carol), api: api)
+
+      assert_equal 34, scores.fetch('alice')
+      assert_equal 25, scores.fetch('bob')
+      assert_equal 25, scores.fetch('carol')
+    end
+
+    warning = logger.warns.join("\n")
+    assert_includes warning, 'requested=3 returned=1'
+    assert_includes warning, 'missing_sample=bob,carol'
+  end
+
   test 'scores for indexing reuse stored non-default reputations' do
     Post.create!(
       author: 'KnownAuthor',
@@ -157,6 +176,18 @@ private
     def rpc_execute(api, method, args)
       @calls += 1
       raise Hive::UnknownError, 'boom'
+    end
+  end
+
+  class CapturingLogger
+    attr_reader :warns
+
+    def initialize
+      @warns = []
+    end
+
+    def warn(message)
+      @warns << message
     end
   end
 end

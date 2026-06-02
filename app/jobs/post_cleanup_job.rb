@@ -68,6 +68,7 @@ private
 
     Rails.logger.info "Refreshing author reputations: #{authors.size}"
     reputations = HiveReputation.scores_for_indexing(authors, api: PostIndexJob::api)
+    log_author_reputation_summary(reputations)
     state.update!(last_indexed_at: Time.current)
     reputations
   end
@@ -80,5 +81,17 @@ private
     end
 
     Rails.logger.info "Author reputations refreshed: #{updated_count}" if updated_count > 0
+  end
+
+  def log_author_reputation_summary(reputations)
+    return if reputations.empty?
+
+    values = reputations.values
+    default_count = values.count(HiveReputation::DEFAULT_REPUTATION)
+    Rails.logger.info(
+      "Author reputation summary: authors=#{reputations.size} " \
+      "default=#{default_count} nondefault=#{values.size - default_count} " \
+      "min=#{values.min} max=#{values.max}"
+    )
   end
 end

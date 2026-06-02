@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  get '/.well-known/healthcheck.json', to: 'healthcheck#show', defaults: {format: :json}
+
   namespace :api do
     namespace :v1 do
       resource :session, only: :show
