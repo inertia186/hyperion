@@ -53,17 +53,23 @@ private
       where(author_reputation: HiveReputation::DEFAULT_REPUTATION).
       where.not(author: Post.active.where.not(author_reputation: HiveReputation::DEFAULT_REPUTATION).select(:author))
 
+    legacy_scope = scope.where(<<~SQL.squish)
+      NOT EXISTS (
+        SELECT 1
+        FROM author_reputations
+        WHERE author_reputations.account = LOWER(posts.author)
+      )
+    SQL
+
     if state.last_indexed_at.present?
-      scope = scope.where('posts.created_at > ?', state.last_indexed_at)
-    elsif Post.where.not(author_reputation: HiveReputation::DEFAULT_REPUTATION).exists?
-      state.update!(last_indexed_at: Time.current)
-      Rails.logger.info 'Author reputation backfill already present; skipping legacy default authors'
-      return {}
+      recent_scope = scope.where('posts.created_at > ?', state.last_indexed_at)
+      authors = (legacy_scope.distinct.pluck(:author) + recent_scope.distinct.pluck(:author)).uniq
+    else
+      authors = scope.distinct.pluck(:author)
     end
 
-    authors = scope.distinct.pluck(:author)
     Rails.logger.info "Refreshing author reputations: #{authors.size}"
-    reputations = HiveReputation.scores_for(authors, api: PostIndexJob::api)
+    reputations = HiveReputation.scores_for_indexing(authors, api: PostIndexJob::api)
     state.update!(last_indexed_at: Time.current)
     reputations
   end

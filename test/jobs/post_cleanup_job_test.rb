@@ -46,7 +46,7 @@ class PostCleanupJobTest < ActiveJob::TestCase
       refreshed_authors.index_with { 42 }
     }
 
-    HiveReputation.stub(:scores_for, reputation_scores) do
+    HiveReputation.stub(:scores_for_indexing, reputation_scores) do
       PostIndexJob.stub(:new, blacklist) do
         PostCleanupJob.new.perform
       end
@@ -58,24 +58,26 @@ class PostCleanupJobTest < ActiveJob::TestCase
     assert_equal 42, posts(:muted_unread).reload.author_reputation
   end
 
-  test 'skips legacy default reputations once backfill is present' do
+  test 'refreshes legacy default reputations not present in the reputation cache' do
     refreshed_authors = nil
     posts(:allowed_unread).update!(author_reputation: 41)
     posts(:muted_unread).update!(author_reputation: 25)
+    IndexerState.fetch!(PostCleanupJob::AUTHOR_REPUTATION_STATE_NAME).update!(last_indexed_at: 2.days.ago)
     blacklist = FakeBlacklist.new({})
     reputation_scores = ->(authors, **) {
       refreshed_authors = Array(authors)
       refreshed_authors.index_with { 42 }
     }
 
-    HiveReputation.stub(:scores_for, reputation_scores) do
+    HiveReputation.stub(:scores_for_indexing, reputation_scores) do
       PostIndexJob.stub(:new, blacklist) do
         PostCleanupJob.new.perform
       end
     end
 
-    assert_nil refreshed_authors
-    assert_equal 25, posts(:muted_unread).reload.author_reputation
+    assert_not_includes refreshed_authors, posts(:allowed_unread).author
+    assert_includes refreshed_authors, posts(:muted_unread).author
+    assert_equal 42, posts(:muted_unread).reload.author_reputation
     assert IndexerState.find_by!(name: PostCleanupJob::AUTHOR_REPUTATION_STATE_NAME).last_indexed_at.present?
   end
 
@@ -117,7 +119,7 @@ private
       end
     }
 
-    HiveReputation.stub(:scores_for, reputation_scores) do
+    HiveReputation.stub(:scores_for_indexing, reputation_scores) do
       yield
     end
   end
