@@ -104,18 +104,28 @@ class HiveReputation
     def fetch_scores(authors, scores, api)
       authors.each_slice(REPUTATION_BATCH_SIZE) do |batch|
         accounts = fetch_accounts(api, batch)
-        accounts_by_name = accounts.index_by { |account| account_field(account, :account).to_s.downcase }
+        accounts_by_name = accounts.index_by { |account| account_name(account) }
         accounts_by_name.each do |name, account|
-          scores[name] = score(account_field(account, :reputation)) if scores.key?(name)
+          scores[name] = score_profile_reputation(account_field(account, :reputation)) if scores.key?(name)
         end
       end
     end
 
     def fetch_accounts(api, authors)
-      response = api.rpc_client.rpc_execute(:condenser_api, :get_accounts, [authors])
+      response = api.rpc_client.rpc_execute(:bridge, :get_profiles, {accounts: authors})
       raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
       Array(response.result)
+    end
+
+    def account_name(account)
+      (account_field(account, :name) || account_field(account, :account)).to_s.downcase
+    end
+
+    def score_profile_reputation(reputation)
+      return DEFAULT_REPUTATION if reputation.blank?
+
+      reputation.to_f.to_i
     end
 
     def log10(reputation)

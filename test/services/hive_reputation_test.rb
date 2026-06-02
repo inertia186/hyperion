@@ -12,7 +12,7 @@ class HiveReputationTest < ActiveSupport::TestCase
 
   test 'fetches scores keyed by lowercase author' do
     api = FakeApi.new([
-      Struct.new(:account, :reputation).new('alice', '10000000000')
+      Struct.new(:name, :reputation).new('alice', 34.8)
     ])
 
     scores = HiveReputation.scores_for(%w(alice bob), api: api)
@@ -34,7 +34,7 @@ class HiveReputationTest < ActiveSupport::TestCase
   test 'fetches scores in batches' do
     authors = (1..1001).map { |index| "author-#{index}" }
     api = FakeApi.new(
-      authors.map { |author| Struct.new(:account, :reputation).new(author, '10000000000') }
+      authors.map { |author| Struct.new(:name, :reputation).new(author, 34.8) }
     )
 
     scores = HiveReputation.scores_for(authors, api: api)
@@ -121,7 +121,7 @@ private
     Response = Struct.new(:result)
 
     def initialize(reputations)
-      @reputations = reputations.sort_by(&:account)
+      @reputations = reputations.sort_by(&:name)
       @calls = 0
       @batches = []
     end
@@ -133,13 +133,13 @@ private
     end
 
     def rpc_execute(api, method, args)
-      raise "unexpected api: #{api}" unless api == :condenser_api
-      raise "unexpected method: #{method}" unless method == :get_accounts
+      raise "unexpected api: #{api}" unless api == :bridge
+      raise "unexpected method: #{method}" unless method == :get_profiles
 
-      accounts = args.first
+      accounts = args.fetch(:accounts)
       @calls += 1
       @batches << accounts
-      Response.new(@reputations.select { |account| accounts.include?(account.account) })
+      Response.new(@reputations.select { |account| accounts.include?(account.name) })
     end
   end
 
