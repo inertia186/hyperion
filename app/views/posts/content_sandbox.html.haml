@@ -77,7 +77,7 @@
   %body{onkeydown: "keyPressed(event)"}
     %header
       %script{crossorigin: "anonymous", integrity: "sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=", src: "https://code.jquery.com/jquery-3.5.1.slim.min.js"}
-      %script{src: "https://unpkg.com/steem-content-renderer"}
+      = javascript_include_tag 'hive-content-renderer'
 
     %div{style: 'max-width: 80%; display: flex; margin-left: auto; margin-right: auto;'}
       #source{style: 'display: none;'}
@@ -104,7 +104,7 @@
       });
       
       try {
-        const renderer = new SteemContentRenderer.DefaultRenderer({
+        const renderer = new HiveContentRenderer.DefaultRenderer({
           baseUrl: "https://hive.blog/",
           breaks: true,
           skipSanitization: false,

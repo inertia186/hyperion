@@ -41,6 +41,18 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'redirect_uri=http%3A%2F%2F192.168.141.168%3A3000%2Fsessions%2Fauthorized'
   end
 
+  def test_hivesigner_redirect_supports_tailscale_host_callback
+    host! 'toto.tail1b9f02.ts.net:3000'
+
+    post sessions_path, params: { account_name: 'inertia', hivesigner: '' }
+
+    assert_redirected_to %r{\Ahttps://hivesigner\.com/oauth2/authorize\?}
+    uri = URI.parse(response.location)
+    params = Rack::Utils.parse_query(uri.query)
+
+    assert_equal 'http://toto.tail1b9f02.ts.net:3000/sessions/authorized', params['redirect_uri']
+  end
+
   def test_hivesigner_cert_store_does_not_require_crl
     store = SessionsController.new.send(:hivesigner_cert_store)
 

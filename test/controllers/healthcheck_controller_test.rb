@@ -14,6 +14,7 @@ class HealthcheckControllerTest < ActionController::TestCase
     get :show, format: :json
 
     assert_response :success
+    assert_equal 'application/json', response.media_type
     payload = JSON.parse(response.body)
     assert_equal 'ok', payload.fetch('status')
     assert_equal 'ok', payload.dig('checks', 'database')

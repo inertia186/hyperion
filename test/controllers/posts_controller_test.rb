@@ -48,6 +48,10 @@ class PostsControllerTest < ActionController::TestCase
     assert_response :success
     assert_includes response.body, 'class="theme-dark"'
     assert_includes response.body, 'background: #0f172a'
+    assert_includes response.body, 'hive-content-renderer'
+    assert_includes response.body, 'HiveContentRenderer.DefaultRenderer'
+    assert_not_includes response.body, 'unpkg.com'
+    assert_not_includes response.body, 'steem-content-renderer'
   end
 
   test 'legacy index hides active posts by poisoned pill authors' do

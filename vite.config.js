@@ -8,7 +8,8 @@ export default defineConfig({
     react()
   ],
   server: {
-    allowedHosts: ['toto.local', 'hyperion.test']
+    allowedHosts: ['toto.local', 'hyperion.test', 'toto.tail1b9f02.ts.net'],
+    hmr: false
   },
   test: {
     environment: 'jsdom',

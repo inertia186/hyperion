@@ -1611,6 +1611,98 @@ describe('App', () => {
     expect(frame).not.toHaveAttribute('referrerpolicy')
   })
 
+  test('renders direct 3Speak links as embedded players', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: 'https://3speak.tv/watch?v=bradleyarrow/3speak-1780351254312',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://play.3speak.tv/watch?v=bradleyarrow/3speak-1780351254312&mode=iframe&layout=desktop')
+    expect(frame).toHaveAttribute('loading', 'lazy')
+  })
+
+  test('renders Hive 3Speak post links as embedded players', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: 'https://hive.blog/hive-181335/@bradleyarrow/3speak-1780351254312',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://play.3speak.tv/watch?v=bradleyarrow/3speak-1780351254312&mode=iframe&layout=desktop')
+  })
+
+  test('keeps non-3Speak Hive post links as normal links', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: 'https://hive.blog/hive-181335/@bradleyarrow/ordinary-post',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    const link = await screen.findByRole('link', {name: 'https://hive.blog/hive-181335/@bradleyarrow/ordinary-post'})
+    expect(link).toHaveAttribute('href', 'https://hive.blog/hive-181335/@bradleyarrow/ordinary-post')
+    expect(document.querySelector('.post-body iframe')).not.toBeInTheDocument()
+  })
+
+  test('preserves direct 3Speak iframe html', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '<iframe src="https://play.3speak.tv/watch?v=bradleyarrow/3speak-1780351254312&mode=iframe" width="640" height="360"></iframe>',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://play.3speak.tv/watch?v=bradleyarrow/3speak-1780351254312&mode=iframe&layout=desktop')
+    expect(frame).toHaveAttribute('loading', 'lazy')
+  })
+
+  test('renders 3Speak-generated thumbnail links as embedded players', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '<a href="https://3speak.tv/watch?v=bradleyarrow/3speak-1780351254312"><img src="https://images.hive.blog/768x0/https://img.3speakcontent.online/3speak-1780351254312/post.png"></a>',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://play.3speak.tv/watch?v=bradleyarrow/3speak-1780351254312&mode=iframe&layout=desktop')
+  })
+
   test('renders server post detail html in dark theme without the legacy sandbox iframe', async () => {
     sessionTheme = 'dark'
     const detail = deferred()

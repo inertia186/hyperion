@@ -1,4 +1,4 @@
-import { DefaultRenderer } from 'steem-content-renderer'
+import { DefaultRenderer } from '@hive/hive-content-renderer'
 
 export function renderPostBody(markdown, post = {}) {
   const renderer = new DefaultRenderer({

@@ -1,0 +1,16 @@
+{
+  "name": "@hive/hive-content-renderer",
+  "version": "2.1.1-hyperion.1",
+  "description": "Vendored Hive content renderer for Hyperion post previews.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "ow": "^0.13.2",
+    "remarkable": "^1.7.1",
+    "sanitize-html": "^1.20.1",
+    "typescript-chained-error": "^1.3.2",
+    "universe-log": "^2.1.0",
+    "xmldom": "^0.1.27"
+  },
+  "license": "MIT"
+}

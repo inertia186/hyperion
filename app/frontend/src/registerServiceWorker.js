@@ -3,6 +3,13 @@ export function registerServiceWorker() {
     return
   }
 
+  if (import.meta.env.DEV) {
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => registrations.forEach((registration) => registration.unregister()))
+      .catch(() => {})
+    return
+  }
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js', {scope: '/'}).catch((error) => {
       if (import.meta.env.DEV) {

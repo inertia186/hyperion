@@ -1,6 +1,4 @@
-class HealthcheckController < ApplicationController
-  skip_before_action :sign_in
-
+class HealthcheckController < ActionController::API
   def show
     database_ok = database_healthy?
     status = database_ok ? :ok : :service_unavailable
