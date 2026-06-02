@@ -9,6 +9,8 @@ class ApplicationController < ActionController::Base
   helper_method :current_account
   helper_method :post_to_slug
   helper_method :bridge
+  helper_method :with_blacklist_sources
+  helper_method :without_blacklist_sources
   helper_method :post_body
   helper_method :read_posts, :mark_post_as_read, :post_read?
   helper_method :best_tag_name, :tag_unread_count, :related_tag_post_count
@@ -81,12 +83,41 @@ private
   def render_post_body(post, body_override = Post::DISPLAY_BODY_UNSET)
     original_body = body_override.equal?(Post::DISPLAY_BODY_UNSET) ? post.display_body : post.display_body(body_override)
     sanitized_body = ActionController::Base.helpers.sanitize(original_body, tags: ALLOWED_TAGS, attributes: ALLOWED_ATTRIBUTES)
-    markdown_ready_body = sanitized_body.gsub('>', " markdown=\"span\">\n")
+    markdown_ready_body = normalize_post_markdown(sanitized_body)
+    markdown_ready_body = markdown_ready_body.gsub('>', " markdown=\"span\">\n")
     markdown_ready_body = markdown_ready_body.gsub(/<\/(.*) markdown="span">/, "\n</\\1>")
     kramdown = Kramdown::Document.new(markdown_ready_body)
-    html_body = kramdown.to_html
+    html_body = harden_post_body_html(kramdown.to_html)
     
     html_body.html_safe
+  end
+
+  def normalize_post_markdown(body)
+    body.gsub(/^([ \t]{0,3}\#{1,6})(?=\S)/) { "\\#{$1}" }
+  end
+
+  def harden_post_body_html(html)
+    fragment = Nokogiri::HTML::DocumentFragment.parse(html)
+
+    fragment.css('iframe').each do |iframe|
+      src = iframe['src'].to_s
+
+      begin
+        uri = URI.parse(src)
+      rescue URI::InvalidURIError
+        iframe.remove
+        next
+      end
+
+      unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
+        iframe.remove
+        next
+      end
+
+      iframe['loading'] = 'lazy'
+    end
+
+    fragment.to_html
   end
   
   def post_read?(post)
@@ -147,7 +178,7 @@ private
   
   def all_tag_unread
     @all_tag_unread ||= if @only_blacklisted
-      Post.active.blacklisted.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
+      with_blacklist_sources(Post.active).joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     elsif @only_deleted
       Post.deleted.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     elsif @only_ignored
@@ -155,6 +186,26 @@ private
     else
       Post.active.joins(:tags).unread(by: current_account, include_muted: !session[:muted_authors_enabled]).group('tags.tag').count
     end
+  end
+
+  def with_blacklist_sources(relation)
+    return relation.none if current_blacklist_sources.empty?
+
+    relation.where(blacklist_source_sql, current_blacklist_sources)
+  end
+
+  def without_blacklist_sources(relation)
+    return relation if current_blacklist_sources.empty?
+
+    relation.where("NOT #{blacklist_source_sql}", current_blacklist_sources)
+  end
+
+  def current_blacklist_sources
+    @current_blacklist_sources ||= current_account.blacklist_sources
+  end
+
+  def blacklist_source_sql
+    "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'account' IN (?))"
   end
   
   def favorite_tags

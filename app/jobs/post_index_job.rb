@@ -5,7 +5,6 @@ class PostIndexJob < ApplicationJob
   extend Memoist
   
   DEPLORABLES = %w(crystalliu anfeng nchain crystalan crystal.liu crystalliuyifei hkex liuyifei lyf)
-  TRUSTED_COMMUNITIES = %w(hive-163399 hive-196037 hive-139531 hive-136001)
   
   queue_as :default
   
@@ -18,6 +17,8 @@ class PostIndexJob < ApplicationJob
   MAX_TAGS = 50
   BLACKLIST_CACHE_TTL = 30.minutes
   BLACKLIST_RETRY_DELAYS = [2, 5, 10].freeze
+  HIVEWATCHERS_SOURCE = 'hivewatchers'
+  HIVEWATCHERS_BLACKLIST_URL = 'https://spaminator.me/api/bl/all.txt'
 
   class << self
     def cached_blacklist_reasons_by_account(include_expired: false)
@@ -84,7 +85,7 @@ class PostIndexJob < ApplicationJob
           transactions = block.transactions
           comment_batch = {}
           delete_comments = []
-          mutes = []
+          follow_updates = []
           
           transactions.each_with_index do |trx, index|
             trx_id = block.transaction_ids[index]
@@ -105,7 +106,7 @@ class PostIndexJob < ApplicationJob
               op.value
             end.compact
             
-            mutes += ops.map do |op|
+            follow_updates += ops.map do |op|
               next unless op.type == 'custom_json_operation'
               next if op.value.required_posting_auths.empty?
               next if (DEPLORABLES & op.value.required_posting_auths).any?
@@ -115,7 +116,6 @@ class PostIndexJob < ApplicationJob
               
               payload = JSON[op.value.json] rescue []
               next unless payload[0] == 'follow'
-              next unless [payload[1]['what']].flatten.include? 'ignore'
               
               payload[1]
             end.compact
@@ -123,7 +123,7 @@ class PostIndexJob < ApplicationJob
           
           process_comments(comment_batch, block_num, timestamp, overdue_catch_up)
           process_delete_comments(delete_comments, timestamp)
-          process_mutes(mutes)
+          process_follow_updates(follow_updates)
         end
       end
     rescue Hive::UnknownError => e
@@ -142,6 +142,8 @@ class PostIndexJob < ApplicationJob
   
   def process_comments(comment_batch, block_num, timestamp, overdue_catch_up = false)
     comment_batch.each do |trx_id, comments|
+      author_reputations = author_reputations_for(comments.map { |comment| comment[:author] || comment['author'] })
+
       comments.each do |comment|
         comment = comment.with_indifferent_access
         comment_params = comment.slice(:title, :body)
@@ -157,6 +159,7 @@ class PostIndexJob < ApplicationJob
         reasons = blacklist_reasons_for(comment[:author])
         comment_params[:blacklisted] = post.blacklisted? || reasons.any?
         comment_params[:blacklist_reasons] = reasons if reasons.any?
+        comment_params[:author_reputation] = author_reputations[comment[:author].to_s.downcase] || HiveReputation::DEFAULT_REPUTATION
         post.update(comment_params)
         
         if !(post.body =~ Post::DIFF_MATCH_PATCH_PATTERN) && post.body =~ /@@/
@@ -228,11 +231,17 @@ class PostIndexJob < ApplicationJob
     end
   end
   
-  def process_mutes(mutes)
-    mutes.each do |mute|
-      account = Account.find_by(name: mute['follower'])
+  def process_follow_updates(follow_updates)
+    follow_updates.each do |follow_update|
+      what = [follow_update['what']].flatten.map(&:to_s)
+      account = Account.find_by(name: follow_update['follower'])
       
-      AccountRefreshJob.perform_later(account.to_param) if !!account
+      AccountRefreshJob.perform_later(account.to_param) if account && what.include?('ignore')
+
+      if (what & %w(blacklist unblacklist reset_blacklist follow_blacklist unfollow_blacklist reset_follow_blacklist)).any?
+        PostIndexJob.clear_blacklist_cache!
+        PostCleanupJob.perform_later
+      end
     end
   end
   
@@ -245,11 +254,10 @@ class PostIndexJob < ApplicationJob
   end
 
   def blacklist_reasons_by_account(reload = false)
+    @blacklist_refresh_failed = false if reload
     @blacklist = @blacklist_reasons_by_account = nil if reload
     PostIndexJob.clear_blacklist_cache! if reload
     return @blacklist_reasons_by_account if @blacklist_reasons_by_account
-
-    Community.ensure_present!(TRUSTED_COMMUNITIES)
 
     if (cached_reasons = PostIndexJob.cached_blacklist_reasons_by_account)
       @blacklist_reasons_by_account = cached_reasons
@@ -259,67 +267,167 @@ class PostIndexJob < ApplicationJob
     reasons = Hash.new { |hash, key| hash[key] = [] }
     successful_fetches = 0
 
-    TRUSTED_COMMUNITIES.each do |community_name|
-      muted_accounts = muted_roles_for_community(community_name)
-      next if muted_accounts.nil?
+    blacklist_source_accounts.each do |source_account|
+      blacklisted_accounts = bridge_follow_list_accounts_for(source_account, 'blacklisted')
+      next if blacklisted_accounts.nil?
 
       successful_fetches += 1
-      muted_accounts.each do |account|
+      blacklisted_accounts.each do |account|
         account = account.to_s.downcase
         next if account.blank?
 
-        reason = {'community' => community_name}
+        reason = {'account' => source_account}
         reasons[account] << reason unless reasons[account].include?(reason)
+      end
+    end
+
+    if hivewatchers_blacklist_enabled?
+      hivewatchers_accounts = hivewatchers_blacklist_accounts
+      if hivewatchers_accounts.nil?
+        @blacklist_refresh_failed = true
+      else
+        successful_fetches += 1
+        hivewatchers_accounts.each do |account|
+          account = account.to_s.downcase
+          next if account.blank?
+
+          reason = {'account' => HIVEWATCHERS_SOURCE}
+          reasons[account] << reason unless reasons[account].include?(reason)
+        end
       end
     end
 
     if successful_fetches.zero?
       stale_reasons = PostIndexJob.cached_blacklist_reasons_by_account(include_expired: true)
       return @blacklist_reasons_by_account = stale_reasons if stale_reasons
+
+      @blacklist_refresh_failed = blacklist_source_accounts.any?
+      return @blacklist_reasons_by_account = {}
     end
 
-    @blacklist_reasons_by_account = reasons.transform_values { |account_reasons| account_reasons.sort_by { |reason| reason.fetch('community') } }
+    @blacklist_reasons_by_account = reasons.transform_values { |account_reasons| account_reasons.sort_by { |reason| reason.fetch('account') } }
     PostIndexJob.cache_blacklist_reasons_by_account(@blacklist_reasons_by_account)
     @blacklist_reasons_by_account
+  end
+
+  def blacklist_refresh_failed?
+    !!@blacklist_refresh_failed
   end
 
   def blacklist_reasons_for(author)
     blacklist_reasons_by_account[author.to_s.downcase] || []
   end
 
-  def muted_roles_for_community(community_name)
-    muted_accounts = []
+  def author_reputations_for(authors)
+    HiveReputation.scores_for_indexing(authors, api: PostIndexJob::api)
+  end
+
+  def blacklist_source_accounts
+    @blacklist_source_accounts ||= begin
+      account_names = Account.pluck(:name).map(&:to_s).map(&:downcase).reject(&:blank?).uniq
+      sources = []
+
+      account_names.each do |account|
+        followed_blacklists = bridge_follow_list_accounts_for(account, 'follow_blacklist')
+        next if followed_blacklists.nil?
+
+        sources << account
+        sources += followed_blacklists if followed_blacklists
+      end
+
+      sources.reject(&:blank?).uniq
+    end
+  rescue => e
+    Rails.logger.warn "Unable to refresh blacklist source accounts: #{e.class}: #{e.message}"
+    []
+  end
+
+  def hivewatchers_blacklist_enabled?
+    Account.where("settings->>? IN ('true', '1')", Account::HIVEWATCHERS_BLACKLIST_SETTING).exists?
+  end
+
+  def hivewatchers_blacklist_accounts
+    body = URI.open(HIVEWATCHERS_BLACKLIST_URL, &:read)
+    parse_hivewatchers_blacklist(body)
+  rescue => e
+    Rails.logger.warn "Unable to refresh Hivewatchers blacklist from #{HIVEWATCHERS_BLACKLIST_URL}: #{e.class}: #{e.message}"
+    nil
+  end
+
+  def parse_hivewatchers_blacklist(body)
+    body.lines.map do |line|
+      line.to_s.strip.downcase.split(/\s+/).first.to_s.delete_prefix('@')
+    end.reject(&:blank?).reject { |account| account.start_with?('#') }.uniq
+  end
+
+  def following_accounts_for(account, type)
+    accounts = []
     last = ''
 
     loop do
-      roles = list_community_roles_with_retry(community_name, last) || []
-      break if roles.empty?
+      page = get_following_with_retry(account, last, type) || []
+      break if page.empty?
 
-      muted_accounts += roles.select { |(_account, role, _title)| role.to_s == 'muted' }.map { |(account, _role, _title)| account.to_s }
+      accounts += page.map { |follow| follow.respond_to?(:following) ? follow.following : follow['following'] || follow[:following] }.map(&:to_s)
 
-      next_last = roles.last&.first.to_s
-      break if roles.size < 100 || next_last.blank? || next_last == last
+      next_last = accounts.last.to_s
+      break if page.size < 1000 || next_last.blank? || next_last == last
 
       last = next_last
     end
 
-    muted_accounts
+    accounts.map(&:downcase).reject(&:blank?).uniq
   rescue => e
-    Rails.logger.warn "Unable to refresh blacklist from #{community_name}: #{e.class}: #{e.message}"
+    Rails.logger.warn "Unable to refresh #{type} follows for #{account}: #{e.class}: #{e.message}"
     nil
   end
 
-  def list_community_roles_with_retry(community_name, last)
+  def bridge_follow_list_accounts_for(account, type)
+    response = get_bridge_follow_list_with_retry(account, type)
+    Array(response).map { |follow| follow.respond_to?(:name) ? follow.name : follow['name'] || follow[:name] }.
+      map(&:to_s).
+      map(&:downcase).
+      reject(&:blank?).
+      uniq
+  rescue => e
+    Rails.logger.warn "Unable to refresh #{type} follow list for #{account}: #{e.class}: #{e.message}"
+    nil
+  end
+
+  def get_bridge_follow_list_with_retry(account, type)
     attempts = 0
 
     begin
-      PostIndexJob::bridge.list_community_roles(community: community_name, last: last, limit: 100).result
+      response = PostIndexJob::api.rpc_client.rpc_execute(:bridge, :get_follow_list, {observer: account, follow_type: type})
+      raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+      response.result
     rescue => e
       raise e unless rate_limited_error?(e) && attempts < BLACKLIST_RETRY_DELAYS.size
 
       delay = BLACKLIST_RETRY_DELAYS[attempts]
       attempts += 1
-      Rails.logger.warn "Rate limited refreshing blacklist from #{community_name}; retrying in #{delay}s"
+      Rails.logger.warn "Rate limited refreshing #{type} follow list for #{account}; retrying in #{delay}s"
+      sleep delay
+      PostIndexJob::api_reset
+      retry
+    end
+  end
+
+  def get_following_with_retry(account, last, type)
+    attempts = 0
+
+    begin
+      response = PostIndexJob::api.rpc_client.rpc_execute(:condenser_api, :get_following, [account, last, type, 1000])
+      raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+      response.result
+    rescue => e
+      raise e unless rate_limited_error?(e) && attempts < BLACKLIST_RETRY_DELAYS.size
+
+      delay = BLACKLIST_RETRY_DELAYS[attempts]
+      attempts += 1
+      Rails.logger.warn "Rate limited refreshing #{type} follows for #{account}; retrying in #{delay}s"
       sleep delay
       PostIndexJob::api_reset
       retry

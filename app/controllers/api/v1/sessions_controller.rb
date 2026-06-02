@@ -17,11 +17,13 @@ class Api::V1::SessionsController < Api::V1::BaseController
       preferences: {
         muted_authors_enabled: !!session[:muted_authors_enabled],
         only_favorite_tags: !!session[:only_favorite_tags],
-        enabled_blacklist_sources: current_account.enabled_blacklist_sources,
         theme: current_account.theme,
+        minimum_reputation: current_account.minimum_reputation,
+        hivewatchers_blacklist_enabled: current_account.hivewatchers_blacklist_enabled?,
         hivesigner_available: session[:hivesigner_access_token].present?
       },
       blacklist_sources: current_account.blacklist_source_catalog,
+      offchain_blacklist_sources: current_account.offchain_blacklist_source_catalog,
       counts: {
         read_posts: current_account.read_posts.count,
         ignored_tags: ignored_tags.size,

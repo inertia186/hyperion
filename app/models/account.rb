@@ -2,9 +2,12 @@ class Account < ApplicationRecord
   extend Immutable
   extend Memoist
 
-  ENABLED_BLACKLIST_SOURCES_SETTING = 'enabled_blacklist_sources'
   THEME_SETTING = 'theme'
   THEMES = %w(light dark system).freeze
+  MINIMUM_REPUTATION_SETTING = 'minimum_reputation'
+  DEFAULT_MINIMUM_REPUTATION = HiveReputation::DEFAULT_REPUTATION
+  MINIMUM_REPUTATION_RANGE = (-100..100)
+  HIVEWATCHERS_BLACKLIST_SETTING = 'hivewatchers_blacklist_enabled'
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
   has_many :account_tags, dependent: :destroy, counter_cache: :account_tags_count
@@ -63,14 +66,6 @@ class Account < ApplicationRecord
     read_posts.where(post_id: id).exists?
   end
 
-  def enabled_blacklist_sources
-    normalize_blacklist_sources((settings || {})[ENABLED_BLACKLIST_SOURCES_SETTING])
-  end
-
-  def update_enabled_blacklist_sources!(sources)
-    update!(settings: (settings || {}).merge(ENABLED_BLACKLIST_SOURCES_SETTING => normalize_blacklist_sources(sources)))
-  end
-
   def theme
     normalize_theme((settings || {})[THEME_SETTING])
   end
@@ -79,21 +74,47 @@ class Account < ApplicationRecord
     update!(settings: (settings || {}).merge(THEME_SETTING => normalize_theme(theme)))
   end
 
-  def blacklist_source_catalog
-    enabled = enabled_blacklist_sources
+  def minimum_reputation
+    normalize_minimum_reputation((settings || {})[MINIMUM_REPUTATION_SETTING])
+  end
 
-    self.class.blacklist_source_catalog.map do |source|
-      source.merge(enabled: enabled.include?(source[:community]))
+  def update_minimum_reputation!(minimum_reputation)
+    update!(settings: (settings || {}).merge(MINIMUM_REPUTATION_SETTING => normalize_minimum_reputation(minimum_reputation)))
+  end
+
+  def hivewatchers_blacklist_enabled?
+    truthy_setting?((settings || {})[HIVEWATCHERS_BLACKLIST_SETTING])
+  end
+
+  def update_hivewatchers_blacklist_enabled!(enabled)
+    update!(settings: (settings || {}).merge(HIVEWATCHERS_BLACKLIST_SETTING => truthy_setting?(enabled)))
+  end
+
+  def blacklist_sources
+    sources = [name] + followed_blacklist_accounts
+    sources << 'hivewatchers' if hivewatchers_blacklist_enabled?
+    sources.map(&:to_s).map(&:downcase).reject(&:blank?).uniq
+  end
+
+  def blacklist_source_catalog
+    ([name] + followed_blacklist_accounts).map(&:to_s).map(&:downcase).reject(&:blank?).uniq.map do |source|
+      {account: source, name: source}
     end
   end
 
-  def self.blacklist_source_catalog
-    Community.ensure_present!(PostIndexJob::TRUSTED_COMMUNITIES)
-    communities = Community.where(name: PostIndexJob::TRUSTED_COMMUNITIES).pluck(:name, :title).to_h
+  def offchain_blacklist_source_catalog
+    [
+      {
+        account: 'hivewatchers',
+        name: 'Hivewatchers',
+        enabled: hivewatchers_blacklist_enabled?,
+        description: 'Powered by the Spaminator active blacklist.'
+      }
+    ]
+  end
 
-    PostIndexJob::TRUSTED_COMMUNITIES.map do |community|
-      {community: community, name: communities[community] || community}
-    end
+  def followed_blacklist_accounts
+    fetch_bridge_follow_list_accounts('follow_blacklist')
   end
   
   def poisoned_posts(poisoned_posts = true)
@@ -114,35 +135,64 @@ class Account < ApplicationRecord
   # TODO make this into "refresh_follows" and track both 'ignore' and 'blog'
   # which also requires a new DB field called 'followed_authors'
   def refresh_muted_authors
-    self.muted_authors = []
-    count = -1
-    
-    Account::with_simple_failover do
-      until count == muted_authors.size
-        count = muted_authors.size
-        # Public Hive nodes commonly keep this legacy follow method available
-        # through condenser_api, even when they do not expose follow_api.
-        response = Account::api.rpc_client.rpc_execute(:condenser_api, :get_following, [name, muted_authors.last || '', 'ignore', 1000])
-        raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+    self.muted_authors = fetch_following_accounts('ignore')
 
-        self.muted_authors += response.result.map(&:following)
-        self.muted_authors = muted_authors.uniq
-        
-        sleep 0.1
-      end
-    end
-    
     save!
-    
+
     return muted_authors
   end
 
 private
-  def normalize_blacklist_sources(sources)
-    Array(sources).map(&:to_s).select { |source| PostIndexJob::TRUSTED_COMMUNITIES.include?(source) }.uniq
+  def fetch_following_accounts(type)
+    accounts = []
+    count = -1
+
+    Account::with_simple_failover do
+      until count == accounts.size
+        count = accounts.size
+        # Public Hive nodes commonly keep this legacy follow method available
+        # through condenser_api, even when they do not expose follow_api.
+        response = Account::api.rpc_client.rpc_execute(:condenser_api, :get_following, [name, accounts.last || '', type, 1000])
+        raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+        accounts += response.result.map { |follow| follow.following.to_s.downcase }
+        accounts = accounts.reject(&:blank?).uniq
+
+        sleep 0.1
+      end
+    end
+
+    accounts
+  end
+
+  def fetch_bridge_follow_list_accounts(type)
+    response = Account::api.rpc_client.rpc_execute(:bridge, :get_follow_list, {observer: name, follow_type: type})
+    raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+    Array(response.result).map { |follow| follow.respond_to?(:name) ? follow.name : follow['name'] || follow[:name] }.
+      map(&:to_s).
+      map(&:downcase).
+      reject(&:blank?).
+      uniq
+  rescue => e
+    Rails.logger.warn "Unable to refresh #{type} follow list for #{name}: #{e.class}: #{e.message}"
+    []
   end
 
   def normalize_theme(theme)
     THEMES.include?(theme.to_s) ? theme.to_s : 'system'
   end
+
+  def normalize_minimum_reputation(minimum_reputation)
+    value = Integer(minimum_reputation)
+    value.clamp(MINIMUM_REPUTATION_RANGE.min, MINIMUM_REPUTATION_RANGE.max)
+  rescue ArgumentError, TypeError
+    DEFAULT_MINIMUM_REPUTATION
+  end
+
+  def truthy_setting?(value)
+    value == true || value.to_s == 'true' || value.to_s == '1'
+  end
+
+  memoize :followed_blacklist_accounts
 end

@@ -20,8 +20,10 @@ class PostsController < ApplicationController
       @posts = @posts.author(@author)
     elsif @only_deleted
       @posts.deleted
+    elsif @only_blacklisted
+      with_blacklist_sources(@posts.active)
     else
-      @posts.active.blacklisted(@only_blacklisted) # but not older than 7 days
+      without_blacklist_sources(@posts.active)
     end
     
     if !!@app

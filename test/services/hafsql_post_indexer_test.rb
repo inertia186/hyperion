@@ -19,7 +19,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
       }
     ])
 
-    with_blacklist([]) do
+    with_blacklist([], reputations: {'alice' => 42}) do
       with_hafsql(connection) do
         HafsqlPostIndexer.new.perform
       end
@@ -31,6 +31,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
     assert_equal 'hive-12345', post.category
     assert_equal 123, post.block_num
     assert_equal 'abc', post.trx_id
+    assert_equal 42, post.author_reputation
     assert_equal %w(hive-12345 ruby), post.tags.order(:tag).pluck(:tag)
     assert post.tags.find_by!(tag: 'hive-12345').category?
   end
@@ -81,7 +82,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
         'deleted_at' => nil
       }
     ])
-    with_blacklist('alice' => [{'community' => 'hive-163399'}]) do
+    with_blacklist('alice' => [{'account' => 'fixture-curator'}]) do
       with_hafsql(connection) do
         HafsqlPostIndexer.new.perform
       end
@@ -89,7 +90,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
 
     post = Post.find_by!(author: 'alice', permlink: 'blacklisted')
     assert post.blacklisted?
-    assert_equal [{'community' => 'hive-163399'}], post.blacklist_reasons
+    assert_equal [{'account' => 'fixture-curator'}], post.blacklist_reasons
   end
 
   test 'preserves existing blacklisted flags when blacklist source is empty' do
@@ -103,7 +104,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
       block_num: 126,
       trx_id: 'existing-trx',
       blacklisted: true,
-      blacklist_reasons: [{'community' => 'hive-163399'}],
+      blacklist_reasons: [{'account' => 'fixture-curator'}],
       created_at: Time.current
     )
     connection = FakeHafsqlConnection.new([
@@ -130,7 +131,47 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
 
     post = Post.find_by!(author: 'alice', permlink: 'already-blacklisted')
     assert post.blacklisted?
-    assert_equal [{'community' => 'hive-163399'}], post.blacklist_reasons
+    assert_equal [{'account' => 'fixture-curator'}], post.blacklist_reasons
+  end
+
+  test 'reuses stored reputation when indexing known authors' do
+    Post.create!(
+      author: 'alice',
+      permlink: 'known-reputation',
+      title: 'Known Reputation',
+      body: nil,
+      category: 'test',
+      metadata: {},
+      block_num: 126,
+      trx_id: 'known-reputation-trx',
+      author_reputation: 66,
+      created_at: Time.current
+    )
+    connection = FakeHafsqlConnection.new([
+      {
+        'id' => 14,
+        'author' => 'alice',
+        'permlink' => 'known-reputation-update',
+        'title' => 'Known Reputation Update',
+        'body' => nil,
+        'category' => 'test',
+        'metadata' => {},
+        'block_num' => 128,
+        'trx_id' => 'known-reputation-update-trx',
+        'created_at' => 1.hour.ago,
+        'updated_at' => Time.current,
+        'deleted_at' => nil
+      }
+    ])
+
+    with_blacklist([], reputations: {'alice' => 99}) do
+      with_hafsql(connection) do
+        HafsqlPostIndexer.new.perform
+      end
+    end
+
+    post = Post.find_by!(author: 'alice', permlink: 'known-reputation-update')
+    assert_equal 66, post.author_reputation
   end
 
   test 'sweep refreshes old rows without regressing incremental cursor' do
@@ -250,10 +291,19 @@ private
     end
   end
 
-  def with_blacklist(reasons_by_account, &block)
+  def with_blacklist(reasons_by_account = nil, **options, &block)
+    reputations = options.delete(:reputations) || {}
+    reasons_by_account ||= options
     source = FakeBlacklistSource.new(reasons_by_account)
+    reputation_scores = ->(authors, **) {
+      Array(authors).map(&:to_s).map(&:downcase).reject(&:blank?).uniq.index_with do |author|
+        reputations.fetch(author, HiveReputation::DEFAULT_REPUTATION)
+      end
+    }
 
-    PostIndexJob.stub(:new, source, &block)
+    HiveReputation.stub(:scores_for, reputation_scores) do
+      PostIndexJob.stub(:new, source, &block)
+    end
   end
 
   class FakeBlacklistSource

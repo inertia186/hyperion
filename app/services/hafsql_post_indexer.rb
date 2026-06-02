@@ -19,11 +19,13 @@ class HafsqlPostIndexer
 
     Post.transaction do
       rows = fetch_rows(state, false)
-      rows.each { |row| upsert_post(row) }
+      author_reputations = author_reputations_for(rows)
+      rows.each { |row| upsert_post(row, author_reputations) }
 
       if sweep && state.last_indexed_at.present?
         sweep_rows = fetch_rows(state, true)
-        sweep_rows.each { |row| upsert_post(row) }
+        sweep_author_reputations = author_reputations_for(sweep_rows)
+        sweep_rows.each { |row| upsert_post(row, sweep_author_reputations) }
         state.last_sweep_at = Time.current
       else
         sweep_rows = []
@@ -91,11 +93,12 @@ private
     result.map { |attributes| build_row(attributes) }
   end
 
-  def upsert_post(row)
+  def upsert_post(row, author_reputations)
     return if PostIndexJob::DEPLORABLES.include?(row.author)
 
     post = Post.find_or_initialize_by(author: row.author, permlink: row.permlink)
     blacklist_reasons = PostIndexJob.new.blacklist_reasons_for(row.author)
+    author_reputation = author_reputations[row.author.to_s.downcase] || HiveReputation::DEFAULT_REPUTATION
     post.assign_attributes(
       title: row.title.to_s,
       body: post.body,
@@ -105,6 +108,7 @@ private
       trx_id: row.trx_id.to_s,
       blacklisted: post.blacklisted? || blacklist_reasons.any?,
       blacklist_reasons: blacklist_reasons.any? ? blacklist_reasons : post.blacklist_reasons,
+      author_reputation: author_reputation,
       created_at: row.created_at,
       deleted_at: row.deleted_at
     )
@@ -125,6 +129,10 @@ private
       record.category = tag == category.to_s.downcase
       record.save!
     end
+  end
+
+  def author_reputations_for(rows)
+    HiveReputation.scores_for_indexing(rows.map(&:author), api: PostIndexJob::api)
   end
 
   def build_row(attributes)

@@ -11,7 +11,7 @@ class Post < ApplicationRecord
   DISPLAY_BODY_UNSET = Object.new.freeze
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
-    blacklisted blacklist_reasons tags_count created_at updated_at
+    blacklisted blacklist_reasons author_reputation tags_count created_at updated_at
   )
   
   has_many :tags, dependent: :destroy, counter_cache: :tags_count

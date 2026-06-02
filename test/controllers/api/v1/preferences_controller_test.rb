@@ -7,22 +7,34 @@ class Api::V1::PreferencesControllerTest < ActionController::TestCase
     @request.session[:current_account] = accounts(:curated)
   end
 
-  test 'updates enabled blacklist sources' do
-    patch :blacklists, params: {enabled_sources: %w(hive-163399 hive-136001)}
+  test 'blacklist preferences are read from Hive relationships' do
+    account = accounts(:curated)
+    def account.blacklist_source_catalog
+      [{account: 'fixture-curator', name: 'fixture-curator'}]
+    end
+    def account.offchain_blacklist_source_catalog
+      [{account: 'hivewatchers', name: 'Hivewatchers', enabled: false, description: 'Powered by the Spaminator active blacklist.'}]
+    end
+    @request.session[:current_account] = account
+
+    patch :blacklists, params: {enabled_sources: %w(fixture-curator)}
 
     assert_response :success
-    payload = response_json
-    assert_equal %w(hive-163399 hive-136001), payload.fetch('enabled_blacklist_sources')
-    assert_equal %w(hive-163399 hive-136001), accounts(:curated).reload.enabled_blacklist_sources
-    assert_equal ['hive-163399', 'hive-136001'], payload.fetch('blacklist_sources').select { |source| source.fetch('enabled') }.map { |source| source.fetch('community') }
+    assert_equal [{'account' => 'fixture-curator', 'name' => 'fixture-curator'}], response_json.fetch('blacklist_sources')
+    assert_equal [{'account' => 'hivewatchers', 'name' => 'Hivewatchers', 'enabled' => false, 'description' => 'Powered by the Spaminator active blacklist.'}], response_json.fetch('offchain_blacklist_sources')
+    assert_match 'managed through Hive', response_json.fetch('message')
   end
 
-  test 'filters unknown blacklist sources' do
-    patch :blacklists, params: {enabled_sources: %w(hive-unknown hive-196037)}
+  test 'updates hivewatchers blacklist preference and clears cache' do
+    PostIndexJob.cache_blacklist_reasons_by_account({'cached' => [{'account' => 'fixture-curator'}]})
+
+    patch :blacklists, params: {hivewatchers_blacklist_enabled: true}
 
     assert_response :success
-    assert_equal %w(hive-196037), response_json.fetch('enabled_blacklist_sources')
-    assert_equal %w(hive-196037), accounts(:curated).reload.enabled_blacklist_sources
+    assert_equal true, response_json.fetch('hivewatchers_blacklist_enabled')
+    assert_equal true, accounts(:curated).reload.hivewatchers_blacklist_enabled?
+    assert_equal true, response_json.fetch('offchain_blacklist_sources').first.fetch('enabled')
+    assert_nil PostIndexJob.cached_blacklist_reasons_by_account
   end
 
   test 'updates theme preference' do
@@ -41,6 +53,22 @@ class Api::V1::PreferencesControllerTest < ActionController::TestCase
     assert_response :success
     assert_equal 'system', response_json.fetch('theme')
     assert_equal 'system', accounts(:curated).reload.theme
+  end
+
+  test 'updates minimum reputation preference' do
+    patch :minimum_reputation, params: {minimum_reputation: '35'}
+
+    assert_response :success
+    assert_equal 35, response_json.fetch('minimum_reputation')
+    assert_equal 35, accounts(:curated).reload.minimum_reputation
+  end
+
+  test 'normalizes unknown minimum reputation preference to default' do
+    patch :minimum_reputation, params: {minimum_reputation: 'lots'}
+
+    assert_response :success
+    assert_equal 25, response_json.fetch('minimum_reputation')
+    assert_equal 25, accounts(:curated).reload.minimum_reputation
   end
 
 private

@@ -29,6 +29,7 @@ Rails.application.routes.draw do
       patch '/preferences/only_favorite_tags', to: 'preferences#only_favorite_tags'
       patch '/preferences/blacklists', to: 'preferences#blacklists'
       patch '/preferences/theme', to: 'preferences#theme'
+      patch '/preferences/minimum_reputation', to: 'preferences#minimum_reputation'
     end
   end
 

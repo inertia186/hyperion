@@ -136,6 +136,7 @@ private
       deleted: post.deleted?,
       blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
       blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
+      author_reputation: display_post.author_reputation,
       read: result.read_post_ids.include?(post.id),
       muted_author: current_account.muted_authors.include?(display_post.author)
     }
@@ -160,7 +161,9 @@ private
       deleted: post.deleted?,
       blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
       blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
+      author_reputation: display_post.author_reputation,
       read: current_account.post_read?(post.id),
+      body_markdown: display_post.display_body,
       body_html: post_body(post).to_s,
       content_sandbox_url: content_sandbox_post_path(post, pp: :skip),
       canonical_url: display_post.canonical_url,
@@ -186,22 +189,18 @@ private
   end
 
   def blacklist_reasons_json(reasons)
-    reasons = Array(reasons)
-    community_names = reasons.map { |reason| reason['community'] || reason[:community] }.compact
-    communities = Community.where(name: community_names).pluck(:name, :title).to_h
-
-    reasons.map do |reason|
-      community = reason['community'] || reason[:community]
-      reason.merge('name' => communities[community] || community)
+    Array(reasons).map do |reason|
+      account = reason['account'] || reason[:account]
+      reason.merge('name' => account)
     end
   end
 
   def effective_blacklist_reasons(reasons)
-    enabled_sources = current_account.enabled_blacklist_sources
-    return [] if enabled_sources.empty?
+    blacklist_sources = current_account.blacklist_sources
+    return [] if blacklist_sources.empty?
 
     Array(reasons).select do |reason|
-      enabled_sources.include?(reason['community'] || reason[:community])
+      blacklist_sources.include?(reason['account'] || reason[:account])
     end
   end
 end

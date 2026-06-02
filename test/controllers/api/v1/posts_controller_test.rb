@@ -4,11 +4,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   tests Api::V1::PostsController
 
   setup do
-    @request.session[:current_account] = accounts(:curated)
-    posts(:blacklisted_allowed).update!(blacklist_reasons: [{'community' => 'hive-163399'}])
+    account = accounts(:curated)
+    def account.blacklist_sources
+      ['fixture-curator']
+    end
+    @request.session[:current_account] = account
+    posts(:blacklisted_allowed).update!(blacklist_reasons: [{'account' => 'fixture-curator'}])
   end
 
-  test 'normal unread results include globally blacklisted posts when no blacklist sources are enabled' do
+  test 'normal unread results exclude posts from current blacklist sources' do
     get :index, params: {sort: 'latest', limit: 30}
 
     assert_response :success
@@ -20,20 +24,20 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_not_includes titles, 'Ignored Unread'
     assert_not_includes titles, 'Old Allowed'
     assert_not_includes titles, 'Deleted Allowed'
-    assert_includes titles, 'Blacklisted Allowed'
+    assert_not_includes titles, 'Blacklisted Allowed'
   end
 
-  test 'mode counts default blacklisted count to zero when no blacklist sources are enabled' do
+  test 'mode counts include current blacklist sources' do
     get :index, params: {sort: 'latest', limit: 30}
 
     assert_response :success
     assert_equal(
       {
-        'unread' => 3,
+        'unread' => 2,
         'read' => 1,
         'ignored' => 1,
         'deleted' => 1,
-        'blacklisted' => 0
+        'blacklisted' => 1
       },
       response_json.fetch('mode_counts')
     )
@@ -45,11 +49,11 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_response :success
     assert_equal(
       {
-        'unread' => 3,
+        'unread' => 2,
         'read' => 1,
         'ignored' => 0,
         'deleted' => 1,
-        'blacklisted' => 0
+        'blacklisted' => 1
       },
       response_json.fetch('mode_counts')
     )
@@ -62,6 +66,36 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 1, response_json.fetch('counts').fetch('muted_posts')
     assert_equal 0, response_json.fetch('counts').fetch('poisoned_pill_tags')
     assert_empty response_json.fetch('poisoned_pill_tags')
+  end
+
+  test 'normal unread results exclude posts below minimum reputation' do
+    Post.update_all(author_reputation: 35)
+    account = @request.session[:current_account]
+    account.update_minimum_reputation!(30)
+    low_rep = create_post_with_tag(author: 'new-author', permlink: 'low-reputation-post', title: 'Low Reputation Post', tag: 'haf', author_reputation: 12)
+
+    get :index, params: {sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_not_includes titles, low_rep.title
+    assert_equal 2, response_json.fetch('mode_counts').fetch('unread')
+    assert_equal 2, response_json.fetch('mode_counts').fetch('ignored')
+    assert_equal 30, response_json.dig('query', 'minimum_reputation')
+  end
+
+  test 'ignored view includes posts below minimum reputation' do
+    Post.update_all(author_reputation: 35)
+    account = @request.session[:current_account]
+    account.update_minimum_reputation!(30)
+    low_rep = create_post_with_tag(author: 'new-author', permlink: 'low-reputation-post', title: 'Low Reputation Post', tag: 'haf', author_reputation: 12)
+
+    get :index, params: {only_ignored: true, sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, 'Ignored Unread'
+    assert_includes titles, low_rep.title
   end
 
   test 'poisoned pill tags suppress active authors from normal inbox' do
@@ -81,7 +115,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_not_includes titles, carol_expired_pill.title
     assert_includes titles, carol_noise.title
     assert_includes response_json.fetch('poisoned_pill_tags'), 'deplorable'
-    assert_equal 4, response_json.fetch('mode_counts').fetch('unread')
+    assert_equal 3, response_json.fetch('mode_counts').fetch('unread')
     assert_equal 3, response_json.fetch('mode_counts').fetch('ignored')
   end
 
@@ -147,6 +181,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 'https://images.hive.blog/u/visible-author/avatar', post.fetch('author_avatar_url')
     assert post.fetch('placeholder_image_url').starts_with?('data:image/gif')
     assert_not post.key?('body')
+    assert_equal 25, post.fetch('author_reputation')
   end
 
   test 'post list thumbnail uses cross post display body' do
@@ -198,22 +233,18 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal ['Deleted Allowed'], response_json.fetch('posts').map { |post| post.fetch('title') }
 
     get :index, params: {only_blacklisted: true}
-    assert_equal [], response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_equal ['Blacklisted Allowed'], response_json.fetch('posts').map { |post| post.fetch('title') }
   end
 
   test 'blacklisted list payload includes blacklist reasons' do
-    accounts(:curated).update_enabled_blacklist_sources!(%w(hive-163399))
-
     get :index, params: {only_blacklisted: true}
 
     post = response_json.fetch('posts').first
     assert_equal true, post.fetch('blacklisted')
-    assert_equal [{'community' => 'hive-163399', 'name' => 'Trusted Safety'}], post.fetch('blacklist_reasons')
+    assert_equal [{'account' => 'fixture-curator', 'name' => 'fixture-curator'}], post.fetch('blacklist_reasons')
   end
 
-  test 'enabled blacklist source excludes matching posts from normal mode' do
-    accounts(:curated).update_enabled_blacklist_sources!(%w(hive-163399))
-
+  test 'blacklist source excludes matching posts from normal mode' do
     get :index, params: {sort: 'latest', limit: 30}
 
     titles = response_json.fetch('posts').map { |post| post.fetch('title') }
@@ -221,14 +252,39 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 1, response_json.fetch('mode_counts').fetch('blacklisted')
   end
 
-  test 'disabled blacklist source reasons do not hide posts' do
-    accounts(:curated).update_enabled_blacklist_sources!(%w(hive-136001))
+  test 'unfollowed blacklist source reasons do not hide posts' do
+    posts(:blacklisted_allowed).update!(blacklist_reasons: [{'account' => 'other-source'}])
 
     get :index, params: {sort: 'latest', limit: 30}
 
     titles = response_json.fetch('posts').map { |post| post.fetch('title') }
     assert_includes titles, 'Blacklisted Allowed'
     assert_equal 0, response_json.fetch('mode_counts').fetch('blacklisted')
+  end
+
+  test 'disabled hivewatchers blacklist reasons do not hide posts' do
+    posts(:blacklisted_allowed).update!(blacklist_reasons: [{'account' => 'hivewatchers'}])
+
+    get :index, params: {sort: 'latest', limit: 30}
+
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, 'Blacklisted Allowed'
+    assert_equal 0, response_json.fetch('mode_counts').fetch('blacklisted')
+  end
+
+  test 'enabled hivewatchers blacklist reasons hide posts' do
+    account = accounts(:curated)
+    def account.blacklist_sources
+      %w(fixture-curator hivewatchers)
+    end
+    @request.session[:current_account] = account
+    posts(:blacklisted_allowed).update!(blacklist_reasons: [{'account' => 'hivewatchers'}])
+
+    get :index, params: {sort: 'latest', limit: 30}
+
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_not_includes titles, 'Blacklisted Allowed'
+    assert_equal 1, response_json.fetch('mode_counts').fetch('blacklisted')
   end
 
   test 'read mutations update read state' do
@@ -274,11 +330,54 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_includes response_json.fetch('body_html'), 'Loaded body'
+    assert_equal 'Loaded body', response_json.fetch('body_markdown')
     assert_equal content_sandbox_post_path(post, pp: :skip), response_json.fetch('content_sandbox_url')
     assert_equal "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_blog')
     assert_equal "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('peakd')
     assert_equal "https://hivehub.dev/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_db')
     assert_not response_json.fetch('urls').key?('scribe')
+  end
+
+  test 'preview only renders hash headings when marker is followed by whitespace' do
+    post = posts(:allowed_unread)
+    post.update!(body: "# Real Heading\n\n#c-c-c #hivegc #gaming\n\n###Welcome without space")
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    body_html = response_json.fetch('body_html')
+    assert_includes body_html, '<h1 id="real-heading">Real Heading</h1>'
+    assert_includes body_html, '#c-c-c #hivegc #gaming'
+    assert_includes body_html, '###Welcome without space'
+    assert_not_includes body_html, '<h1 id="c-c-c-hivegc-gaming">'
+    assert_not_includes body_html, '<h3 id="welcome-without-space">'
+  end
+
+  test 'preview hardens embedded iframe html' do
+    post = posts(:allowed_unread)
+    post.update!(body: '<iframe src="https://www.youtube.com/embed/abc" width="640" height="360"></iframe>')
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    body_html = response_json.fetch('body_html')
+    assert_includes body_html, '<iframe'
+    assert_includes body_html, 'src="https://www.youtube.com/embed/abc"'
+    assert_includes body_html, 'loading="lazy"'
+    assert_not_includes body_html, 'referrerpolicy='
+    assert_not_includes body_html, 'sandbox='
+  end
+
+  test 'preview removes embedded iframe html with unsafe src' do
+    post = posts(:allowed_unread)
+    post.update!(body: '<iframe src="javascript:alert(1)"></iframe>Visible body')
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    body_html = response_json.fetch('body_html')
+    assert_not_includes body_html, '<iframe'
+    assert_includes body_html, 'Visible body'
   end
 
   test 'revisions returns rendered HAFBE revisions and local fallback' do
@@ -334,15 +433,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
   test 'preview payload includes blacklist reasons' do
-    accounts(:curated).update_enabled_blacklist_sources!(%w(hive-163399 hive-136001))
     post = posts(:blacklisted_allowed)
-    post.update!(body: 'Blacklisted body', blacklist_reasons: [{'community' => 'hive-163399'}, {'community' => 'hive-136001'}])
+    post.update!(body: 'Blacklisted body', blacklist_reasons: [{'account' => 'fixture-curator'}])
 
     get :show, params: {id: post.id}
 
     assert_response :success
     assert_equal true, response_json.fetch('blacklisted')
-    assert_equal [{'community' => 'hive-163399', 'name' => 'Trusted Safety'}, {'community' => 'hive-136001', 'name' => 'Ban Hammer'}], response_json.fetch('blacklist_reasons')
+    assert_equal [{'account' => 'fixture-curator', 'name' => 'fixture-curator'}], response_json.fetch('blacklist_reasons')
+    assert_equal 25, response_json.fetch('author_reputation')
   end
 
   test 'preview renders referenced post for cross posts' do
@@ -377,7 +476,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
 private
-  def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current)
+  def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current, author_reputation: 25)
     post = Post.create!(
       author: author,
       permlink: permlink,
@@ -387,6 +486,7 @@ private
       metadata: {tags: [tag]},
       block_num: 1000 + Post.count,
       trx_id: "#{author}-#{permlink}",
+      author_reputation: author_reputation,
       created_at: created_at,
       updated_at: created_at
     )

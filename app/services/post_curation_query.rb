@@ -42,8 +42,12 @@ class PostCurationQuery
     !!session[:only_favorite_tags]
   end
 
-  def enabled_blacklist_sources
-    @enabled_blacklist_sources ||= account.enabled_blacklist_sources
+  def blacklist_sources
+    @blacklist_sources ||= account.blacklist_sources
+  end
+
+  def minimum_reputation
+    @minimum_reputation ||= account.minimum_reputation
   end
 
 private
@@ -106,7 +110,8 @@ private
       only_blacklisted: @only_blacklisted,
       only_deleted: @only_deleted,
       muted_authors_enabled: muted_authors_enabled?,
-      only_favorite_tags: only_favorite_tags?
+      only_favorite_tags: only_favorite_tags?,
+      minimum_reputation: minimum_reputation
     }
   end
 
@@ -132,7 +137,7 @@ private
       active.
       unread(by: account, include_muted: true)
 
-    without_enabled_blacklist_sources(relation).
+    without_low_reputation(without_blacklist_sources(relation)).
       where(author: account.reload.muted_authors).
       count
   end
@@ -151,36 +156,45 @@ private
 
     case mode
     when :read
-      without_enabled_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
+      without_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
     when :ignored
-      ignored_relation = without_enabled_blacklist_sources(relation.active)
+      ignored_relation = without_blacklist_sources(relation.active)
       ignored_relation.where(id: Tag.where(tag: ignored_tags).select(:post_id)).
-        or(ignored_relation.where(author: account.poisoned_authors))
+        or(ignored_relation.where(author: account.poisoned_authors)).
+        or(low_reputation(ignored_relation))
     when :deleted
       relation.deleted
     when :blacklisted
-      with_enabled_blacklist_sources(relation.active)
+      with_blacklist_sources(relation.active)
     else
-      without_enabled_blacklist_sources(relation.active).
+      without_low_reputation(without_blacklist_sources(relation.active)).
         unread(by: account, include_muted: true).
         where.not(author: account.poisoned_authors)
     end
   end
 
-  def with_enabled_blacklist_sources(relation)
-    return relation.none if enabled_blacklist_sources.empty?
-
-    relation.where(blacklist_source_sql, enabled_blacklist_sources)
+  def low_reputation(relation)
+    relation.where('posts.author_reputation < ?', minimum_reputation)
   end
 
-  def without_enabled_blacklist_sources(relation)
-    return relation if enabled_blacklist_sources.empty?
+  def without_low_reputation(relation)
+    relation.where('posts.author_reputation >= ?', minimum_reputation)
+  end
 
-    relation.where("NOT #{blacklist_source_sql}", enabled_blacklist_sources)
+  def with_blacklist_sources(relation)
+    return relation.none if blacklist_sources.empty?
+
+    relation.where(blacklist_source_sql, blacklist_sources)
+  end
+
+  def without_blacklist_sources(relation)
+    return relation if blacklist_sources.empty?
+
+    relation.where("NOT #{blacklist_source_sql}", blacklist_sources)
   end
 
   def blacklist_source_sql
-    "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'community' IN (?))"
+    "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'account' IN (?))"
   end
 
   def base_filter_relation(apply_muted_filter: true)

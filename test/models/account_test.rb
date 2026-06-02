@@ -2,15 +2,24 @@ require 'test_helper'
 
 class AccountTest < ActiveSupport::TestCase
   class FollowingRpcClient
-    def initialize(pages)
+    def initialize(pages, type = 'ignore')
       @pages = pages
-      @expected_starts = ['', 'muted-author']
+      @type = type
+      @expected_starts = ['', type == 'ignore' ? pages.first&.last&.following : nil]
     end
 
     def rpc_execute(api, method, args)
+      if @type == 'follow_blacklist'
+        raise "unexpected api: #{api}" unless api == :bridge
+        raise "unexpected method: #{method}" unless method == :get_follow_list
+        raise "unexpected args: #{args.inspect}" unless args == {observer: 'curator', follow_type: 'follow_blacklist'}
+
+        return Hashie::Mash.new(result: @pages.shift)
+      end
+
       raise "unexpected api: #{api}" unless api == :condenser_api
       raise "unexpected method: #{method}" unless method == :get_following
-      raise "unexpected args: #{args.inspect}" unless args == ['curator', @expected_starts.shift, 'ignore', 1000]
+      raise "unexpected args: #{args.inspect}" unless args == ['curator', @expected_starts.shift.to_s, @type, 1000]
 
       Hashie::Mash.new(result: @pages.shift)
     end
@@ -19,8 +28,8 @@ class AccountTest < ActiveSupport::TestCase
   class FollowingApi
     attr_reader :rpc_client
 
-    def initialize(pages)
-      @rpc_client = FollowingRpcClient.new(pages)
+    def initialize(pages, type = 'ignore')
+      @rpc_client = FollowingRpcClient.new(pages, type)
     end
   end
 
@@ -40,26 +49,52 @@ class AccountTest < ActiveSupport::TestCase
     assert_equal ['muted-author'], account.reload.muted_authors
   end
 
-  test 'enabled blacklist sources default to empty' do
-    assert_equal [], accounts(:curated).enabled_blacklist_sources
+  test 'blacklist sources include account and followed blacklist accounts' do
+    account = Account.create!(name: 'curator')
+    pages = [
+      [Struct.new(:name).new('hive.blog')]
+    ]
+
+    Account.stub(:api, FollowingApi.new(pages, 'follow_blacklist')) do
+      Account.stub(:with_simple_failover, ->(&block) { block.call }) do
+        assert_equal ['curator', 'hive.blog'], account.blacklist_sources
+      end
+    end
   end
 
-  test 'enabled blacklist sources keep only trusted communities' do
-    account = accounts(:curated)
+  test 'blacklist sources include hivewatchers when enabled' do
+    account = Account.create!(name: 'curator')
 
-    account.update_enabled_blacklist_sources!(%w(hive-163399 hive-unknown hive-136001 hive-163399))
+    account.stub(:followed_blacklist_accounts, []) do
+      assert_equal ['curator'], account.blacklist_sources
 
-    assert_equal %w(hive-163399 hive-136001), account.reload.enabled_blacklist_sources
+      account.update_hivewatchers_blacklist_enabled!(true)
+
+      assert_equal ['curator', 'hivewatchers'], account.blacklist_sources
+    end
   end
 
-  test 'blacklist source catalog includes enabled state' do
-    account = accounts(:curated)
-    account.update_enabled_blacklist_sources!(%w(hive-136001))
+  test 'blacklist source catalog exposes account sources' do
+    account = Account.create!(name: 'curator')
 
-    catalog = account.blacklist_source_catalog
+    account.stub(:followed_blacklist_accounts, %w(hive.blog)) do
+      assert_equal(
+        [{account: 'curator', name: 'curator'}, {account: 'hive.blog', name: 'hive.blog'}],
+        account.blacklist_source_catalog
+      )
+    end
+  end
 
-    assert_equal PostIndexJob::TRUSTED_COMMUNITIES, catalog.map { |source| source.fetch(:community) }
-    assert_equal ['hive-136001'], catalog.select { |source| source.fetch(:enabled) }.map { |source| source.fetch(:community) }
-    assert_includes catalog.map { |source| source.fetch(:name) }, 'Ban Hammer'
+  test 'offchain blacklist source catalog exposes hivewatchers state' do
+    account = Account.create!(name: 'curator')
+
+    assert_equal(
+      [{account: 'hivewatchers', name: 'Hivewatchers', enabled: false, description: 'Powered by the Spaminator active blacklist.'}],
+      account.offchain_blacklist_source_catalog
+    )
+
+    account.update_hivewatchers_blacklist_enabled!(true)
+
+    assert_equal true, account.offchain_blacklist_source_catalog.first.fetch(:enabled)
   end
 end
