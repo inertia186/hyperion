@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, FileDiff, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { api } from '../api'
+import { renderPostBody } from '../renderPostBody'
 import { closeOnBackdropClick, useModalDismiss } from '../useModalDismiss'
 import CategoryTagsControl from './CategoryTagsControl'
 
@@ -26,9 +27,6 @@ export default function PreviewPane({
 }) {
   const detail = previewState.postId === post?.id ? previewState.detail : null
   const urls = detail?.urls || {}
-  const sandboxUrl = detail?.content_sandbox_url
-  const themedSandboxUrl = sandboxUrl ? sandboxUrlWithTheme(sandboxUrl, theme) : null
-  const [sandboxLoaded, setSandboxLoaded] = useState(false)
   const previewReady = !!post && previewState.status === 'ready' && previewState.postId === post.id
   const blacklistReasons = detail?.blacklist_reasons || post?.blacklist_reasons || []
   const displayPost = useMemo(() => {
@@ -37,6 +35,15 @@ export default function PreviewPane({
     return {...post, ...detail.display_post, id: post.id, tags: post.tags}
   }, [detail?.display_post, post])
   const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost), [displayPost, urls])
+  const previewHtml = useMemo(() => {
+    if (!detail?.body_markdown) return previewState.html
+
+    try {
+      return renderPostBody(detail.body_markdown, displayPost)
+    } catch (_error) {
+      return previewState.html
+    }
+  }, [detail?.body_markdown, displayPost, previewState.html])
   const [stats, setStats] = useState({status: 'idle', votes: null, replies: null, payout: null, currentVote: null})
   const [votePanel, setVotePanel] = useState(null)
   const [voteWeight, setVoteWeight] = useState(100)
@@ -48,10 +55,6 @@ export default function PreviewPane({
   useEffect(() => {
     setPreviewTagsExpanded(false)
   }, [post?.id])
-
-  useEffect(() => {
-    setSandboxLoaded(false)
-  }, [themedSandboxUrl])
 
   useEffect(() => {
     if (!displayPost) return
@@ -263,24 +266,9 @@ export default function PreviewPane({
         )}
         <div className="mt-2 text-[11px] text-slate-500">? shortcuts · j/k move · Enter preview · Esc list · &gt; mark read + next · Space scroll</div>
       </div>
-      <div ref={previewScrollRef} className={`touch-scroll min-h-0 flex-1 overflow-auto ${previewReady && sandboxUrl ? 'bg-white p-0.5 dark:bg-slate-900' : 'safe-area-bottom p-4'}`} tabIndex={-1}>
-        {previewReady && themedSandboxUrl ? (
-          <div className="relative h-full min-h-[360px]">
-            {!sandboxLoaded && <SandboxLoadingPlaceholder theme={theme} />}
-            <iframe
-              key={`${post.id}-${themedSandboxUrl}`}
-              className={`block h-full min-h-[360px] w-full border-0 bg-white dark:bg-slate-900 ${sandboxLoaded ? 'opacity-100' : 'opacity-0'}`}
-              style={{colorScheme: theme === 'dark' ? 'dark' : 'light'}}
-              data-preview-frame="true"
-              loading="eager"
-              onLoad={() => setSandboxLoaded(true)}
-              sandbox="allow-same-origin allow-scripts allow-popups"
-              src={themedSandboxUrl}
-              title={`Rendered post: ${displayPost.title}`}
-            />
-          </div>
-        ) : previewReady ? (
-          <article className="post-body text-sm" dangerouslySetInnerHTML={{__html: previewState.html}} />
+      <div ref={previewScrollRef} className="safe-area-bottom touch-scroll min-h-0 flex-1 overflow-auto p-4" tabIndex={-1}>
+        {previewReady ? (
+          <article className="post-body text-sm" dangerouslySetInnerHTML={{__html: previewHtml}} />
         ) : previewState.status === 'error' && previewState.postId === post.id ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Preview failed to load.</div>
         ) : (
@@ -314,34 +302,11 @@ export default function PreviewPane({
   )
 }
 
-function SandboxLoadingPlaceholder({theme}) {
-  const dark = theme === 'dark'
-
-  return (
-    <div className={`absolute inset-0 flex min-h-[360px] items-center justify-center px-4 text-center text-sm ${dark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}`}>
-      <div className="w-full max-w-xl space-y-3" aria-label="Loading rendered post">
-        <div className={`mx-auto h-4 w-40 rounded ${dark ? 'bg-slate-700' : 'bg-slate-200'}`} />
-        <div className={`h-3 w-full rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
-        <div className={`h-3 w-11/12 rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
-        <div className={`h-3 w-3/4 rounded ${dark ? 'bg-slate-800' : 'bg-slate-100'}`} />
-        <div className="pt-2">Loading rendered post...</div>
-      </div>
-    </div>
-  )
-}
-
-function sandboxUrlWithTheme(url, theme) {
-  const [path, query = ''] = url.split('?')
-  const params = new URLSearchParams(query)
-  params.set('theme', theme === 'dark' ? 'dark' : 'light')
-  return `${path}?${params.toString()}`
-}
-
 function blacklistReasonText(reasons) {
-  const communities = [...new Set((reasons || []).map((reason) => reason?.name || reason?.community).filter(Boolean))]
-  if (communities.length === 0) return 'Blacklisted: author is muted by a trusted community.'
+  const accounts = [...new Set((reasons || []).map((reason) => reason?.name || reason?.account).filter(Boolean))]
+  if (accounts.length === 0) return 'Blacklisted: author appears on a Hive blacklist.'
 
-  return `Blacklisted: author is muted by ${communities.join(', ')}.`
+  return `Blacklisted: author appears on ${accounts.join(', ')}.`
 }
 
 function previewExternalLinks(urls, displayPost) {

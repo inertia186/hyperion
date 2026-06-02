@@ -139,19 +139,19 @@ export default function App() {
       {settingsOpen && (
         <SettingsModal
           session={session}
-          onClose={() => setSettingsOpen(false)}
           onSave={(payload) => {
-            setSession((current) => ({
+            setSession((current) => current ? {
               ...current,
               preferences: {
                 ...current.preferences,
-                enabled_blacklist_sources: payload.enabled_blacklist_sources
+                ...(payload.preferences || {})
               },
-              blacklist_sources: payload.blacklist_sources
-            }))
+              ...(payload.offchain_blacklist_sources ? {offchain_blacklist_sources: payload.offchain_blacklist_sources} : {})
+            } : current)
             setRefreshKey((key) => key + 1)
-            setSettingsOpen(false)
           }}
+          onError={(message) => setError(message)}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>
@@ -174,72 +174,102 @@ function ThemeSelector({theme, onChange, disabled}) {
   )
 }
 
-function SettingsModal({session, onClose, onSave}) {
-  const [selectedSources, setSelectedSources] = useState(() => new Set(session.preferences.enabled_blacklist_sources || []))
+function SettingsModal({session, onSave, onError, onClose}) {
+  const [minimumReputation, setMinimumReputation] = useState(session.preferences?.minimum_reputation ?? 25)
+  const [hivewatchersEnabled, setHivewatchersEnabled] = useState(!!session.preferences?.hivewatchers_blacklist_enabled)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
   useModalDismiss(true, onClose)
-
-  const toggleSource = (community) => {
-    setSelectedSources((current) => {
-      const next = new Set(current)
-      if (next.has(community)) {
-        next.delete(community)
-      } else {
-        next.add(community)
-      }
-      return next
-    })
-  }
 
   const save = async () => {
     setSaving(true)
-    setError(null)
 
     try {
-      const payload = await api.setBlacklists(Array.from(selectedSources))
-      onSave(payload)
+      const [reputationPayload, blacklistPayload] = await Promise.all([
+        api.setMinimumReputation(minimumReputation),
+        api.setBlacklists({hivewatchers_blacklist_enabled: hivewatchersEnabled})
+      ])
+      setMinimumReputation(reputationPayload.minimum_reputation)
+      setHivewatchersEnabled(!!blacklistPayload.hivewatchers_blacklist_enabled)
+      onSave({
+        preferences: {
+          minimum_reputation: reputationPayload.minimum_reputation,
+          hivewatchers_blacklist_enabled: !!blacklistPayload.hivewatchers_blacklist_enabled
+        },
+        offchain_blacklist_sources: blacklistPayload.offchain_blacklist_sources
+      })
+      onClose()
     } catch (err) {
-      setError(err.message || 'Request failed')
+      onError(err.message || 'Request failed')
+    } finally {
       setSaving(false)
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-16 sm:pt-24" role="dialog" aria-modal="true" aria-label="Settings" onClick={closeOnBackdropClick(onClose)}>
-      <div className="w-full max-w-lg rounded-md border border-slate-200 bg-white shadow-xl">
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="text-sm font-semibold text-slate-900">Settings</div>
-          <button className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close settings">
+      <div className="w-full max-w-lg rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Settings</div>
+          <button className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800" type="button" onClick={onClose} aria-label="Close settings">
             <X size={15} />
           </button>
         </div>
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-5 px-4 py-4">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-100">Minimum reputation</span>
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">Posts below this appear in Ignored.</span>
+            <input
+              className="mt-2 h-10 w-28 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+              type="number"
+              aria-label="Minimum reputation"
+              min="-100"
+              max="100"
+              step="1"
+              value={minimumReputation}
+              onChange={(event) => setMinimumReputation(event.target.value)}
+            />
+          </label>
           <div>
-            <div className="text-sm font-medium text-slate-900">Blacklists</div>
-            <div className="mt-1 text-xs text-slate-500">Choose which trusted community mute lists apply to this inbox.</div>
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">On-chain blacklists</div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              This inbox uses your Hive blacklist and{' '}
+              <a className="text-blue-700 hover:underline dark:text-blue-300" href={`https://hive.blog/@${session.account.name}/lists/followed_blacklists`} target="_blank" rel="noreferrer">
+                blacklist subscriptions
+              </a>.
+            </div>
           </div>
           <div className="space-y-2">
             {(session.blacklist_sources || []).map((source) => (
-              <label key={source.community} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm">
-                <input className="h-4 w-4" type="checkbox" checked={selectedSources.has(source.community)} onChange={() => toggleSource(source.community)} />
+              <div key={source.account} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-slate-800">{source.name}</span>
-                  <span className="block truncate text-xs text-slate-500">{source.community}</span>
+                  <span className="block truncate font-medium text-slate-800 dark:text-slate-200">{source.name}</span>
+                  <span className="block truncate text-xs text-slate-500 dark:text-slate-400">@{source.account}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Off-chain blacklists</div>
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">Optional external sources applied during indexing.</div>
+          </div>
+          <div className="space-y-2">
+            {(session.offchain_blacklist_sources || []).map((source) => (
+              <label key={source.account} className="flex items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                <input className="h-4 w-4" type="checkbox" checked={hivewatchersEnabled} onChange={(event) => setHivewatchersEnabled(event.target.checked)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-slate-800 dark:text-slate-200">{source.name}</span>
+                  <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{source.description}</span>
                 </span>
               </label>
             ))}
           </div>
-          {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
         </div>
-        <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
-          <a className="text-sm text-blue-700 hover:underline" href="/tags">Tag management</a>
-          <a className="text-sm text-blue-700 hover:underline" href="/posts">Legacy Inbox</a>
+        <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+          <a className="text-sm text-blue-700 hover:underline dark:text-blue-300" href="/tags">Tag management</a>
+          <a className="text-sm text-blue-700 hover:underline dark:text-blue-300" href="/posts">Legacy Inbox</a>
           <div className="ml-auto flex items-center gap-2">
-            <button className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50" type="button" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="inline-flex h-9 items-center rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" type="button" onClick={save} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+            <button className="inline-flex h-9 items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={onClose}>Close</button>
+            <button className="inline-flex h-9 items-center rounded-md bg-slate-900 px-3 text-sm text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white" type="button" onClick={save} disabled={saving}>Save</button>
           </div>
         </div>
       </div>

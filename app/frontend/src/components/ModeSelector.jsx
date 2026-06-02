@@ -17,7 +17,7 @@ export default function ModeSelector({query, counts, compact = false, onChange})
     return (
       <label className="inline-flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm sm:flex-none">
         <span className="text-xs font-medium text-slate-500">View</span>
-        <select className="min-w-0 flex-1 bg-transparent text-sm outline-none" value={activeMode} onChange={(event) => onChange(modeOptions.find((mode) => mode.key === event.target.value).updates)} aria-label="View mode">
+        <select className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={activeMode} onChange={(event) => onChange(modeOptions.find((mode) => mode.key === event.target.value).updates)} aria-label="View mode">
           {modeOptions.map((mode) => (
             <option key={mode.key} value={mode.key}>{modeLabel(mode, counts)}</option>
           ))}

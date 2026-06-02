@@ -171,6 +171,8 @@ let hivesignerAvailable
 let emptyTags
 let onlyFavoriteTagsEnabled
 let sessionTheme
+let minimumReputation
+let hivewatchersBlacklistEnabled
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
@@ -192,7 +194,8 @@ const postsPayload = (params = new URLSearchParams()) => {
       only_read: params.get('only_read') === 'true',
       only_ignored: params.get('only_ignored') === 'true',
       only_deleted: params.get('only_deleted') === 'true',
-      only_blacklisted: params.get('only_blacklisted') === 'true'
+      only_blacklisted: params.get('only_blacklisted') === 'true',
+      minimum_reputation: minimumReputation
     },
     pagination: {page, limit, total_count: filteredPosts.length, total_pages: Math.max(Math.ceil(filteredPosts.length / limit), 1)},
     mode_counts: {unread: filteredPosts.length, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
@@ -227,6 +230,8 @@ describe('App', () => {
     emptyTags = new Set()
     onlyFavoriteTagsEnabled = false
     sessionTheme = 'system'
+    minimumReputation = 25
+    hivewatchersBlacklistEnabled = false
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
@@ -247,10 +252,13 @@ describe('App', () => {
         return jsonResponse({
           authenticated: true,
           account: {name: 'fixture-curator', avatar_url: 'avatar.png'},
-          preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, enabled_blacklist_sources: [], theme: sessionTheme, hivesigner_available: hivesignerAvailable},
+          preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, theme: sessionTheme, minimum_reputation: minimumReputation, hivewatchers_blacklist_enabled: hivewatchersBlacklistEnabled, hivesigner_available: hivesignerAvailable},
           blacklist_sources: [
-            {community: 'hive-163399', name: 'Trusted Safety', enabled: false},
-            {community: 'hive-136001', name: 'Ban Hammer', enabled: false}
+            {account: 'fixture-curator', name: 'fixture-curator'},
+            {account: 'hive.blog', name: 'hive.blog'}
+          ],
+          offchain_blacklist_sources: [
+            {account: 'hivewatchers', name: 'Hivewatchers', enabled: hivewatchersBlacklistEnabled, description: 'Powered by the Spaminator active blacklist.'}
           ],
           counts: {read_posts: 1, ignored_tags: 1, poisoned_pill_tags: 0, favorite_tags: 1, past_tags: 1, muted_posts: 2, tags: 3},
           muted_authors: ['muted-author'],
@@ -367,21 +375,29 @@ describe('App', () => {
         return jsonResponse({only_favorite_tags: onlyFavoriteTagsEnabled})
       }
 
-      if (url === '/api/v1/preferences/blacklists' && options.method === 'PATCH') {
-        const enabledSources = JSON.parse(options.body).enabled_sources
-        return jsonResponse({
-          enabled_blacklist_sources: enabledSources,
-          blacklist_sources: [
-            {community: 'hive-163399', name: 'Trusted Safety', enabled: enabledSources.includes('hive-163399')},
-            {community: 'hive-136001', name: 'Ban Hammer', enabled: enabledSources.includes('hive-136001')}
-          ]
-        })
-      }
-
       if (url === '/api/v1/preferences/theme' && options.method === 'PATCH') {
         const theme = JSON.parse(options.body).theme
         sessionTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system'
         return jsonResponse({theme: sessionTheme})
+      }
+
+      if (url === '/api/v1/preferences/minimum_reputation' && options.method === 'PATCH') {
+        minimumReputation = Number(JSON.parse(options.body).minimum_reputation)
+        return jsonResponse({minimum_reputation: minimumReputation})
+      }
+
+      if (url === '/api/v1/preferences/blacklists' && options.method === 'PATCH') {
+        hivewatchersBlacklistEnabled = !!JSON.parse(options.body).hivewatchers_blacklist_enabled
+        return jsonResponse({
+          hivewatchers_blacklist_enabled: hivewatchersBlacklistEnabled,
+          blacklist_sources: [
+            {account: 'fixture-curator', name: 'fixture-curator'},
+            {account: 'hive.blog', name: 'hive.blog'}
+          ],
+          offchain_blacklist_sources: [
+            {account: 'hivewatchers', name: 'Hivewatchers', enabled: hivewatchersBlacklistEnabled, description: 'Powered by the Spaminator active blacklist.'}
+          ]
+        })
       }
 
       if (url === '/api/v1/past_tags?only_ignored=true' && options.method === 'DELETE') {
@@ -416,14 +432,18 @@ describe('App', () => {
     expect(screen.queryByRole('link', {name: 'Legacy inbox'})).not.toBeInTheDocument()
   })
 
-  test('opens settings with blacklist sources disabled by default', async () => {
+  test('opens settings with Hive blacklist sources', async () => {
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
 
     expect(screen.getByRole('dialog', {name: 'Settings'})).toBeInTheDocument()
-    expect(screen.getByLabelText(/Trusted Safety/)).not.toBeChecked()
-    expect(screen.getByLabelText(/Ban Hammer/)).not.toBeChecked()
+    expect(screen.getByRole('spinbutton', {name: 'Minimum reputation'})).toHaveValue(25)
+    expect(screen.getAllByText('fixture-curator').length).toBeGreaterThan(0)
+    expect(screen.getByText('@hive.blog')).toBeInTheDocument()
+    expect(screen.getByRole('link', {name: 'blacklist subscriptions'})).toHaveAttribute('href', 'https://hive.blog/@fixture-curator/lists/followed_blacklists')
+    expect(screen.getByLabelText(/Hivewatchers/)).not.toBeChecked()
+    expect(screen.getByText('Powered by the Spaminator active blacklist.')).toBeInTheDocument()
     expect(screen.getByRole('link', {name: 'Tag management'})).toHaveAttribute('href', '/tags')
     expect(screen.getByRole('link', {name: 'Legacy Inbox'})).toHaveAttribute('href', '/posts')
 
@@ -486,23 +506,47 @@ describe('App', () => {
     expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
   })
 
-  test('saves blacklist settings and reloads posts', async () => {
+  test('settings no longer saves local blacklist toggles', async () => {
     await renderApp()
-    const initialPostRequests = global.fetch.mock.calls.filter(([url]) => url.toString().startsWith('/api/v1/posts?')).length
 
     fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
-    fireEvent.click(screen.getByLabelText(/Trusted Safety/))
+    fireEvent.click(screen.getByRole('button', {name: 'Close'}))
+
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/v1/preferences/blacklists', expect.anything())
+    expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
+  })
+
+  test('saves minimum reputation from settings and refreshes posts', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
+    fireEvent.change(screen.getByRole('spinbutton', {name: 'Minimum reputation'}), {target: {value: '35'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Save'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/minimum_reputation', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({minimum_reputation: '35'})
+    })))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/blacklists', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({hivewatchers_blacklist_enabled: false})
+    })))
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument())
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().startsWith('/api/v1/posts?')).length).toBeGreaterThan(1)
+  })
+
+  test('saves Hivewatchers off-chain blacklist preference from settings', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Settings'}))
+    fireEvent.click(screen.getByLabelText(/Hivewatchers/))
     fireEvent.click(screen.getByRole('button', {name: 'Save'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/blacklists', expect.objectContaining({
       method: 'PATCH',
-      body: JSON.stringify({enabled_sources: ['hive-163399']})
+      body: JSON.stringify({hivewatchers_blacklist_enabled: true})
     })))
-    await waitFor(() => {
-      const postRequests = global.fetch.mock.calls.filter(([url]) => url.toString().startsWith('/api/v1/posts?')).length
-      expect(postRequests).toBeGreaterThan(initialPostRequests)
-    })
-    expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Settings'})).not.toBeInTheDocument())
   })
 
   test('resizes the desktop list and post view with a drag handle', async () => {
@@ -810,13 +854,13 @@ describe('App', () => {
       {
         ...posts[0],
         blacklisted: true,
-        blacklist_reasons: [{community: 'hive-163399', name: 'Trusted Safety'}, {community: 'hive-136001', name: 'Ban Hammer'}]
+        blacklist_reasons: [{account: 'fixture-curator', name: 'fixture-curator'}, {account: 'hive.blog', name: 'hive.blog'}]
       }
     ]
 
     await renderApp()
 
-    expect(screen.getByText('Blacklisted: author is muted by Trusted Safety, Ban Hammer.')).toBeInTheDocument()
+    expect(screen.getByText('Blacklisted: author appears on fixture-curator, hive.blog.')).toBeInTheDocument()
   })
 
   test('uses referenced display post details in the preview', async () => {
@@ -1510,7 +1554,7 @@ describe('App', () => {
     expect(screen.getByText('Preview 2')).toBeInTheDocument()
   })
 
-  test('renders post detail through the sandbox iframe when available', async () => {
+  test('renders server post detail html without the legacy sandbox iframe', async () => {
     const detail = deferred()
     detailResponses.set(1, detail)
     detail.resolve({
@@ -1523,13 +1567,51 @@ describe('App', () => {
 
     await renderApp({waitForPreview: false})
 
-    const frame = await screen.findByTitle('Rendered post: First Post')
-    expect(frame).toHaveAttribute('src', '/posts/1/content_sandbox?pp=skip&theme=light')
-    expect(frame).toHaveAttribute('sandbox', 'allow-same-origin allow-scripts allow-popups')
-    expect(screen.queryByText('Fallback preview')).not.toBeInTheDocument()
+    expect(await screen.findByText('Fallback preview')).toBeInTheDocument()
+    expect(screen.queryByTitle('Rendered post: First Post')).not.toBeInTheDocument()
   })
 
-  test('passes the matching dark theme to the sandbox iframe', async () => {
+  test('renders post markdown with the Steem renderer instead of the server html fallback', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '# Real Heading\n\n#c-c-c #hivegc',
+      body_html: '<h1 id="c-c-c-hivegc">c-c-c #hivegc</h1>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    expect(await screen.findByRole('heading', {name: 'Real Heading'})).toBeInTheDocument()
+    expect(screen.getByRole('link', {name: '#c-c-c'})).toBeInTheDocument()
+    expect(screen.getByRole('link', {name: '#hivegc'})).toBeInTheDocument()
+    expect(screen.queryByRole('heading', {name: 'c-c-c #hivegc'})).not.toBeInTheDocument()
+  })
+
+  test('renders YouTube embeds without sandboxing the player iframe', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://www.youtube.com/embed/dQw4w9WgXcQ')
+    expect(frame).toHaveAttribute('allowfullscreen', 'allowfullscreen')
+    expect(frame).not.toHaveAttribute('sandbox')
+    expect(frame).not.toHaveAttribute('referrerpolicy')
+  })
+
+  test('renders server post detail html in dark theme without the legacy sandbox iframe', async () => {
     sessionTheme = 'dark'
     const detail = deferred()
     detailResponses.set(1, detail)
@@ -1543,7 +1625,8 @@ describe('App', () => {
 
     await renderApp({waitForPreview: false})
 
-    expect(await screen.findByTitle('Rendered post: First Post')).toHaveAttribute('src', '/posts/1/content_sandbox?pp=skip&theme=dark')
+    expect(await screen.findByText('Fallback preview')).toBeInTheDocument()
+    expect(screen.queryByTitle('Rendered post: First Post')).not.toBeInTheDocument()
   })
 
   test('shows an inline preview failure without replacing the list', async () => {

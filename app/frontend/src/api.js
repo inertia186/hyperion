@@ -44,6 +44,7 @@ export const api = {
   clearIgnoredTags: () => request('/api/v1/ignored_tags', {method: 'DELETE', body: '{}'}),
   setMute: (enabled) => request('/api/v1/preferences/mute', {method: 'PATCH', body: JSON.stringify({enabled})}),
   setOnlyFavoriteTags: (enabled) => request('/api/v1/preferences/only_favorite_tags', {method: 'PATCH', body: JSON.stringify({enabled})}),
-  setBlacklists: (enabledSources) => request('/api/v1/preferences/blacklists', {method: 'PATCH', body: JSON.stringify({enabled_sources: enabledSources})}),
-  setTheme: (theme) => request('/api/v1/preferences/theme', {method: 'PATCH', body: JSON.stringify({theme})})
+  setTheme: (theme) => request('/api/v1/preferences/theme', {method: 'PATCH', body: JSON.stringify({theme})}),
+  setMinimumReputation: (minimum_reputation) => request('/api/v1/preferences/minimum_reputation', {method: 'PATCH', body: JSON.stringify({minimum_reputation})}),
+  setBlacklists: (payload) => request('/api/v1/preferences/blacklists', {method: 'PATCH', body: JSON.stringify(payload)})
 }

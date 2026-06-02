@@ -885,14 +885,7 @@ function useMediaQuery(query) {
 }
 
 function previewScrollTarget(container) {
-  const iframe = container?.querySelector?.('iframe[data-preview-frame="true"]')
-  if (!iframe) return container
-
-  try {
-    return iframe.contentDocument?.scrollingElement || iframe.contentDocument?.documentElement || iframe.contentDocument?.body || container
-  } catch (_error) {
-    return container
-  }
+  return container
 }
 
 function readDesktopPreviewPercent() {

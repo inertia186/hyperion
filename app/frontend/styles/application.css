@@ -33,9 +33,17 @@ body.mobile-preview-open {
   overflow: hidden;
 }
 
+@media (max-width: 767px), (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 .post-body {
   color: #1f2937;
-  line-height: 1.6;
+  line-height: 1.8;
 }
 
 .dark .post-body {
@@ -45,6 +53,64 @@ body.mobile-preview-open {
 .post-body img {
   max-width: 100%;
   height: auto;
+}
+
+.post-body p,
+.post-body blockquote,
+.post-body ul,
+.post-body ol,
+.post-body table,
+.post-body pre {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.post-body h1,
+.post-body h2,
+.post-body h3,
+.post-body h4,
+.post-body h5,
+.post-body h6 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.post-body h1 {
+  font-size: 2.2em;
+}
+
+.post-body h2 {
+  font-size: 1.5em;
+}
+
+.post-body h3 {
+  font-size: 1.25em;
+}
+
+.post-body iframe {
+  display: block;
+  max-width: 100%;
+  margin: 1rem auto;
+  border: 0;
+}
+
+.post-body .videoWrapper {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin: 1rem auto;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+
+.post-body .videoWrapper iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
 }
 
 .post-body a {

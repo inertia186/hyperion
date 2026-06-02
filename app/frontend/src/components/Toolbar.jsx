@@ -28,7 +28,7 @@ export default function Toolbar({
           <span className="sr-only">Tag, author, app, excluded tags</span>
           <div className="flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
             <Search size={16} className="text-slate-400" />
-            <input className="min-w-0 flex-1 bg-transparent text-sm outline-none" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
+            <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
           </div>
         </label>
         <button className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-w-24" type="submit" disabled={loading} aria-label="Search">
@@ -45,7 +45,7 @@ export default function Toolbar({
         <ModeSelector query={query} counts={payload?.mode_counts} compact={compactModeSelector} onChange={updateQuery} />
         <label className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm">
           <span className="text-xs font-medium text-slate-500">Sort</span>
-          <select className="min-w-0 bg-transparent text-sm outline-none" value={query.sort} onChange={(event) => updateQuery({sort: event.target.value})} aria-label="Sort posts">
+          <select className="min-w-0 bg-transparent text-base outline-none md:text-sm" value={query.sort} onChange={(event) => updateQuery({sort: event.target.value})} aria-label="Sort posts">
             {SORTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
