@@ -107,8 +107,18 @@ function PostThumbnail({post}) {
   const thumbnailRef = useRef(null)
   const visible = useVisibleOnce(thumbnailRef)
   const sources = useMemo(() => {
-    const values = [post.thumbnail_url, post.author_avatar_url, post.placeholder_image_url]
-    return values.filter((value, index) => value && values.indexOf(value) === index)
+    const candidates = [
+      {url: post.thumbnail_url},
+      {url: post.author_avatar_url, size: '0x96'},
+      {url: post.placeholder_image_url}
+    ].filter(({url}) => url)
+    const seenUrls = new Set()
+    return candidates.filter(({url}) => {
+      if (seenUrls.has(url)) return false
+
+      seenUrls.add(url)
+      return true
+    })
   }, [post.author_avatar_url, post.placeholder_image_url, post.thumbnail_url])
   const [sourceIndex, setSourceIndex] = useState(0)
 
@@ -116,14 +126,14 @@ function PostThumbnail({post}) {
     setSourceIndex(0)
   }, [post.id, sources])
 
-  const source = sources[sourceIndex] || post.placeholder_image_url
+  const source = sources[sourceIndex] || {url: post.placeholder_image_url}
 
   return (
     <img
       ref={thumbnailRef}
       data-testid={`post-thumbnail-${post.id}`}
       className="post-row-thumbnail hidden h-12 w-12 rounded-md object-cover md:block"
-      src={visible ? imageProxy(source, '0x96') : undefined}
+      src={visible ? imageProxy(source.url, source.size) : undefined}
       alt=""
       onError={visible ? () => setSourceIndex((current) => Math.min(current + 1, sources.length - 1)) : undefined}
     />

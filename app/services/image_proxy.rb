@@ -15,6 +15,9 @@ class ImageProxy
   OPEN_TIMEOUT = 2
   READ_TIMEOUT = 5
   MAX_REDIRECTS = 3
+  BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+  BROWSER_IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+  BROWSER_ACCEPT_LANGUAGE = 'en-US,en;q=0.9'
   ALLOWED_CONTENT_TYPES = {
     'image/jpeg' => 'jpg',
     'image/png' => 'png',
@@ -150,7 +153,7 @@ private
     Timeout.timeout(OPEN_TIMEOUT + READ_TIMEOUT + 1) do
       Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
         request = Net::HTTP::Get.new(uri.request_uri)
-        request['User-Agent'] = 'Hyperion image proxy'
+        apply_browser_image_headers(request)
         response = http.request(request)
 
         if response.is_a?(Net::HTTPRedirection)
@@ -165,10 +168,12 @@ private
           return fetch_with_net_http(redirect_uri, redirects_remaining - 1)
         end
 
-        raise Error, "Image fetch failed with #{response.code}." unless response.is_a?(Net::HTTPSuccess)
-
         content_length = response['Content-Length'].to_i
         raise Error, 'Image is too large.' if content_length > MAX_BYTES
+        content_type = normalize_content_type(response['Content-Type'])
+        unless response.is_a?(Net::HTTPSuccess) || ALLOWED_CONTENT_TYPES.key?(content_type)
+          raise Error, "Image fetch failed with #{response.code}."
+        end
 
         {body: response.body.to_s.b, content_type: response['Content-Type']}
       end
@@ -177,6 +182,12 @@ private
     raise Error, 'Image fetch timed out.'
   rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Net::OpenTimeout, Net::ReadTimeout, SocketError
     raise Error, 'Image fetch failed.'
+  end
+
+  def apply_browser_image_headers(request)
+    request['User-Agent'] = BROWSER_USER_AGENT
+    request['Accept'] = BROWSER_IMAGE_ACCEPT
+    request['Accept-Language'] = BROWSER_ACCEPT_LANGUAGE
   end
 
   def write_cache(response)

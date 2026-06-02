@@ -85,7 +85,8 @@
                 .thumbnail-area.float-left
                   - begin
                     - thumbnail_url = post.thumbnail_url
-                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: thumbnail_url.starts_with?('data:') ? thumbnail_url : ('https://images.hive.blog/0x48/' + thumbnail_url)}
+                    - thumbnail_src = thumbnail_url.starts_with?('data:') ? thumbnail_url : "/api/v1/images/proxy?#{Rack::Utils.build_query(url: thumbnail_url)}"
+                    = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'lazyload img-thumbnail mw-100', style: 'width: 48px;', data: {src: thumbnail_src}
                   - rescue Sprockets::Rails::Helper::AssetNotFound => e
                     = image_tag 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs=', class: 'img-thumbnail mw-100', style: 'width: 48px;'
                   = post.title.truncate(70)

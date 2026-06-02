@@ -765,7 +765,7 @@ describe('App', () => {
     await renderApp()
 
     const firstThumbnail = screen.getByTestId('post-thumbnail-1')
-    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg', '0x96'))
+    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg'))
 
     const middleThumbnail = screen.getByTestId('post-thumbnail-2')
     expect(middleThumbnail).toHaveAttribute('src', proxiedImage('https://images.hive.blog/u/middle-author/avatar', '0x96'))
@@ -956,7 +956,7 @@ describe('App', () => {
     expect(secondPayout).toHaveTextContent('...')
 
     visibility.trigger(firstThumbnail)
-    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg', '0x96'))
+    expect(firstThumbnail).toHaveAttribute('src', proxiedImage('https://example.com/first-post.jpg'))
     expect(secondThumbnail).not.toHaveAttribute('src')
 
     visibility.trigger(secondThumbnail)

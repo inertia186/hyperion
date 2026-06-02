@@ -99,6 +99,71 @@ class ImageProxyTest < ActiveSupport::TestCase
     end
   end
 
+  test 'net http requests include browser image headers' do
+    fake_http = FakeHttp.new(http_response(body: 'png-bytes', content_type: 'image/png'))
+
+    with_public_dns do
+      with_fake_http(fake_http) do
+        proxy(fetcher: nil).call
+      end
+    end
+
+    assert_includes fake_http.last_request['User-Agent'], 'Chrome/'
+    assert_includes fake_http.last_request['User-Agent'], 'Safari/'
+    assert_includes fake_http.last_request['Accept'], 'image/avif'
+    assert_includes fake_http.last_request['Accept'], 'image/webp'
+    assert_includes fake_http.last_request['Accept'], 'image/*'
+    assert_equal 'en-US,en;q=0.9', fake_http.last_request['Accept-Language']
+    assert_nil fake_http.last_request['Referer']
+  end
+
+  test 'browser user agent avoids provider html interstitial responses' do
+    fake_http = FakeHttp.new(->(request) {
+      if request['User-Agent'] == 'Hyperion image proxy'
+        http_response(body: '<html>not the image</html>', content_type: 'text/html')
+      else
+        http_response(body: 'provider-image', content_type: 'image/png')
+      end
+    })
+
+    with_public_dns do
+      with_fake_http(fake_http) do
+        result = proxy(fetcher: nil).call
+
+        assert_equal 'provider-image', result.body
+        assert_equal 'image/png', result.content_type
+      end
+    end
+
+    assert_equal 1, Dir.glob(@cache_root.join('*.bin')).size
+    assert_equal 1, Dir.glob(@cache_root.join('*.json')).size
+  end
+
+  test 'image content is proxied when upstream returns an error status' do
+    fake_http = FakeHttp.new(http_response(body: 'not-found-image', content_type: 'image/png', code: '404', message: 'Not Found'))
+
+    with_public_dns do
+      with_fake_http(fake_http) do
+        result = proxy(fetcher: nil).call
+
+        assert_equal 'not-found-image', result.body
+        assert_equal 'image/png', result.content_type
+      end
+    end
+  end
+
+  test 'non-image upstream error responses are rejected' do
+    fake_http = FakeHttp.new(http_response(body: '<html>not found</html>', content_type: 'text/html', code: '404', message: 'Not Found'))
+
+    with_public_dns do
+      with_fake_http(fake_http) do
+        assert_raises(ImageProxy::Error) do
+          proxy(fetcher: nil).call
+        end
+      end
+    end
+  end
+
   test 'sized requests fetch through hive image host' do
     requested_uri = nil
 
@@ -156,5 +221,30 @@ private
 
   def with_public_dns(&block)
     Resolv.stub(:getaddresses, ['93.184.216.34'], &block)
+  end
+
+  def with_fake_http(fake_http, &block)
+    Net::HTTP.stub(:start, ->(*_args, **_kwargs, &http_block) { http_block.call(fake_http) }, &block)
+  end
+
+  def http_response(body:, content_type:, code: '200', message: 'OK')
+    response = Net::HTTPOK.new('1.1', code, message)
+    response['Content-Type'] = content_type
+    response.body = body
+    response.instance_variable_set(:@read, true)
+    response
+  end
+
+  class FakeHttp
+    attr_reader :last_request
+
+    def initialize(response)
+      @response = response
+    end
+
+    def request(request)
+      @last_request = request
+      @response.respond_to?(:call) ? @response.call(request) : @response
+    end
   end
 end
