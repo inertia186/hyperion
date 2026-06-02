@@ -475,7 +475,90 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal "https://hive.blog/#{original.category}/@#{original.author}/#{original.permlink}", response_json.fetch('urls').fetch('hive_blog')
   end
 
+  test 'chain stats proxy returns payout votes replies and current vote' do
+    api = ChainStatsApi.new(
+      get_active_votes: [
+        {voter: 'fixture-curator', percent: 4200},
+        {voter: 'other-curator', percent: 10000},
+        {voter: 'flagger', percent: -1000}
+      ],
+      get_content_replies: [{id: 1}, {id: 2}],
+      get_content: {cashout_time: '2026-06-07T00:00:00', pending_payout_value: '1.234 HBD', total_payout_value: '0.000 HBD'}
+    )
+
+    Account.stub(:api, api) do
+      get :chain_stats, params: {id: posts(:allowed_unread).id}
+    end
+
+    assert_response :success
+    assert_equal 'ready', response_json.fetch('status')
+    assert_equal 2, response_json.fetch('votes')
+    assert_equal 2, response_json.fetch('replies')
+    assert_equal '1.234 HBD', response_json.fetch('payout')
+    assert_equal 4200, response_json.fetch('current_vote')
+  end
+
+  test 'chain stats proxy returns unavailable payload on Hive errors' do
+    Account.stub(:api, FailingChainStatsApi.new) do
+      get :chain_stats, params: {id: posts(:allowed_unread).id}
+    end
+
+    assert_response :success
+    assert_equal 'unavailable', response_json.fetch('status')
+    assert_nil response_json.fetch('votes')
+    assert_nil response_json.fetch('replies')
+    assert_nil response_json.fetch('payout')
+    assert_nil response_json.fetch('current_vote')
+  end
+
+  test 'payout proxy returns current payout without fetching full chain stats' do
+    api = ChainStatsApi.new(
+      get_content: {cashout_time: '2026-06-07T00:00:00', pending_payout_value: '1.234 HBD', total_payout_value: '0.000 HBD'}
+    )
+
+    Account.stub(:api, api) do
+      get :payout, params: {id: posts(:allowed_unread).id}
+    end
+
+    assert_response :success
+    assert_equal 'ready', response_json.fetch('status')
+    assert_equal '1.234 HBD', response_json.fetch('payout')
+    assert_equal [:get_content], api.calls
+  end
+
 private
+  ChainStatsResult = Struct.new(:result, keyword_init: true)
+
+  class ChainStatsApi
+    attr_reader :calls
+
+    def initialize(responses)
+      @responses = responses
+      @calls = []
+    end
+
+    def rpc_client
+      self
+    end
+
+    def rpc_execute(api, method, args)
+      raise "unexpected api: #{api}" unless api == :condenser_api
+
+      @calls << method
+      ChainStatsResult.new(result: @responses.fetch(method))
+    end
+  end
+
+  class FailingChainStatsApi
+    def rpc_client
+      self
+    end
+
+    def rpc_execute(api, method, args)
+      raise Hive::UnknownError, 'boom'
+    end
+  end
+
   def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current, author_reputation: 25)
     post = Post.create!(
       author: author,

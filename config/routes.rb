@@ -3,11 +3,17 @@ Rails.application.routes.draw do
 
   namespace :api do
     namespace :v1 do
-      resource :session, only: :show
+      resource :session, only: :show do
+        get :voting_power
+      end
+
+      get '/images/proxy', to: 'images#proxy'
 
       resources :posts, only: %i(index show) do
         member do
           get :revisions
+          get :chain_stats
+          get :payout
           patch :read, action: :mark_read
           delete :read, action: :mark_unread
         end

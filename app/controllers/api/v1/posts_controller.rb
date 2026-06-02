@@ -1,4 +1,9 @@
+require 'timeout'
+
 class Api::V1::PostsController < Api::V1::BaseController
+  CHAIN_STATS_CACHE_TTL = 2.minutes
+  CHAIN_STATS_TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
+
   def index
     result = PostCurationQuery.new(account: current_account, params: params, session: session).call
 
@@ -65,6 +70,37 @@ class Api::V1::PostsController < Api::V1::BaseController
     render json: {error: e.message}, status: :bad_gateway
   end
 
+  def chain_stats
+    post = Post.find(params[:id])
+    author = params[:author].presence || post.author
+    permlink = params[:permlink].presence || post.permlink
+
+    render json: chain_stats_json(author, permlink)
+  rescue StandardError => e
+    Rails.logger.warn "Unable to fetch chain stats for post #{params[:id]}: #{e.class}: #{e.message}"
+    render json: {
+      status: 'unavailable',
+      votes: nil,
+      replies: nil,
+      payout: nil,
+      current_vote: nil
+    }
+  end
+
+  def payout
+    post = Post.find(params[:id])
+    author = params[:author].presence || post.author
+    permlink = params[:permlink].presence || post.permlink
+
+    render json: payout_json(author, permlink)
+  rescue StandardError => e
+    Rails.logger.warn "Unable to fetch payout for post #{params[:id]}: #{e.class}: #{e.message}"
+    render json: {
+      status: 'unavailable',
+      payout: nil
+    }
+  end
+
   def mark_read
     current_account.mark_post_as_read!(params[:id])
 
@@ -101,6 +137,87 @@ class Api::V1::PostsController < Api::V1::BaseController
 private
   def truthy?(value)
     value == true || value.to_s == 'true' || value.to_s == '1'
+  end
+
+  def chain_stats_json(author, permlink)
+    payload = cached_chain_stats_payload(author, permlink)
+    votes = payload.fetch(:votes)
+    replies = payload.fetch(:replies)
+    content = payload.fetch(:content)
+    current_vote = Array(votes).find { |vote| chain_value(vote, :voter) == current_account.name }
+
+    {
+      status: 'ready',
+      votes: Array(votes).count { |vote| chain_value(vote, :percent).to_i > 0 },
+      replies: Array(replies).size,
+      payout: payout_value(content),
+      current_vote: chain_value(current_vote, :percent)
+    }
+  end
+
+  def cached_chain_stats_payload(author, permlink)
+    cache_key = ['chain-stats', author, permlink]
+    if truthy?(params[:refresh])
+      payload = fetch_chain_stats_payload(author, permlink)
+      Rails.cache.write(cache_key, payload, expires_in: CHAIN_STATS_CACHE_TTL)
+      return payload
+    end
+
+    Rails.cache.fetch(cache_key, expires_in: CHAIN_STATS_CACHE_TTL, race_condition_ttl: 10.seconds) do
+      fetch_chain_stats_payload(author, permlink)
+    end
+  end
+
+  def fetch_chain_stats_payload(author, permlink)
+    Timeout.timeout(CHAIN_STATS_TIMEOUT) do
+      {
+        votes: condenser_rpc(:get_active_votes, [author, permlink]),
+        replies: condenser_rpc(:get_content_replies, [author, permlink]),
+        content: condenser_rpc(:get_content, [author, permlink])
+      }
+    end
+  end
+
+  def payout_json(author, permlink)
+    {
+      status: 'ready',
+      payout: payout_value(cached_payout_content(author, permlink))
+    }
+  end
+
+  def cached_payout_content(author, permlink)
+    Rails.cache.fetch(['post-payout', author, permlink], expires_in: CHAIN_STATS_CACHE_TTL, race_condition_ttl: 10.seconds) do
+      Timeout.timeout(CHAIN_STATS_TIMEOUT) do
+        condenser_rpc(:get_content, [author, permlink])
+      end
+    end
+  end
+
+  def condenser_rpc(method, args)
+    response = Account.api.rpc_client.rpc_execute(:condenser_api, method, args)
+    raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
+
+    response.result
+  end
+
+  def payout_value(content)
+    return nil unless content
+
+    if chain_value(content, :cashout_time).to_s == '1969-12-31T23:59:59'
+      chain_value(content, :total_payout_value)
+    else
+      chain_value(content, :pending_payout_value)
+    end
+  end
+
+  def chain_value(object, key)
+    return nil unless object
+
+    if object.respond_to?(key)
+      object.public_send(key)
+    elsif object.respond_to?(:[])
+      object[key.to_s] || object[key.to_sym]
+    end
   end
 
   def post_json(post, result)
