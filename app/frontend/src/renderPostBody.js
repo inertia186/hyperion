@@ -1,6 +1,8 @@
 import { DefaultRenderer } from '@hive/hive-content-renderer'
 import { imageProxy } from './format'
 
+const POST_BODY_IMAGE_SIZE = '1280x0'
+
 export function renderPostBody(markdown, post = {}) {
   const renderer = new DefaultRenderer({
     baseUrl: 'https://hive.blog/',
@@ -53,7 +55,7 @@ function hardenRenderedEmbeds(html) {
 }
 
 function absoluteImageProxy(url) {
-  const proxiedUrl = imageProxy(url)
+  const proxiedUrl = imageProxy(url, POST_BODY_IMAGE_SIZE)
   if (typeof window === 'undefined') return proxiedUrl
 
   return new URL(proxiedUrl, window.location.origin).toString()

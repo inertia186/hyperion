@@ -20,14 +20,16 @@ class Api::V1::ImagesControllerTest < ActionController::TestCase
     assert_equal 'image-bytes', response.body
   end
 
-  test 'returns bad request for rejected images' do
+  test 'returns placeholder image for rejected images' do
     proxy = FakeImageProxy.new(ImageProxy::Error.new('bad image'))
 
     ImageProxy.stub(:new, ->(**_kwargs) { proxy }) do
       get :proxy, params: {url: 'https://127.0.0.1/image.png'}
     end
 
-    assert_response :bad_request
+    assert_response :success
+    assert_equal 'image/svg+xml', response.media_type
+    assert_includes response.body, 'Image unavailable'
   end
 
 private

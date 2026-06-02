@@ -1862,7 +1862,7 @@ describe('App', () => {
     await renderApp({waitForPreview: false})
 
     const image = await screen.findByRole('img', {name: 'Alt text'})
-    expect(image).toHaveAttribute('src', new URL(proxiedImage('https://example.com/body.png'), window.location.origin).toString().replace(/^http:/, ''))
+    expect(image).toHaveAttribute('src', new URL(proxiedImage('https://example.com/body.png', '1280x0'), window.location.origin).toString().replace(/^http:/, ''))
     expect(image).toHaveAttribute('loading', 'lazy')
     expect(image).toHaveAttribute('decoding', 'async')
     expect(image).toHaveAttribute('referrerpolicy', 'no-referrer')
