@@ -66,4 +66,6 @@ Rails.application.configure do
   config.hosts << 'hyperion.test'
   config.hosts << 'toto.local'
   config.hosts << 'toto.tail1b9f02.ts.net'
+
+  config.web_console.allowed_ips = '100.112.0.0/16'
 end
