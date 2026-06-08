@@ -21,10 +21,9 @@ export default function PreviewPane({
   onPrevious,
   onNext,
   onMarkReadNext,
-  onFocusPreview,
-  onFocusList,
   onSelectTag,
   onSelectAuthor,
+  onChainStatsRefresh,
   theme = 'light',
   readBusy,
   hasPrevious,
@@ -40,6 +39,7 @@ export default function PreviewPane({
     return {...post, ...detail.display_post, id: post.id, tags: post.tags}
   }, [detail?.display_post, post])
   const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost), [displayPost, urls])
+  const commentsUrl = useMemo(() => replyCommentsUrl(urls, displayPost), [displayPost, urls])
   const previewHtml = useMemo(() => {
     if (!detail?.body_markdown) return previewState.html
 
@@ -90,6 +90,7 @@ export default function PreviewPane({
           payout: payload.payout ?? null,
           currentVote: payload.current_vote ?? null
         })
+        if (payload.status === 'ready') onChainStatsRefresh?.(post.id, payload)
       })
       .catch(() => {
         if (active) setStats({status: 'unavailable', votes: null, replies: null, payout: null, currentVote: null})
@@ -98,7 +99,7 @@ export default function PreviewPane({
     return () => {
       active = false
     }
-  }, [accountName, displayPost?.id, displayPost?.author, displayPost?.permlink, previewReady])
+  }, [accountName, displayPost?.id, displayPost?.author, displayPost?.permlink, onChainStatsRefresh, post?.id, previewReady])
 
   const refreshStatsAfterVote = ({expectedVote = null} = {}) => {
     if (!displayPost) return
@@ -129,6 +130,8 @@ export default function PreviewPane({
             const observedVote = payload.current_vote == null ? null : Number(payload.current_vote)
             if (expectedVote != null && observedVote !== expectedVote && attempt + 1 < voteRefreshDelays.length) {
               scheduleRefresh(attempt + 1)
+            } else {
+              onChainStatsRefresh?.(post.id, payload, {refreshVotingPower: true})
             }
           })
           .catch(() => {
@@ -205,7 +208,7 @@ export default function PreviewPane({
   }
 
   return (
-    <div className={`flex h-full min-h-[420px] flex-col ${previewActive ? 'ring-2 ring-blue-500 ring-inset' : ''}`}>
+    <div className={`flex h-full min-h-[420px] flex-col ${previewActive ? 'ring-2 ring-blue-500 ring-inset' : ''}`} data-testid="preview-pane">
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-start gap-3">
           <img className="h-10 w-10 rounded-full" src={imageProxy(`https://images.hive.blog/u/${displayPost.author}/avatar`, '0x80')} alt="" />
@@ -246,9 +249,6 @@ export default function PreviewPane({
           <button className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-xs disabled:opacity-50" type="button" onClick={onMarkReadNext} disabled={readBusy}>
             <CheckSquare size={14} /> Mark read + next
           </button>
-          <button className="inline-flex h-8 items-center rounded-md border border-slate-300 px-2 text-xs" type="button" onClick={previewActive ? onFocusList : onFocusPreview}>
-            {previewActive ? 'List focus' : 'Preview focus'}
-          </button>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {externalLinks.map((link) => (
               <ExternalLinkButton key={link.key} href={link.href} label={link.label} />
@@ -265,7 +265,9 @@ export default function PreviewPane({
           <button className={`inline-flex h-8 items-center gap-1 rounded-md border px-2 disabled:opacity-50 ${stats.currentVote < 0 ? 'border-red-300 bg-red-50 text-red-800' : 'border-slate-300'}`} type="button" onClick={() => setVotePanel(votePanel === 'down' ? null : 'down')} disabled={voteBusy}>
             <ThumbsDown size={14} /> Downvote {votePanel === 'down' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
-          <span className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2"><MessageSquare size={14} /> Replies: {stats.replies ?? '...'}</span>
+          <a className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-slate-700 hover:bg-slate-50 hover:text-blue-700" href={commentsUrl} target="_blank" rel="noopener noreferrer">
+            <MessageSquare size={14} /> Replies: {stats.replies ?? '...'}
+          </a>
           <span className="inline-flex h-8 items-center rounded-md border border-slate-300 px-2">{stats.payout || '...'}</span>
         </div>
         {votePanel && (
@@ -335,6 +337,13 @@ function previewExternalLinks(urls, displayPost) {
   const canonicalLink = canonicalHref && canonicalHost && !builtInHosts.has(canonicalHost) ? [{key: 'canonical', href: canonicalHref, label: canonicalHost}] : []
 
   return [...canonicalLink, ...builtInLinks]
+}
+
+function replyCommentsUrl(urls, displayPost) {
+  const baseUrl = urls.hive_blog || (displayPost ? `https://hive.blog/${displayPost.category}/@${displayPost.author}/${displayPost.permlink}` : '')
+  if (!baseUrl) return '#comments'
+
+  return `${baseUrl.split('#')[0]}#comments`
 }
 
 function normalizedHost(href) {

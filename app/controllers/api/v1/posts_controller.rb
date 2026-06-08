@@ -16,6 +16,7 @@ class Api::V1::PostsController < Api::V1::BaseController
         total_pages: (result.total_count.to_f / result.limit).ceil
       },
       mode_counts: result.mode_counts,
+      keyword_suggestion: result.keyword_suggestion,
       posts: result.posts.map { |post| post_json(post, result) },
       related_tags: result.related_tags,
       related_authors: result.related_authors,

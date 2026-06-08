@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Laptop, LogOut, Moon, Settings, Sun, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
@@ -6,6 +6,7 @@ import FullPageState from './components/FullPageState'
 import { imageProxy } from './format'
 import { applyTheme, normalizeTheme, storedTheme, writeStoredTheme } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
+import hyperionLogo from '../../assets/images/favicon.svg'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -13,6 +14,7 @@ export default function App() {
   const [votingPower, setVotingPower] = useState({status: 'loading', percent: null})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [resetKey, setResetKey] = useState(0)
   const [theme, setTheme] = useState(() => storedTheme())
   const [effectiveTheme, setEffectiveTheme] = useState(() => applyTheme(storedTheme()))
   const [themeSaving, setThemeSaving] = useState(false)
@@ -65,13 +67,24 @@ export default function App() {
       })
   }, [])
 
+  const refreshVotingPower = useCallback(() => {
+    if (!session?.authenticated) return Promise.resolve()
+
+    return api.votingPower()
+      .then((payload) => {
+        setVotingPower(payload.status === 'ready' ? {status: 'ready', percent: payload.percent} : {status: 'unavailable', percent: null})
+      })
+      .catch(() => {
+        setVotingPower({status: 'unavailable', percent: null})
+      })
+  }, [session?.authenticated])
+
   useEffect(() => {
     if (!session?.authenticated) return undefined
 
     let cancelled = false
     let intervalId
-
-    const refreshVotingPower = () => {
+    const guardedRefreshVotingPower = () => {
       api.votingPower()
         .then((payload) => {
           if (cancelled) return
@@ -83,8 +96,8 @@ export default function App() {
         })
     }
 
-    refreshVotingPower()
-    intervalId = window.setInterval(refreshVotingPower, 60_000)
+    guardedRefreshVotingPower()
+    intervalId = window.setInterval(guardedRefreshVotingPower, 60_000)
 
     return () => {
       cancelled = true
@@ -144,7 +157,10 @@ export default function App() {
     <div className="safe-area-shell min-h-screen bg-[#f6f7f9] text-slate-800 [min-height:100dvh] dark:bg-slate-950 dark:text-slate-200">
       <header className="safe-area-top border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
-          <div className="text-xl font-semibold tracking-normal">Hyperion</div>
+          <button className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-1.5 text-xl font-semibold tracking-normal text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900" type="button" onClick={() => setResetKey((key) => key + 1)} title="Reset">
+            <img className="h-7 w-7 object-contain dark:invert" src={hyperionLogo} alt="" />
+            <span>Hyperion</span>
+          </button>
           <div className="ml-auto flex min-w-0 items-center gap-3">
             <img className="h-8 w-8 rounded-full" src={imageProxy(session.account.avatar_url, '0x64')} alt="" />
             <VotingPowerBadge votingPower={votingPower} />
@@ -165,7 +181,7 @@ export default function App() {
         </div>
       </header>
 
-      <CurationInbox session={session} refreshKey={refreshKey} theme={effectiveTheme} />
+      <CurationInbox session={session} refreshKey={refreshKey} resetKey={resetKey} theme={effectiveTheme} onRefreshVotingPower={refreshVotingPower} />
       {settingsOpen && (
         <SettingsModal
           session={session}

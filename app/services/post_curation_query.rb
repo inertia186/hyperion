@@ -9,7 +9,8 @@ class PostCurationQuery
   attr_reader :account, :params, :session, :query_state, :relation, :all_posts,
     :posts, :post_ids, :read_post_ids, :post_tags, :post_communities,
     :post_bodies, :related_tags, :related_authors, :related_communities, :past_tags,
-    :favorite_tag_set, :mode_counts, :muted_posts_count, :total_count, :page, :limit
+    :favorite_tag_set, :mode_counts, :muted_posts_count, :total_count, :page, :limit,
+    :keyword_suggestion
 
   def initialize(account:, params:, session:, track_past_tags: true)
     @account = account
@@ -22,6 +23,7 @@ class PostCurationQuery
     read_params
     build_relation
     load_page
+    build_keyword_suggestion
     load_associations
     self
   end
@@ -63,6 +65,7 @@ private
     @app = params[:app].presence
     @only_ignored = truthy?(params[:only_ignored])
     @only_read = truthy?(params[:only_read])
+    @only_keyword = truthy?(params[:only_keyword])
     @only_blacklisted = truthy?(params[:only_blacklisted])
     @only_deleted = truthy?(params[:only_deleted])
 
@@ -107,6 +110,7 @@ private
       app: @app,
       only_ignored: @only_ignored,
       only_read: @only_read,
+      only_keyword: @only_keyword,
       only_blacklisted: @only_blacklisted,
       only_deleted: @only_deleted,
       muted_authors_enabled: muted_authors_enabled?,
@@ -125,6 +129,7 @@ private
   def build_mode_counts
     {
       unread: relation_for_mode(:unread).count,
+      keyword: relation_for_mode(:keyword).count,
       read: relation_for_mode(:read).count,
       ignored: relation_for_mode(:ignored).count,
       deleted: relation_for_mode(:deleted).count,
@@ -144,6 +149,7 @@ private
 
   def selected_mode
     return :read if @only_read
+    return :keyword if @only_keyword
     return :ignored if @only_ignored
     return :deleted if @only_deleted
     return :blacklisted if @only_blacklisted
@@ -152,11 +158,13 @@ private
   end
 
   def relation_for_mode(mode)
-    relation = base_filter_relation
+    relation = base_filter_relation(apply_keyword_filter: mode != :keyword)
 
     case mode
     when :read
       without_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
+    when :keyword
+      @query.present? ? keyword_filter(Post.all) : Post.none
     when :ignored
       ignored_relation = without_blacklist_sources(relation.active)
       ignored_relation.where(id: Tag.where(tag: ignored_tags).select(:post_id)).
@@ -197,7 +205,7 @@ private
     "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'account' IN (?))"
   end
 
-  def base_filter_relation(apply_muted_filter: true)
+  def base_filter_relation(apply_muted_filter: true, apply_keyword_filter: true)
     relation = Post.tagged_any(@tag)
     relation = relation.tagged_all(@other_tags) if @other_tags.any?
     relation = relation.where.not(id: Tag.where(tag: @without_tags).select(:post_id)) if @without_tags.any?
@@ -211,17 +219,88 @@ private
       end
     end
 
-    relation = relation.where('body ILIKE ?', "%#{@query}%") if @query
+    relation = keyword_filter(relation) if apply_keyword_filter && @query
     relation = relation.where.not(author: account.reload.muted_authors) if apply_muted_filter && muted_authors_enabled?
     relation = relation.where(id: Tag.where(tag: account.favorite_tags.select(:tag)).select(:post_id)) if only_favorite_tags?
 
     relation
   end
 
+  def keyword_filter(relation, query = @query)
+    terms = keyword_terms_from(query)
+
+    terms.reduce(relation) do |scope, term|
+      pattern = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+      scope.where('(posts.title ILIKE ? OR posts.body ILIKE ?)', pattern, pattern)
+    end
+  end
+
+  def keyword_terms
+    @keyword_terms ||= keyword_terms_from(@query)
+  end
+
+  def keyword_terms_from(query)
+    query.to_s.split(/\s+/).map { |term| term.sub(/\A@+/, '') }.reject(&:blank?)
+  end
+
   def load_page
     @total_count = @all_posts.count
     @posts = @relation.offset((page - 1) * limit).limit(limit).to_a
     @post_ids = @posts.map(&:id)
+  end
+
+  def build_keyword_suggestion
+    @keyword_suggestion = nil
+    return unless selected_mode == :keyword
+    return if total_count.positive?
+    return if keyword_terms.empty?
+
+    @keyword_suggestion = find_keyword_suggestion
+  end
+
+  def find_keyword_suggestion
+    original_terms = keyword_terms
+    target = original_terms.find { |term| term.length >= 3 } || original_terms.first
+    return nil if target.blank?
+
+    candidate_counts = Post.where.not(title: [nil, '']).order(created_at: :desc).limit(2000).pluck(:title).
+      flat_map { |title| title.to_s.downcase.scan(/[a-z0-9][a-z0-9-]{2,}/) }.
+      tally
+
+    candidate_counts.keys.
+      reject { |candidate| candidate == target.downcase }.
+      map { |candidate| [candidate, levenshtein_distance(target.downcase, candidate)] }.
+      select { |_candidate, distance| distance <= suggestion_distance_limit(target) }.
+      sort_by { |candidate, distance| [distance, -candidate_counts.fetch(candidate), candidate] }.
+      map(&:first).
+      find do |candidate|
+        suggestion = original_terms.map { |term| term == target ? candidate : term }.join(' ')
+        return suggestion if keyword_filter(Post.all, suggestion).exists?
+      end
+  end
+
+  def suggestion_distance_limit(term)
+    term.length <= 4 ? 1 : 2
+  end
+
+  def levenshtein_distance(left, right)
+    previous = (0..right.length).to_a
+
+    left.chars.each_with_index do |left_char, left_index|
+      current = [left_index + 1]
+
+      right.chars.each_with_index do |right_char, right_index|
+        current << [
+          current[right_index] + 1,
+          previous[right_index + 1] + 1,
+          previous[right_index] + (left_char == right_char ? 0 : 1)
+        ].min
+      end
+
+      previous = current
+    end
+
+    previous.last
   end
 
   def load_associations

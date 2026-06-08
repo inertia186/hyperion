@@ -18,9 +18,11 @@ const MIN_DESKTOP_PREVIEW_PERCENT = 28
 const MAX_DESKTOP_PREVIEW_PERCENT = 65
 const COMPACT_MODE_SELECTOR_PREVIEW_PERCENT = 50
 
-export default function CurationInbox({session, refreshKey = 0, theme = 'light'}) {
+export default function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', onRefreshVotingPower}) {
   const [query, setQuery] = useState(initialQuery)
   const [draftTag, setDraftTag] = useState('')
+  const [draftQuery, setDraftQuery] = useState('')
+  const [searchMode, setSearchMode] = useState('filters')
   const [postsPayload, setPostsPayload] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
@@ -42,6 +44,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
   const mobilePreviewScrollRef = useRef(null)
   const loadMoreRef = useRef(null)
   const previewRequestRef = useRef(0)
+  const resetKeyRef = useRef(resetKey)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
 
   const posts = postsPayload?.posts || []
@@ -58,6 +61,8 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
   const loadedPostsCount = posts.length
   const hasMorePosts = !!pagination && pagination.page < pagination.total_pages
   const resultCountLabel = postsPayload ? postsResultCountLabel(postsPayload.query, totalPosts, loadedPostsCount, hasMorePosts) : ''
+  const keywordSearchSuggestion = postsPayload && !postsPayload.query?.only_keyword ? keywordSuggestionFromFilterQuery(postsPayload.query) : ''
+  const keywordDidYouMean = postsPayload?.query?.only_keyword ? postsPayload.keyword_suggestion : ''
   const visibleSelectionCount = allMatchingSelected ? totalPosts : selectedPostIds.size
   const allLoadedSelected = posts.length > 0 && posts.every((post) => selectedPostIds.has(post.id))
   const canSelectAllMatching = allLoadedSelected && !allMatchingSelected && totalPosts > loadedPostsCount
@@ -88,6 +93,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
         setAllMatchingSelected(false)
         setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
         setDraftTag(queryInputValue(payload.query))
+        setDraftQuery(payload.query.query || '')
       })
       .catch(handleError)
       .finally(() => setLoading(false))
@@ -225,12 +231,73 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
 
   const submitQuery = (event) => {
     event.preventDefault()
-    updateQuery(parseQueryInput(draftTag))
+    if (searchMode === 'keyword') {
+      updateQuery({
+        tag: '',
+        author: '',
+        query: draftQuery.trim(),
+        only_keyword: true,
+        only_read: false,
+        only_ignored: false,
+        only_deleted: false,
+        only_blacklisted: false
+      })
+      return
+    }
+
+    updateQuery({
+      ...parseQueryInput(draftTag),
+      query: '',
+      only_keyword: false
+    })
   }
 
   const resetQueryInput = () => {
     setDraftTag('')
-    updateQuery({tag: '', author: ''})
+    setDraftQuery('')
+    setSearchMode('filters')
+    updateQuery({tag: '', query: '', author: '', only_keyword: false})
+  }
+
+  useEffect(() => {
+    if (resetKeyRef.current === resetKey) return
+
+    resetKeyRef.current = resetKey
+    resetQueryInput()
+  }, [resetKey])
+
+  const searchKeywordsFromFilters = () => {
+    if (!keywordSearchSuggestion) return
+
+    setSearchMode('keyword')
+    setDraftQuery(keywordSearchSuggestion)
+    updateQuery({
+      tag: '',
+      author: '',
+      query: keywordSearchSuggestion,
+      only_keyword: true,
+      only_read: false,
+      only_ignored: false,
+      only_deleted: false,
+      only_blacklisted: false
+    })
+  }
+
+  const searchKeywordSuggestion = () => {
+    if (!keywordDidYouMean) return
+
+    setSearchMode('keyword')
+    setDraftQuery(keywordDidYouMean)
+    updateQuery({
+      tag: '',
+      author: '',
+      query: keywordDidYouMean,
+      only_keyword: true,
+      only_read: false,
+      only_ignored: false,
+      only_deleted: false,
+      only_blacklisted: false
+    })
   }
 
   const selectedPostRef = useRef(null)
@@ -291,7 +358,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
         const markedPosts = payload.posts.map((item) => item.id === post.id ? {...item, read: result.read} : item)
         const nextPayload = adjustReadCounts(payload, query, post.read ? 0 : 1)
 
-        if (query.only_read) {
+        if (query.only_read || query.only_keyword) {
           const currentIndex = payload.posts.findIndex((item) => item.id === post.id)
           const nextIndex = direction > 0 ? Math.min(currentIndex + 1, payload.posts.length - 1) : Math.max(currentIndex - 1, 0)
           if (payload.posts[nextIndex]) setSelectedId(payload.posts[nextIndex].id)
@@ -306,7 +373,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
     } finally {
       setBusy(false)
     }
-  }, [handleError, query.only_read, selectAfterRemoval])
+  }, [handleError, query.only_keyword, query.only_read, selectAfterRemoval])
 
   const togglePostSelection = (postId) => {
     if (allMatchingSelected) {
@@ -363,7 +430,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
         const readDelta = allMatchingSelected ? result.marked_count ?? markedPostIds.length : markedPostIds.length
         const nextPayload = adjustReadCounts(payload, query, readDelta)
 
-        if (query.only_read) {
+        if (query.only_read || query.only_keyword) {
           return {...nextPayload, posts: markedPosts.map((post) => markedPostIds.includes(post.id) ? {...post, read: true} : post)}
         }
 
@@ -481,6 +548,47 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
     }
   }
 
+  const updatePostChainStats = useCallback((postId, statsPayload, options = {}) => {
+    if (!statsPayload || statsPayload.status !== 'ready') return
+
+    setPostsPayload((payload) => {
+      if (!payload) return payload
+      const payoutFetchedAt = statsPayload.payout_fetched_at ?? (statsPayload.payout ? new Date().toISOString() : null)
+
+      return {
+        ...payload,
+        posts: payload.posts.map((post) => post.id === postId ? {
+          ...post,
+          payout: statsPayload.payout ?? post.payout,
+          payout_amount: statsPayload.payout_amount ?? post.payout_amount,
+          payout_currency: statsPayload.payout_currency ?? post.payout_currency,
+          payout_fetched_at: payoutFetchedAt ?? post.payout_fetched_at,
+          current_vote: statsPayload.current_vote ?? post.current_vote
+        } : post)
+      }
+    })
+    if (options.refreshVotingPower) onRefreshVotingPower?.()
+  }, [onRefreshVotingPower])
+
+  const updatePostPayout = useCallback((postId, payoutPayload) => {
+    if (!payoutPayload || payoutPayload.status !== 'ready') return
+
+    setPostsPayload((payload) => {
+      if (!payload) return payload
+
+      return {
+        ...payload,
+        posts: payload.posts.map((post) => post.id === postId ? {
+          ...post,
+          payout: payoutPayload.payout ?? post.payout,
+          payout_amount: payoutPayload.payout_amount ?? post.payout_amount,
+          payout_currency: payoutPayload.payout_currency ?? post.payout_currency,
+          payout_fetched_at: payoutPayload.payout_fetched_at ?? post.payout_fetched_at
+        } : post)
+      }
+    })
+  }, [])
+
   useEffect(() => {
     if (!selectedId) return
 
@@ -517,14 +625,21 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
     if (isMobilePreviewLayout) openPreview()
   }
 
+  const switchToFilters = () => {
+    setSearchMode('filters')
+    setDraftQuery('')
+  }
+
   const focusTag = (tag) => {
-    updateQuery({tag})
+    switchToFilters()
+    updateQuery({tag, query: '', only_keyword: false})
     if (isMobilePreviewLayout) closePreview()
     setTagsOpen(false)
   }
 
   const focusAuthor = (author) => {
-    updateQuery({author})
+    switchToFilters()
+    updateQuery({author, query: '', only_keyword: false})
     if (isMobilePreviewLayout) closePreview()
     setTagsOpen(false)
   }
@@ -606,6 +721,10 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
             query={query}
             draftTag={draftTag}
             setDraftTag={setDraftTag}
+            draftQuery={draftQuery}
+            setDraftQuery={setDraftQuery}
+            searchMode={searchMode}
+            setSearchMode={setSearchMode}
             submitQuery={submitQuery}
             resetQueryInput={resetQueryInput}
             updateQuery={updateQuery}
@@ -651,7 +770,24 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
             {loading ? (
               <PostListSkeleton />
             ) : posts.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">All caught up for this view.</div>
+              <div className="px-4 py-12 text-center text-sm text-slate-500">
+                <div>All caught up for this view.</div>
+                {keywordSearchSuggestion && (
+                  <div className="mt-3">
+                    <button className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={searchKeywordsFromFilters}>
+                      Search keywords for "{keywordSearchSuggestion}"
+                    </button>
+                  </div>
+                )}
+                {keywordDidYouMean && (
+                  <div className="mt-3">
+                    <span className="mr-2">Did you mean:</span>
+                    <button className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={searchKeywordSuggestion}>
+                      {keywordDidYouMean}
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <PostList
                 posts={posts}
@@ -663,6 +799,7 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
                 onToggleSelected={togglePostSelection}
                 onSelectTag={focusTag}
                 onSelectAuthor={focusAuthor}
+                onPayoutRefresh={updatePostPayout}
               />
             )}
           </div>
@@ -700,10 +837,9 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
               onPrevious={() => moveSelection(-1)}
               onNext={() => moveSelection(1)}
               onMarkReadNext={markSelectedReadAndMoveNext}
-              onFocusPreview={openPreview}
-              onFocusList={closePreview}
               onSelectTag={focusTag}
               onSelectAuthor={focusAuthor}
+              onChainStatsRefresh={updatePostChainStats}
               readBusy={busy}
               hasPrevious={selectedIndex > 0}
               hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
@@ -725,10 +861,9 @@ export default function CurationInbox({session, refreshKey = 0, theme = 'light'}
         onPrevious={() => moveSelection(-1)}
         onNext={() => moveSelection(1)}
         onMarkReadNext={markSelectedReadAndMoveNext}
-        onFocusPreview={openPreview}
-        onFocusList={closePreview}
         onSelectTag={focusTag}
         onSelectAuthor={focusAuthor}
+        onChainStatsRefresh={updatePostChainStats}
         readBusy={busy}
         hasPrevious={selectedIndex > 0}
         hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
@@ -826,10 +961,9 @@ function MobilePreviewDrawer({
   onPrevious,
   onNext,
   onMarkReadNext,
-  onFocusPreview,
-  onFocusList,
   onSelectTag,
   onSelectAuthor,
+  onChainStatsRefresh,
   readBusy,
   hasPrevious,
   hasNext
@@ -852,10 +986,9 @@ function MobilePreviewDrawer({
             onPrevious={onPrevious}
             onNext={onNext}
             onMarkReadNext={onMarkReadNext}
-            onFocusPreview={onFocusPreview}
-            onFocusList={onFocusList}
             onSelectTag={onSelectTag}
             onSelectAuthor={onSelectAuthor}
+            onChainStatsRefresh={onChainStatsRefresh}
             readBusy={readBusy}
             hasPrevious={hasPrevious}
             hasNext={hasNext}
@@ -937,6 +1070,10 @@ function parseQueryInput(value) {
   }
 }
 
+function keywordSuggestionFromFilterQuery(query = {}) {
+  return [query.tag, ...(query.other_tags || [])].filter(Boolean).join(' ').trim()
+}
+
 function adjustReadCounts(payload, query, readDelta) {
   if (!readDelta || query.only_read) return payload
 
@@ -945,7 +1082,7 @@ function adjustReadCounts(payload, query, readDelta) {
     read_posts: Math.max((payload.counts.read_posts || 0) + readDelta, 0)
   } : payload.counts
 
-  if (query.only_ignored || query.only_deleted || query.only_blacklisted) {
+  if (query.only_keyword || query.only_ignored || query.only_deleted || query.only_blacklisted) {
     return {...payload, counts}
   }
 
@@ -969,7 +1106,7 @@ function adjustReadCounts(payload, query, readDelta) {
 }
 
 function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {
-  const noun = query.only_read ? 'read posts' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
+  const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
   const loadedSuffix = hasMorePosts ? ` · ${loadedPostsCount} loaded` : ''
 
   return `${totalPosts} ${noun}${loadedSuffix}`

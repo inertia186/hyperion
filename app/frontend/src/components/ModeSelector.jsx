@@ -1,9 +1,9 @@
 const modeOptions = [
-  {key: 'unread', countKey: 'unread', label: 'Unread', updates: {only_read: false, only_ignored: false, only_deleted: false, only_blacklisted: false}},
-  {key: 'only_read', countKey: 'read', label: 'Read', updates: {only_read: true, only_ignored: false, only_deleted: false, only_blacklisted: false}},
-  {key: 'only_ignored', countKey: 'ignored', label: 'Ignored', updates: {only_ignored: true, only_read: false, only_deleted: false, only_blacklisted: false}},
-  {key: 'only_deleted', countKey: 'deleted', label: 'Deleted', updates: {only_deleted: true, only_read: false, only_ignored: false, only_blacklisted: false}},
-  {key: 'only_blacklisted', countKey: 'blacklisted', label: 'Blacklisted', updates: {only_blacklisted: true, only_read: false, only_ignored: false, only_deleted: false}}
+  {key: 'unread', countKey: 'unread', label: 'Unread', updates: {only_read: false, only_keyword: false, only_ignored: false, only_deleted: false, only_blacklisted: false}},
+  {key: 'only_read', countKey: 'read', label: 'Read', updates: {only_read: true, only_keyword: false, only_ignored: false, only_deleted: false, only_blacklisted: false}},
+  {key: 'only_ignored', countKey: 'ignored', label: 'Ignored', updates: {only_ignored: true, only_read: false, only_keyword: false, only_deleted: false, only_blacklisted: false}},
+  {key: 'only_deleted', countKey: 'deleted', label: 'Deleted', updates: {only_deleted: true, only_read: false, only_keyword: false, only_ignored: false, only_blacklisted: false}},
+  {key: 'only_blacklisted', countKey: 'blacklisted', label: 'Blacklisted', updates: {only_blacklisted: true, only_read: false, only_keyword: false, only_ignored: false, only_deleted: false}}
 ]
 
 export function activeModeKey(query) {

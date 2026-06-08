@@ -11,11 +11,13 @@ export const SORTS = [
 
 export const initialQuery = {
   tag: '',
+  query: '',
   author: '',
   sort: 'latest',
   limit: '30',
   page: '1',
   only_read: false,
+  only_keyword: false,
   only_ignored: false,
   only_deleted: false,
   only_blacklisted: false

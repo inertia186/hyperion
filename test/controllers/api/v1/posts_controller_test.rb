@@ -34,6 +34,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal(
       {
         'unread' => 2,
+        'keyword' => 0,
         'read' => 1,
         'ignored' => 1,
         'deleted' => 1,
@@ -50,6 +51,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal(
       {
         'unread' => 2,
+        'keyword' => 0,
         'read' => 1,
         'ignored' => 0,
         'deleted' => 1,
@@ -82,6 +84,39 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 2, response_json.fetch('mode_counts').fetch('unread')
     assert_equal 2, response_json.fetch('mode_counts').fetch('ignored')
     assert_equal 30, response_json.dig('query', 'minimum_reputation')
+  end
+
+  test 'keyword mode searches titles and bodies without curation filters' do
+    posts(:allowed_unread).update!(body: 'A post about needlecraft and curation.')
+    posts(:read_allowed).update!(body: 'A read post about needlecraft.')
+    posts(:ignored_unread).update!(body: 'Ignored needlecraft post.')
+    posts(:blacklisted_allowed).update!(body: 'Blacklisted needlecraft post.')
+
+    get :index, params: {only_keyword: true, query: 'needlecraft', tag: 'haf', sort: 'latest', limit: 30}
+
+    assert_response :success
+    assert_equal true, response_json.dig('query', 'only_keyword')
+    assert_equal 4, response_json.fetch('mode_counts').fetch('keyword')
+    assert_equal ['Allowed Unread', 'Blacklisted Allowed', 'Ignored Unread', 'Read Allowed'], response_json.fetch('posts').map { |post| post.fetch('title') }.sort
+  end
+
+  test 'keyword mode treats leading at signs as user mention syntax' do
+    posts(:allowed_unread).update!(body: 'This post mentions alice without the punctuation.')
+
+    get :index, params: {only_keyword: true, query: '@alice', sort: 'latest', limit: 30}
+
+    assert_response :success
+    assert_includes response_json.fetch('posts').map { |post| post.fetch('title') }, 'Allowed Unread'
+  end
+
+  test 'empty keyword mode suggests a nearby keyword with results' do
+    posts(:allowed_unread).update!(title: 'Needlecraft Notes')
+
+    get :index, params: {only_keyword: true, query: 'nedlecraft', sort: 'latest', limit: 30}
+
+    assert_response :success
+    assert_empty response_json.fetch('posts')
+    assert_equal 'needlecraft', response_json.fetch('keyword_suggestion')
   end
 
   test 'ignored view includes posts below minimum reputation' do

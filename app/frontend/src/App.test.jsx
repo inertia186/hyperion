@@ -235,32 +235,38 @@ let votingPowerPayload
 let votingPowerFailure
 let chainStatsPayload
 let chainStatsResponses
+let payoutResponses
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
+  const query = params.get('query') || ''
   const author = params.get('author') || ''
   const page = Number(params.get('page') || 1)
   const limit = Number(params.get('limit') || 30)
-  const filteredPosts = emptyTags.has(tag) ? [] : currentPosts
+  const onlyKeyword = params.get('only_keyword') === 'true'
+  const filteredPosts = onlyKeyword && query === 'frist' ? [] : emptyTags.has(tag) ? [] : currentPosts
   const pagePosts = filteredPosts.slice((page - 1) * limit, page * limit)
 
   return {
     query: {
       tag,
       tag_pattern: tag,
+      query,
       author,
       muted_authors_enabled: false,
       only_favorite_tags: onlyFavoriteTagsEnabled,
       sort: params.get('sort') || 'latest',
       limit,
       only_read: params.get('only_read') === 'true',
+      only_keyword: onlyKeyword,
       only_ignored: params.get('only_ignored') === 'true',
       only_deleted: params.get('only_deleted') === 'true',
       only_blacklisted: params.get('only_blacklisted') === 'true',
       minimum_reputation: minimumReputation
     },
+    keyword_suggestion: onlyKeyword && query === 'frist' ? 'first' : null,
     pagination: {page, limit, total_count: filteredPosts.length, total_pages: Math.max(Math.ceil(filteredPosts.length / limit), 1)},
-    mode_counts: {unread: filteredPosts.length, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
+    mode_counts: {unread: filteredPosts.length, keyword: query ? filteredPosts.length : 0, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
     posts: pagePosts,
     related_tags: [{name: 'haf', tag: 'haf', count: 24}, {name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png', count: 6}],
     related_authors: ['visible-author'],
@@ -298,6 +304,7 @@ describe('App', () => {
     votingPowerFailure = false
     chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 10000}
     chainStatsResponses = new Map()
+    payoutResponses = new Map()
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
@@ -406,7 +413,9 @@ describe('App', () => {
 
       const payoutMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/payout(?:\?(.*))?$/)
       if (payoutMatch) {
-        return jsonResponse({status: 'ready', payout: '1.234 HBD'})
+        const id = Number(payoutMatch[1])
+        const payload = payoutResponses.get(id) || {status: 'ready', payout: '1.234 HBD', payout_amount: '1.234', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString()}
+        return jsonResponse(payload)
       }
 
       const readMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)\/read$/)
@@ -812,12 +821,12 @@ describe('App', () => {
 
     expect(screen.getByText('30 selected.')).toBeInTheDocument()
     expect(screen.getByRole('button', {name: 'Select all 31 posts in this filter.'})).toBeInTheDocument()
-    expect(screen.getByRole('button', {name: /Mark selected read/})).toHaveTextContent('30')
+    expect(screen.getByRole('button', {name: /Mark as Read/})).toHaveTextContent('30')
 
     fireEvent.click(screen.getByRole('button', {name: 'Select all 31 posts in this filter.'}))
 
     expect(screen.getByText('All 31 posts in this filter selected.')).toBeInTheDocument()
-    expect(screen.getByRole('button', {name: /Mark selected read/})).toHaveTextContent('31')
+    expect(screen.getByRole('button', {name: /Mark as Read/})).toHaveTextContent('31')
   })
 
   test('marks all matching posts read with the current query instead of loaded ids', async () => {
@@ -830,7 +839,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', {name: 'Select loaded posts'}))
     fireEvent.click(screen.getByRole('button', {name: 'Select all 31 posts in this filter.'}))
-    fireEvent.click(screen.getByRole('button', {name: /Mark selected read/}))
+    fireEvent.click(screen.getByRole('button', {name: /Mark as Read/}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/read', expect.objectContaining({method: 'PATCH'})))
     const bulkCall = global.fetch.mock.calls.find(([url]) => url === '/api/v1/posts/read')
@@ -849,7 +858,7 @@ describe('App', () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
     expect(screen.getByText('Select loaded posts for bulk actions.')).toBeInTheDocument()
-    expect(screen.getByRole('button', {name: 'Mark selected read'})).toBeDisabled()
+    expect(screen.getByRole('button', {name: 'Mark as Read'})).toBeEnabled()
   })
 
   test('row toggles leave all matching mode for loaded row selection', async () => {
@@ -869,7 +878,7 @@ describe('App', () => {
     await renderApp()
 
     await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
-    expect(screen.getByText('Replies: 2')).toBeInTheDocument()
+    expect(screen.getByRole('link', {name: 'Replies: 2'})).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/post-1#comments')
     expect(screen.getAllByText('1.234 HBD').length).toBeGreaterThan(1)
     expect(screen.getByRole('link', {name: /canonical.example/i})).toHaveAttribute('href', 'https://canonical.example/1')
     expect(screen.queryByRole('link', {name: /^Canonical$/i})).not.toBeInTheDocument()
@@ -887,10 +896,21 @@ describe('App', () => {
       '/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post'
     ])
     expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)).toEqual([
-      '/api/v1/posts/1/payout?author=visible-author&permlink=first-post',
-      '/api/v1/posts/2/payout?author=middle-author&permlink=middle-post',
-      '/api/v1/posts/3/payout?author=last-author&permlink=last-post'
+      '/api/v1/posts/1/payout?',
+      '/api/v1/posts/2/payout?',
+      '/api/v1/posts/3/payout?'
     ])
+  })
+
+  test('uses preview chain stats payout to update the selected list row', async () => {
+    installIntersectionObserverMock()
+    chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '7.000 HBD', payout_amount: '7.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString(), current_vote: 10000}
+
+    await renderApp()
+
+    await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
+    await waitFor(() => expect(within(document.querySelector('[data-post-list-row="1"]')).getByText('7.000 HBD')).toBeInTheDocument())
+    expect(global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout'))).toEqual([])
   })
 
   test('loads preview body before requesting preview chain stats', async () => {
@@ -945,14 +965,16 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
     expect(payoutUrls()).toEqual([])
-    expect(firstPayout).toHaveTextContent('...')
+    await waitFor(() => expect(firstPayout).toHaveTextContent('1.234 HBD'))
     expect(firstThumbnail).not.toHaveAttribute('src')
     expect(secondThumbnail).not.toHaveAttribute('src')
     expect(visibility.observers.every((observer) => observer.options.root === null && observer.options.rootMargin === '0px')).toBe(true)
 
     visibility.trigger(firstPayout)
-    await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/1/payout?author=visible-author&permlink=first-post']))
-    await waitFor(() => expect(firstPayout).toHaveTextContent('1.234 HBD'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(payoutUrls()).toEqual([])
     expect(secondPayout).toHaveTextContent('...')
 
     visibility.trigger(firstThumbnail)
@@ -964,6 +986,75 @@ describe('App', () => {
 
     fireEvent.error(secondThumbnail)
     expect(secondThumbnail).toHaveAttribute('src', 'data:image/gif;base64,R0lGODdhAQABAAAAACw=')
+  })
+
+  test('uses fresh persisted list payouts without fetching them again', async () => {
+    const visibility = installIntersectionObserverMock()
+    currentPosts = [
+      {...posts[0], payout: '5.000 HBD', payout_amount: '5.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString()},
+      posts[1],
+      posts[2]
+    ]
+
+    await renderApp()
+
+    const payoutUrls = () => global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)
+    const firstPayout = screen.getByTestId('post-payout-1')
+    const secondPayout = screen.getByTestId('post-payout-2')
+
+    expect(firstPayout).toHaveTextContent('5.000 HBD')
+    visibility.trigger(firstPayout)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(payoutUrls()).toEqual([])
+
+    visibility.trigger(secondPayout)
+    await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/2/payout?']))
+  })
+
+  test('skips payout fetches for rows marked payout unavailable', async () => {
+    const visibility = installIntersectionObserverMock()
+    currentPosts = [
+      {...posts[0], payout_unavailable_at: new Date().toISOString()},
+      posts[1],
+      posts[2]
+    ]
+
+    await renderApp()
+
+    const payoutUrls = () => global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)
+    const firstPayout = screen.getByTestId('post-payout-1')
+    const secondPayout = screen.getByTestId('post-payout-2')
+
+    visibility.trigger(firstPayout)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(payoutUrls()).toEqual([])
+
+    visibility.trigger(secondPayout)
+    await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/2/payout?']))
+  })
+
+  test('refreshes stale list payout in place without reordering the loaded rows', async () => {
+    const visibility = installIntersectionObserverMock()
+    currentPosts = [
+      {...posts[0], payout: '1.000 HBD', payout_amount: '1.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString()},
+      {...posts[1], payout: '9.000 HBD', payout_amount: '9.000', payout_currency: 'HBD', payout_fetched_at: new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString()},
+      posts[2]
+    ]
+    payoutResponses.set(2, {status: 'ready', payout: '10.000 HBD', payout_amount: '10.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString()})
+
+    await renderApp()
+
+    const rowTitles = () => [...document.querySelectorAll('[data-post-list-row]')].map((row) => row.querySelector('.min-w-0 > button').textContent)
+    expect(rowTitles()).toEqual(['First Post', 'Middle Post', 'Last Post'])
+
+    visibility.trigger(screen.getByTestId('post-payout-2'))
+
+    await waitFor(() => expect(within(document.querySelector('[data-post-list-row="2"]')).getByText('10.000 HBD')).toBeInTheDocument())
+    expect(rowTitles()).toEqual(['First Post', 'Middle Post', 'Last Post'])
   })
 
   test('uses Bootstrap-style post list columns with expandable tags', async () => {
@@ -1145,16 +1236,19 @@ describe('App', () => {
     })
 
     chainStatsPayload = {status: 'ready', votes: 3, replies: 2, payout: '2.000 HBD', current_vote: 4200}
+    votingPowerPayload = {status: 'ready', value: 9840, percent: 98.4, fetched_at: '2026-06-01T12:01:00Z'}
     act(() => vi.advanceTimersByTime(7000))
     await act(async () => {
       await Promise.resolve()
       await Promise.resolve()
     })
+    vi.useRealTimers()
 
     expect(screen.getByText('Votes: 3')).toBeInTheDocument()
-    expect(screen.getByText('2.000 HBD')).toBeInTheDocument()
+    expect(screen.getAllByText('2.000 HBD').length).toBeGreaterThanOrEqual(2)
+    await waitFor(() => expect(within(document.querySelector('[data-post-list-row="1"]')).getByText('2.000 HBD')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Current voting power')).toHaveTextContent('VP 98.4%'))
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
-    vi.useRealTimers()
   })
 
   test('casts hivesigner downvotes in a signing modal', async () => {
@@ -1236,6 +1330,68 @@ describe('App', () => {
       expect.stringContaining('author=author'),
       expect.any(Object)
     ))
+  })
+
+  test('submits keyword terms and switches to keyword mode', async () => {
+    window.localStorage.setItem('hyperion.desktopPreviewPercent', '45')
+
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    expect(screen.queryByRole('group', {name: 'View mode'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', {name: 'Ignore tag'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', {name: 'Mute'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', {name: 'Favorites'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', {name: 'Tags'})).not.toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'hive engine'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=hive+engine'), expect.any(Object)))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_keyword=true'), expect.any(Object)))
+  })
+
+  test('keeps the keyword form selected when the initial filters response finishes late', async () => {
+    const originalFetch = global.fetch
+    let resolvePosts
+
+    global.fetch = vi.fn((url, options = {}) => {
+      if (url.toString().startsWith('/api/v1/posts?')) {
+        return new Promise((resolve) => {
+          resolvePosts = () => resolve(jsonResponse(postsPayload(new URLSearchParams(url.toString().split('?')[1]))))
+        })
+      }
+
+      return originalFetch(url, options)
+    })
+
+    await renderApp({waitForPreview: false})
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    expect(screen.getByPlaceholderText('title or body keywords')).toBeInTheDocument()
+
+    await act(async () => resolvePosts())
+    await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
+
+    expect(screen.getByPlaceholderText('title or body keywords')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('photography @author app:peakd -contests')).not.toBeInTheDocument()
+  })
+
+  test('suggests a working keyword when keyword search is empty', async () => {
+    window.localStorage.setItem('hyperion.desktopPreviewPercent', '45')
+
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'frist'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+
+    await waitFor(() => expect(screen.getByText('All caught up for this view.')).toBeInTheDocument())
+    expect(screen.getByText('Did you mean:')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'first'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
+    await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
+    expect(screen.getByPlaceholderText('title or body keywords')).toHaveValue('first')
   })
 
   test('supports the Hyperion Goes Live tag discovery and favorites workflow', async () => {
@@ -1322,11 +1478,17 @@ describe('App', () => {
   test('focuses the query from a preview tag', async () => {
     await renderApp()
 
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'needlecraft'}})
+
     const previewTags = screen.getByTestId('preview-tags-1')
     fireEvent.click(within(previewTags).getByRole('button', {name: 'Expand tags for preview First Post'}))
     fireEvent.click(within(previewTags).getByRole('button', {name: 'Focus tag haf'}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('only_keyword=true'), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('haf')
+    expect(screen.queryByPlaceholderText('title or body keywords')).not.toBeInTheDocument()
   })
 
   test('focuses the query from a preview author', async () => {
@@ -1363,6 +1525,19 @@ describe('App', () => {
     expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('')
   })
 
+  test('clicking the Hyperion heading resets the query', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Focus tag curation'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('curation')
+
+    fireEvent.click(screen.getByRole('button', {name: 'Hyperion'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('tag='), expect.any(Object)))
+    expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('')
+  })
+
   test('updates sort and mutually exclusive desktop mode selector', async () => {
     window.localStorage.setItem('hyperion.desktopPreviewPercent', '45')
 
@@ -1370,11 +1545,16 @@ describe('App', () => {
 
     fireEvent.change(screen.getByLabelText('Sort posts'), {target: {value: 'oldest'}})
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sort=oldest'), expect.any(Object)))
+    fireEvent.change(screen.getByLabelText('Sort posts'), {target: {value: 'highest_payout'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sort=highest_payout'), expect.any(Object)))
+    fireEvent.change(screen.getByLabelText('Sort posts'), {target: {value: 'lowest_payout'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sort=lowest_payout'), expect.any(Object)))
 
-    fireEvent.click(screen.getByRole('button', {name: /Read/}))
+    const viewMode = within(screen.getByRole('group', {name: 'View mode'}))
+    fireEvent.click(viewMode.getByRole('button', {name: /Read/}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_read=true'), expect.any(Object)))
 
-    fireEvent.click(screen.getByRole('button', {name: /Ignored/}))
+    fireEvent.click(viewMode.getByRole('button', {name: /Ignored/}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_ignored=true'), expect.any(Object)))
     expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('only_read=true'), expect.any(Object))
   })
@@ -1384,11 +1564,12 @@ describe('App', () => {
 
     await renderApp()
 
-    expect(screen.getByRole('button', {name: /Unread/})).toHaveTextContent('3')
-    expect(screen.getByRole('button', {name: /Read/})).toHaveTextContent('1')
-    expect(screen.getByRole('button', {name: /Ignored/})).toHaveTextContent('2')
-    expect(screen.getByRole('button', {name: /Deleted/})).toHaveTextContent('3')
-    expect(screen.getByRole('button', {name: /Blacklisted/})).toHaveTextContent('4')
+    const viewMode = within(screen.getByRole('group', {name: 'View mode'}))
+    expect(viewMode.getByRole('button', {name: /Unread/})).toHaveTextContent('3')
+    expect(viewMode.getByRole('button', {name: /Read/})).toHaveTextContent('1')
+    expect(viewMode.getByRole('button', {name: /Ignored/})).toHaveTextContent('2')
+    expect(viewMode.getByRole('button', {name: /Deleted/})).toHaveTextContent('3')
+    expect(viewMode.getByRole('button', {name: /Blacklisted/})).toHaveTextContent('4')
   })
 
   test('uses compact mobile mode dropdown', async () => {
@@ -1430,8 +1611,11 @@ describe('App', () => {
   test('uses row checkboxes for bulk selection instead of read toggles', async () => {
     await renderApp()
 
-    const markSelected = screen.getByRole('button', {name: 'Mark selected read'})
-    expect(markSelected).toBeDisabled()
+    const markSelected = screen.getByRole('button', {name: 'Mark as Read'})
+    expect(markSelected).toBeEnabled()
+    fireEvent.click(markSelected)
+    expect(screen.getByText('Select posts first.')).toBeInTheDocument()
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/v1/posts/read', expect.any(Object))
 
     fireEvent.click(screen.getByRole('button', {name: 'Select Middle Post'}))
 
@@ -1449,7 +1633,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', {name: 'Select First Post'}))
     fireEvent.click(screen.getByRole('button', {name: 'Select Last Post'}))
-    fireEvent.click(screen.getByRole('button', {name: /Mark selected read/}))
+    fireEvent.click(screen.getByRole('button', {name: /Mark as Read/}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/read', expect.objectContaining({
       method: 'PATCH',
@@ -1459,10 +1643,11 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByText('First Post')).not.toBeInTheDocument())
     expect(screen.queryByText('Last Post')).not.toBeInTheDocument()
     expect(screen.getAllByText('Middle Post').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', {name: 'Mark selected read'})).toBeDisabled()
+    expect(screen.getByRole('button', {name: 'Mark as Read'})).toBeEnabled()
     expect(screen.getByText('1 unread posts')).toBeInTheDocument()
-    expect(screen.getByRole('button', {name: /Unread/})).toHaveTextContent('1')
-    expect(screen.getByRole('button', {name: /Read/})).toHaveTextContent('3')
+    const viewMode = within(screen.getByRole('group', {name: 'View mode'}))
+    expect(viewMode.getByRole('button', {name: /Unread/})).toHaveTextContent('1')
+    expect(viewMode.getByRole('button', {name: /Read/})).toHaveTextContent('3')
   })
 
   test('keeps selected rows visible when marking read in read mode', async () => {
@@ -1472,14 +1657,14 @@ describe('App', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_read=true'), expect.any(Object)))
 
     fireEvent.click(screen.getByRole('button', {name: 'Select First Post'}))
-    fireEvent.click(screen.getByRole('button', {name: /Mark selected read/}))
+    fireEvent.click(screen.getByRole('button', {name: /Mark as Read/}))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/read', expect.objectContaining({
       method: 'PATCH',
       body: JSON.stringify({post_ids: [1]})
     })))
     expect(screen.getAllByText('First Post').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', {name: 'Mark selected read'})).toBeDisabled()
+    expect(screen.getByRole('button', {name: 'Mark as Read'})).toBeEnabled()
   })
 
   test('moves selection with j/down and k/up shortcuts', async () => {
@@ -1549,14 +1734,15 @@ describe('App', () => {
   test('toggles preview focus with enter and escape', async () => {
     await renderApp()
 
-    expect(screen.getByText('Preview focus')).toBeInTheDocument()
+    expect(screen.queryByText('Preview focus')).not.toBeInTheDocument()
     expect(screen.getByText(/\? shortcuts/)).toBeInTheDocument()
+    expect(screen.getByTestId('preview-pane')).not.toHaveClass('ring-2')
 
     fireEvent.keyDown(document, {key: 'Enter'})
-    await waitFor(() => expect(screen.getByText('List focus')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('preview-pane')).toHaveClass('ring-2'))
 
     fireEvent.keyDown(document, {key: 'Escape'})
-    await waitFor(() => expect(screen.getByText('Preview focus')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('preview-pane')).not.toHaveClass('ring-2'))
   })
 
   test('opens and closes the selected post in a mobile preview drawer', async () => {
@@ -1765,7 +1951,11 @@ describe('App', () => {
     fireEvent.click(within(relatedSection).getByRole('button', {name: 'haf'}))
 
     await waitFor(() => expect(screen.getByText('All caught up for this view.')).toBeInTheDocument())
-    expect(screen.getByText('Select a post.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', {name: 'Search keywords for "haf"'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=haf'), expect.any(Object)))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_keyword=true'), expect.any(Object)))
+    expect(screen.getByPlaceholderText('title or body keywords')).toHaveValue('haf')
+    await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
     expect(screen.getByText('Hyperion')).toBeInTheDocument()
   })
 
@@ -2024,7 +2214,7 @@ describe('App', () => {
     await renderApp()
 
     fireEvent.keyDown(document, {key: 'Enter'})
-    await waitFor(() => expect(screen.getByText('List focus')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('preview-pane')).toHaveClass('ring-2'))
 
     const previewPane = screen.getByText('Preview 1').closest('[tabindex="-1"]')
     Object.defineProperties(previewPane, {
