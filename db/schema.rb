@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_01_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_05_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -87,6 +87,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_01_002000) do
     t.datetime "created_at", null: false
     t.datetime "deleted_at", precision: nil
     t.json "metadata", default: {}, null: false
+    t.string "payout"
+    t.decimal "payout_amount", precision: 12, scale: 3
+    t.string "payout_currency"
+    t.datetime "payout_fetched_at"
+    t.datetime "payout_unavailable_at"
     t.string "permlink", null: false
     t.integer "tags_count", default: 0, null: false
     t.string "title", null: false
@@ -99,6 +104,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_01_002000) do
     t.index ["blacklisted", "created_at"], name: "index_posts_active_listing", order: { created_at: :desc }, where: "(deleted_at IS NULL)"
     t.index ["category"], name: "index_community_on_posts", where: "((category)::text ~~ 'hive-%'::text)"
     t.index ["deleted_at", "created_at"], name: "index_posts_deleted_listing", order: { created_at: :desc }
+    t.index ["payout_amount"], name: "index_posts_on_payout_amount"
+    t.index ["payout_fetched_at"], name: "index_posts_on_payout_fetched_at"
+    t.index ["payout_unavailable_at"], name: "index_posts_on_payout_unavailable_at"
   end
 
   create_table "read_posts", force: :cascade do |t|

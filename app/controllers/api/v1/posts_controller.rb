@@ -72,12 +72,11 @@ class Api::V1::PostsController < Api::V1::BaseController
 
   def chain_stats
     post = Post.find(params[:id])
-    author = params[:author].presence || post.author
-    permlink = params[:permlink].presence || post.permlink
+    author, permlink = chain_identity(post)
 
-    render json: chain_stats_json(author, permlink)
+    render json: chain_stats_json(post, author, permlink)
   rescue StandardError => e
-    Rails.logger.warn "Unable to fetch chain stats for post #{params[:id]}: #{e.class}: #{e.message}"
+    log_chain_fetch_error(:chain_stats, e)
     render json: {
       status: 'unavailable',
       votes: nil,
@@ -89,12 +88,11 @@ class Api::V1::PostsController < Api::V1::BaseController
 
   def payout
     post = Post.find(params[:id])
-    author = params[:author].presence || post.author
-    permlink = params[:permlink].presence || post.permlink
+    author, permlink = chain_identity(post, allow_override: false)
 
-    render json: payout_json(author, permlink)
+    render json: payout_json(post, author, permlink)
   rescue StandardError => e
-    Rails.logger.warn "Unable to fetch payout for post #{params[:id]}: #{e.class}: #{e.message}"
+    log_chain_fetch_error(:payout, e)
     render json: {
       status: 'unavailable',
       payout: nil
@@ -139,18 +137,52 @@ private
     value == true || value.to_s == 'true' || value.to_s == '1'
   end
 
-  def chain_stats_json(author, permlink)
+  def chain_identity(post, allow_override: true)
+    author = allow_override ? params[:author].presence : nil
+    permlink = allow_override ? params[:permlink].presence : nil
+
+    return [author, permlink] if valid_chain_identity?(author, permlink)
+
+    [post.author, post.permlink]
+  end
+
+  def valid_chain_identity?(author, permlink)
+    author.to_s.match?(/\A[a-z0-9](?:[a-z0-9.-]{1,14}[a-z0-9])?\z/) &&
+      permlink.to_s.match?(/\A[a-z0-9][a-z0-9-]{0,255}\z/)
+  end
+
+  def log_chain_fetch_error(endpoint, error)
+    message = "Unable to fetch #{endpoint.to_s.tr('_', ' ')} for post #{params[:id]}: #{error.class}: #{error.message}"
+
+    if expected_chain_fetch_error?(error)
+      Rails.logger.debug message
+    else
+      Rails.logger.warn message
+    end
+  end
+
+  def expected_chain_fetch_error?(error)
+    error.is_a?(Timeout::Error) ||
+      (defined?(Hive::ArgumentError) && error.is_a?(Hive::ArgumentError))
+  end
+
+  def chain_stats_json(post, author, permlink)
     payload = cached_chain_stats_payload(author, permlink)
     votes = payload.fetch(:votes)
     replies = payload.fetch(:replies)
     content = payload.fetch(:content)
     current_vote = Array(votes).find { |vote| chain_value(vote, :voter) == current_account.name }
+    payout = payout_value(content)
+    persist_payout(post, payout)
 
     {
       status: 'ready',
       votes: Array(votes).count { |vote| chain_value(vote, :percent).to_i > 0 },
       replies: Array(replies).size,
-      payout: payout_value(content),
+      payout: payout,
+      payout_amount: post.payout_amount&.to_s,
+      payout_currency: post.payout_currency,
+      payout_fetched_at: post.payout_fetched_at&.iso8601,
       current_vote: chain_value(current_vote, :percent)
     }
   end
@@ -178,11 +210,22 @@ private
     end
   end
 
-  def payout_json(author, permlink)
+  def payout_json(post, author, permlink)
+    content = cached_payout_content(author, permlink)
+    payout = payout_value(content)
+    persist_payout(post, payout)
+
     {
-      status: 'ready',
-      payout: payout_value(cached_payout_content(author, permlink))
+      status: content.present? ? 'ready' : 'unavailable',
+      payout: payout,
+      payout_amount: post.payout_amount&.to_s,
+      payout_currency: post.payout_currency,
+      payout_fetched_at: post.payout_fetched_at&.iso8601
     }
+  end
+
+  def persist_payout(post, payout)
+    post.capture_payout!(payout) if payout.present?
   end
 
   def cached_payout_content(author, permlink)
@@ -254,6 +297,11 @@ private
       blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
       blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
       author_reputation: display_post.author_reputation,
+      payout: post.payout,
+      payout_amount: post.payout_amount&.to_s,
+      payout_currency: post.payout_currency,
+      payout_fetched_at: post.payout_fetched_at&.iso8601,
+      payout_unavailable_at: post.payout_unavailable_at&.iso8601,
       read: result.read_post_ids.include?(post.id),
       muted_author: current_account.muted_authors.include?(display_post.author)
     }

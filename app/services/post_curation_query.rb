@@ -2,7 +2,7 @@ require 'set'
 
 class PostCurationQuery
   TAG_CLOUD_LIMIT = 250
-  SORTS = %w(latest oldest most_tags least_tags most_prolific least_prolific).freeze
+  SORTS = %w(latest oldest most_tags least_tags most_prolific least_prolific highest_payout lowest_payout).freeze
   DEFAULT_SORT = 'latest'
   DEFAULT_LIMIT = 30
 
@@ -290,6 +290,8 @@ private
     when 'least_tags' then scope.order_by_tag_count(:asc)
     when 'most_prolific' then scope.order_by_prolific(@tag, :DESC)
     when 'least_prolific' then scope.order_by_prolific(@tag, :ASC)
+    when 'highest_payout' then scope.order_by_payout(:desc)
+    when 'lowest_payout' then scope.order_by_payout(:asc)
     else scope
     end
   end

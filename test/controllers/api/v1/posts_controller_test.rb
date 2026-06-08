@@ -171,7 +171,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
   test 'post list image payload includes body image avatar and placeholder' do
-    posts(:allowed_unread).update!(body: 'body https://example.com/allowed.png', metadata: {tags: %w(haf hive-13323)})
+    posts(:allowed_unread).update!(
+      body: 'body https://example.com/allowed.png',
+      metadata: {tags: %w(haf hive-13323)},
+      payout: '1.234 HBD',
+      payout_amount: 1.234,
+      payout_currency: 'HBD',
+      payout_fetched_at: Time.zone.parse('2026-06-04T12:00:00Z'),
+      payout_unavailable_at: Time.zone.parse('2026-06-05T12:00:00Z')
+    )
 
     get :index, params: {sort: 'latest', limit: 30}
 
@@ -182,6 +190,31 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert post.fetch('placeholder_image_url').starts_with?('data:image/gif')
     assert_not post.key?('body')
     assert_equal 25, post.fetch('author_reputation')
+    assert_equal '1.234 HBD', post.fetch('payout')
+    assert_equal '1.234', post.fetch('payout_amount')
+    assert_equal 'HBD', post.fetch('payout_currency')
+    assert_equal '2026-06-04T12:00:00Z', post.fetch('payout_fetched_at')
+    assert_equal '2026-06-05T12:00:00Z', post.fetch('payout_unavailable_at')
+  end
+
+  test 'payout sorts use persisted numeric payout with unknowns last' do
+    posts(:allowed_unread).update!(payout: '1.000 HBD', payout_amount: 1.000, payout_currency: 'HBD', payout_fetched_at: 10.minutes.ago)
+    posts(:muted_unread).update!(payout: '9.000 HBD', payout_amount: 9.000, payout_currency: 'HBD', payout_fetched_at: 10.minutes.ago)
+    unknown = create_post_with_tag(author: 'unknown-payout', permlink: 'unknown-payout', title: 'Unknown Payout', tag: 'haf')
+
+    get :index, params: {sort: 'highest_payout', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_operator titles.index('Muted Unread'), :<, titles.index('Allowed Unread')
+    assert_operator titles.index('Allowed Unread'), :<, titles.index(unknown.title)
+
+    get :index, params: {sort: 'lowest_payout', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_operator titles.index('Allowed Unread'), :<, titles.index('Muted Unread')
+    assert_operator titles.index('Muted Unread'), :<, titles.index(unknown.title)
   end
 
   test 'post list thumbnail uses cross post display body' do
@@ -495,7 +528,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 2, response_json.fetch('votes')
     assert_equal 2, response_json.fetch('replies')
     assert_equal '1.234 HBD', response_json.fetch('payout')
+    assert_equal '1.234', response_json.fetch('payout_amount')
+    assert_equal 'HBD', response_json.fetch('payout_currency')
+    assert response_json.fetch('payout_fetched_at').present?
     assert_equal 4200, response_json.fetch('current_vote')
+    posts(:allowed_unread).reload
+    assert_equal '1.234 HBD', posts(:allowed_unread).payout
+    assert_equal BigDecimal('1.234'), posts(:allowed_unread).payout_amount
+    assert_equal 'HBD', posts(:allowed_unread).payout_currency
+    assert posts(:allowed_unread).payout_fetched_at.present?
   end
 
   test 'chain stats proxy returns unavailable payload on Hive errors' do
@@ -511,6 +552,21 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_nil response_json.fetch('current_vote')
   end
 
+  test 'chain stats proxy does not warn for invalid Hive parameters' do
+    logger = Minitest::Mock.new
+    logger.expect(:debug, nil, [String])
+
+    Rails.stub(:logger, logger) do
+      Account.stub(:api, InvalidParameterApi.new) do
+        get :chain_stats, params: {id: posts(:allowed_unread).id}
+      end
+    end
+
+    assert_response :success
+    assert_equal 'unavailable', response_json.fetch('status')
+    logger.verify
+  end
+
   test 'payout proxy returns current payout without fetching full chain stats' do
     api = ChainStatsApi.new(
       get_content: {cashout_time: '2026-06-07T00:00:00', pending_payout_value: '1.234 HBD', total_payout_value: '0.000 HBD'}
@@ -523,7 +579,30 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_response :success
     assert_equal 'ready', response_json.fetch('status')
     assert_equal '1.234 HBD', response_json.fetch('payout')
+    assert_equal '1.234', response_json.fetch('payout_amount')
+    assert_equal 'HBD', response_json.fetch('payout_currency')
+    assert response_json.fetch('payout_fetched_at').present?
     assert_equal [:get_content], api.calls
+    posts(:allowed_unread).reload
+    assert_equal '1.234 HBD', posts(:allowed_unread).payout
+    assert_equal BigDecimal('1.234'), posts(:allowed_unread).payout_amount
+    assert_equal 'HBD', posts(:allowed_unread).payout_currency
+    assert posts(:allowed_unread).payout_fetched_at.present?
+  end
+
+  test 'payout proxy does not warn for Hive timeouts' do
+    logger = Minitest::Mock.new
+    logger.expect(:debug, nil, [String])
+
+    Rails.stub(:logger, logger) do
+      Account.stub(:api, TimeoutApi.new) do
+        get :payout, params: {id: posts(:allowed_unread).id}
+      end
+    end
+
+    assert_response :success
+    assert_equal 'unavailable', response_json.fetch('status')
+    logger.verify
   end
 
 private
@@ -556,6 +635,28 @@ private
 
     def rpc_execute(api, method, args)
       raise Hive::UnknownError, 'boom'
+    end
+  end
+
+  class InvalidParameterApi
+    def rpc_client
+      self
+    end
+
+    def rpc_execute(api, method, args)
+      raise "unexpected api: #{api}" unless api == :condenser_api
+
+      raise Hive::ArgumentError, '{"error":"Invalid parameters"}'
+    end
+  end
+
+  class TimeoutApi
+    def rpc_client
+      self
+    end
+
+    def rpc_execute(_api, _method, _args)
+      raise Timeout::Error, 'execution expired'
     end
   end
 

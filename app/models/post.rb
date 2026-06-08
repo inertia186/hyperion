@@ -11,7 +11,8 @@ class Post < ApplicationRecord
   DISPLAY_BODY_UNSET = Object.new.freeze
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
-    blacklisted blacklist_reasons author_reputation tags_count created_at updated_at
+    blacklisted blacklist_reasons author_reputation tags_count payout payout_amount
+    payout_currency payout_fetched_at payout_unavailable_at created_at updated_at
   )
   
   has_many :tags, dependent: :destroy, counter_cache: :tags_count
@@ -137,6 +138,12 @@ class Post < ApplicationRecord
 
     order(Arel.sql(prolific_order))
   }
+
+  scope :order_by_payout, lambda { |direction = :desc|
+    direction = direction.to_s.downcase == 'asc' ? 'ASC' : 'DESC'
+
+    order(Arel.sql("payout_amount #{direction} NULLS LAST, posts.created_at DESC"))
+  }
   
   def self.group_by_tag_count(direction = :desc)
     joins(:tags).group(:tag).order("count_all #{direction}").count(:all)
@@ -144,6 +151,29 @@ class Post < ApplicationRecord
   
   def to_param
     [id, author, permlink].join('/').parameterize
+  end
+
+  def capture_payout!(payout_value, fetched_at: Time.current)
+    amount, currency = self.class.parse_payout(payout_value)
+
+    update!(
+      payout: payout_value.presence,
+      payout_amount: amount,
+      payout_currency: currency,
+      payout_fetched_at: fetched_at,
+      payout_unavailable_at: nil
+    )
+  end
+
+  def mark_payout_unavailable!(unavailable_at: Time.current)
+    update!(payout_unavailable_at: unavailable_at)
+  end
+
+  def self.parse_payout(payout_value)
+    match = payout_value.to_s.strip.match(/\A(?<amount>-?\d+(?:\.\d+)?)\s+(?<currency>[A-Z]{2,10})\z/)
+    return [nil, nil] unless match
+
+    [BigDecimal(match[:amount]), match[:currency]]
   end
 
   def display_body(body_override = DISPLAY_BODY_UNSET)

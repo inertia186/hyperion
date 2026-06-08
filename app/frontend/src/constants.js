@@ -4,7 +4,9 @@ export const SORTS = [
   ['most_prolific', 'Prolific'],
   ['least_prolific', 'Non-prolific'],
   ['most_tags', 'Most tags'],
-  ['least_tags', 'Least tags']
+  ['least_tags', 'Least tags'],
+  ['highest_payout', 'Highest payout'],
+  ['lowest_payout', 'Lowest payout']
 ]
 
 export const initialQuery = {

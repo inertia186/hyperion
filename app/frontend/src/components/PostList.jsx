@@ -5,7 +5,7 @@ import { imageProxy, relativeAge, tagLabel } from '../format'
 import CategoryTagsControl from './CategoryTagsControl'
 import CommunityLabel from './CommunityLabel'
 
-export default function PostList({posts, selectedId, selectedPostIds, allMatchingSelected, ignoredTags, onSelect, onToggleSelected, onSelectTag, onSelectAuthor}) {
+export default function PostList({posts, selectedId, selectedPostIds, allMatchingSelected, ignoredTags, onSelect, onToggleSelected, onSelectTag, onSelectAuthor, onPayoutRefresh}) {
   const [expandedTagRows, setExpandedTagRows] = useState(() => new Set())
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
             <button className="flex h-10 w-10 items-center justify-center rounded text-blue-700 hover:bg-blue-100 md:h-auto md:w-auto md:p-1" type="button" onClick={() => onToggleSelected(post.id)} aria-label={`${checked ? 'Deselect' : 'Select'} ${post.title}`} aria-pressed={checked}>
               {checked ? <CheckSquare size={18} /> : <Square size={18} />}
             </button>
-            <PostPayout post={post} />
+            <PostPayout post={post} onPayoutRefresh={onPayoutRefresh} />
             <PostThumbnail post={post} />
             <div className="min-w-0">
               <button className="block w-full truncate text-left font-medium text-slate-900" type="button" onClick={() => onSelect(post.id)}>
@@ -74,33 +74,59 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
   )
 }
 
-function PostPayout({post}) {
+function PostPayout({post, onPayoutRefresh}) {
   const payoutRef = useRef(null)
   const visible = useVisibleOnce(payoutRef)
-  const [payout, setPayout] = useState('...')
+  const [payout, setPayout] = useState(post.payout || '...')
+  const payoutFresh = freshPayout(post.payout_fetched_at)
+  const payoutUnavailable = Boolean(post.payout_unavailable_at)
+
+  useEffect(() => {
+    if (post.payout) setPayout(post.payout)
+  }, [post.payout])
 
   useEffect(() => {
     if (!visible) return undefined
+    if (payoutUnavailable) {
+      setPayout(post.payout || '...')
+      return undefined
+    }
+    if (post.payout && payoutFresh) {
+      setPayout(post.payout)
+      return undefined
+    }
 
     const abortController = new AbortController()
-    setPayout('...')
+    if (!post.payout) setPayout('...')
 
-    api.postPayout(post.id, {author: post.author, permlink: post.permlink}, {signal: abortController.signal})
-      .then((payload) => setPayout(payload.payout || '...'))
+    api.postPayout(post.id, {}, {signal: abortController.signal})
+      .then((payload) => {
+        setPayout(payload.payout || post.payout || '...')
+        onPayoutRefresh?.(post.id, payload)
+      })
       .catch(() => {
-        if (!abortController.signal.aborted) setPayout('...')
+        if (!abortController.signal.aborted) setPayout(post.payout || '...')
       })
 
     return () => {
       abortController.abort()
     }
-  }, [post.id, post.author, post.permlink, visible])
+  }, [onPayoutRefresh, payoutFresh, payoutUnavailable, post.id, post.author, post.permlink, post.payout, visible])
 
   return (
     <span ref={payoutRef} data-testid={`post-payout-${post.id}`} className="post-row-payout hidden h-7 min-w-0 items-center justify-center rounded bg-slate-100 px-2 text-center text-[11px] font-medium text-slate-600 md:inline-flex">
       <span className="truncate">{payout}</span>
     </span>
   )
+}
+
+function freshPayout(fetchedAt) {
+  if (!fetchedAt) return false
+
+  const fetchedTime = new Date(fetchedAt).getTime()
+  if (!Number.isFinite(fetchedTime)) return false
+
+  return Date.now() - fetchedTime < 60 * 60 * 1000
 }
 
 function PostThumbnail({post}) {
