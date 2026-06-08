@@ -12,4 +12,9 @@ namespace :ops do
   task :reputation, [:account] => :environment do |_task, args|
     puts JSON.pretty_generate(OpsDiagnostics.reputation(required_account.call(args)))
   end
+
+  desc 'Print read-only blacklist diagnostics'
+  task blacklist: :environment do
+    puts JSON.pretty_generate(OpsDiagnostics.blacklist)
+  end
 end

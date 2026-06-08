@@ -1,3 +1,5 @@
+require 'digest'
+
 class OpsDiagnostics
   SAMPLE_LIMIT = 5
 
@@ -51,7 +53,48 @@ class OpsDiagnostics
       }
     end
 
+    def blacklist
+      blacklisted = Post.blacklisted
+      db_ordered_keys = blacklisted.order(:author, :permlink).pluck(:author, :permlink).map { |author, permlink| post_key(author, permlink) }
+      normalized_keys = db_ordered_keys.sort
+      reason_map = blacklist_reason_map(blacklisted)
+
+      {
+        environment: Rails.env,
+        counts: {
+          posts: Post.count,
+          blacklisted: blacklisted.count,
+          active_blacklisted: Post.active.blacklisted.count,
+          blacklisted_with_reasons: blacklisted.where.not(blacklist_reasons: []).count
+        },
+        signatures: {
+          normalized_blacklisted_keys: digest_lines(normalized_keys),
+          database_order_blacklisted_keys: digest_lines(db_ordered_keys),
+          normalized_blacklist_reasons: digest_json(reason_map)
+        },
+        samples: {
+          first: normalized_keys.first(SAMPLE_LIMIT),
+          last: normalized_keys.last(SAMPLE_LIMIT)
+        },
+        indexer_states: IndexerState.order(:name).map { |state| indexer_state_payload(state) }
+      }
+    end
+
   private
+    def blacklist_reason_map(relation)
+      relation.pluck(:author, :permlink, :blacklist_reasons).each_with_object({}) do |(author, permlink, reasons), map|
+        map[post_key(author, permlink)] = reasons
+      end.sort.to_h
+    end
+
+    def digest_json(value)
+      Digest::SHA256.hexdigest(JSON.generate(value))
+    end
+
+    def digest_lines(lines)
+      Digest::SHA256.hexdigest(lines.join("\n"))
+    end
+
     def inbox_filter_breakdown(account)
       recent = Post.active
       no_blacklist = without_blacklist_sources(recent, account.blacklist_sources)
@@ -85,6 +128,14 @@ class OpsDiagnostics
       relation.limit(SAMPLE_LIMIT).pluck(:author, :title, :author_reputation).map do |author, title, reputation|
         {author: author, title: title, author_reputation: reputation}
       end
+    end
+
+    def post_key(author, permlink)
+      "#{author}/#{permlink}"
+    end
+
+    def indexer_state_payload(state)
+      state.attributes.slice('name', 'last_id', 'last_indexed_at', 'last_sweep_at')
     end
   end
 end
