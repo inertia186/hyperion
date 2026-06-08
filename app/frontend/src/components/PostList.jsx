@@ -77,22 +77,22 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
 function PostPayout({post, onPayoutRefresh}) {
   const payoutRef = useRef(null)
   const visible = useVisibleOnce(payoutRef)
-  const [payout, setPayout] = useState(post.payout || '...')
+  const [payout, setPayout] = useState(displayPayout(post))
   const payoutFresh = freshPayout(post.payout_fetched_at)
   const payoutUnavailable = Boolean(post.payout_unavailable_at)
 
   useEffect(() => {
-    if (post.payout) setPayout(post.payout)
-  }, [post.payout])
+    setPayout(displayPayout(post))
+  }, [post.payout, post.payout_source])
 
   useEffect(() => {
     if (!visible) return undefined
     if (payoutUnavailable) {
-      setPayout(post.payout || '...')
+      setPayout(displayPayout(post))
       return undefined
     }
     if (post.payout && payoutFresh) {
-      setPayout(post.payout)
+      setPayout(displayPayout(post))
       return undefined
     }
 
@@ -101,23 +101,29 @@ function PostPayout({post, onPayoutRefresh}) {
 
     api.postPayout(post.id, {}, {signal: abortController.signal})
       .then((payload) => {
-        setPayout(payload.payout || post.payout || '...')
+        setPayout(displayPayout({...post, ...payload}))
         onPayoutRefresh?.(post.id, payload)
       })
       .catch(() => {
-        if (!abortController.signal.aborted) setPayout(post.payout || '...')
+        if (!abortController.signal.aborted) setPayout(displayPayout(post))
       })
 
     return () => {
       abortController.abort()
     }
-  }, [onPayoutRefresh, payoutFresh, payoutUnavailable, post.id, post.author, post.permlink, post.payout, visible])
+  }, [onPayoutRefresh, payoutFresh, payoutUnavailable, post.id, post.author, post.permlink, post.payout, post.payout_source, visible])
 
   return (
     <span ref={payoutRef} data-testid={`post-payout-${post.id}`} className="post-row-payout hidden h-7 min-w-0 items-center justify-center rounded bg-slate-100 px-2 text-center text-[11px] font-medium text-slate-600 md:inline-flex">
       <span className="truncate">{payout}</span>
     </span>
   )
+}
+
+function displayPayout(post) {
+  if (!post.payout) return '...'
+
+  return post.payout_source === 'estimated' ? `~${post.payout}` : post.payout
 }
 
 function freshPayout(fetchedAt) {

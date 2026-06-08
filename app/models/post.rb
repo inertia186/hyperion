@@ -12,7 +12,7 @@ class Post < ApplicationRecord
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
     blacklisted blacklist_reasons author_reputation tags_count payout payout_amount
-    payout_currency payout_fetched_at payout_unavailable_at created_at updated_at
+    payout_currency payout_fetched_at payout_unavailable_at payout_source created_at updated_at
   )
   
   has_many :tags, dependent: :destroy, counter_cache: :tags_count
@@ -153,7 +153,7 @@ class Post < ApplicationRecord
     [id, author, permlink].join('/').parameterize
   end
 
-  def capture_payout!(payout_value, fetched_at: Time.current)
+  def capture_payout!(payout_value, fetched_at: Time.current, source: 'exact')
     amount, currency = self.class.parse_payout(payout_value)
 
     update!(
@@ -161,12 +161,13 @@ class Post < ApplicationRecord
       payout_amount: amount,
       payout_currency: currency,
       payout_fetched_at: fetched_at,
-      payout_unavailable_at: nil
+      payout_unavailable_at: nil,
+      payout_source: source
     )
   end
 
   def mark_payout_unavailable!(unavailable_at: Time.current)
-    update!(payout_unavailable_at: unavailable_at)
+    update!(payout_unavailable_at: unavailable_at, payout_source: nil)
   end
 
   def self.parse_payout(payout_value)

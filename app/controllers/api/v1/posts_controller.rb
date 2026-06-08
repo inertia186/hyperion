@@ -184,6 +184,7 @@ private
       payout_amount: post.payout_amount&.to_s,
       payout_currency: post.payout_currency,
       payout_fetched_at: post.payout_fetched_at&.iso8601,
+      payout_source: post.payout_source,
       current_vote: chain_value(current_vote, :percent)
     }
   end
@@ -221,7 +222,8 @@ private
       payout: payout,
       payout_amount: post.payout_amount&.to_s,
       payout_currency: post.payout_currency,
-      payout_fetched_at: post.payout_fetched_at&.iso8601
+      payout_fetched_at: post.payout_fetched_at&.iso8601,
+      payout_source: post.payout_source
     }
   end
 
@@ -303,6 +305,7 @@ private
       payout_currency: post.payout_currency,
       payout_fetched_at: post.payout_fetched_at&.iso8601,
       payout_unavailable_at: post.payout_unavailable_at&.iso8601,
+      payout_source: post.payout_source,
       read: result.read_post_ids.include?(post.id),
       muted_author: current_account.muted_authors.include?(display_post.author)
     }

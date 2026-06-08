@@ -1013,6 +1013,27 @@ describe('App', () => {
     await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/2/payout?']))
   })
 
+  test('marks fresh persisted estimated list payouts without fetching them again', async () => {
+    const visibility = installIntersectionObserverMock()
+    currentPosts = [
+      {...posts[0], payout: '5.000 HBD', payout_amount: '5.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString(), payout_source: 'estimated'},
+      posts[1],
+      posts[2]
+    ]
+
+    await renderApp()
+
+    const payoutUrls = () => global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)
+    const firstPayout = screen.getByTestId('post-payout-1')
+
+    expect(firstPayout).toHaveTextContent('~5.000 HBD')
+    visibility.trigger(firstPayout)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(payoutUrls()).toEqual([])
+  })
+
   test('skips payout fetches for rows marked payout unavailable', async () => {
     const visibility = installIntersectionObserverMock()
     currentPosts = [

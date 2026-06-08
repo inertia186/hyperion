@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_05_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_08_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -91,6 +91,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_05_000000) do
     t.decimal "payout_amount", precision: 12, scale: 3
     t.string "payout_currency"
     t.datetime "payout_fetched_at"
+    t.string "payout_source"
     t.datetime "payout_unavailable_at"
     t.string "permlink", null: false
     t.integer "tags_count", default: 0, null: false
@@ -106,6 +107,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_05_000000) do
     t.index ["deleted_at", "created_at"], name: "index_posts_deleted_listing", order: { created_at: :desc }
     t.index ["payout_amount"], name: "index_posts_on_payout_amount"
     t.index ["payout_fetched_at"], name: "index_posts_on_payout_fetched_at"
+    t.index ["payout_source"], name: "index_posts_on_payout_source"
     t.index ["payout_unavailable_at"], name: "index_posts_on_payout_unavailable_at"
   end
 

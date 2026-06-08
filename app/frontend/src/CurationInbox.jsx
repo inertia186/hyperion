@@ -563,6 +563,7 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
           payout_amount: statsPayload.payout_amount ?? post.payout_amount,
           payout_currency: statsPayload.payout_currency ?? post.payout_currency,
           payout_fetched_at: payoutFetchedAt ?? post.payout_fetched_at,
+          payout_source: statsPayload.payout_source ?? post.payout_source,
           current_vote: statsPayload.current_vote ?? post.current_vote
         } : post)
       }
@@ -583,7 +584,8 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
           payout: payoutPayload.payout ?? post.payout,
           payout_amount: payoutPayload.payout_amount ?? post.payout_amount,
           payout_currency: payoutPayload.payout_currency ?? post.payout_currency,
-          payout_fetched_at: payoutPayload.payout_fetched_at ?? post.payout_fetched_at
+          payout_fetched_at: payoutPayload.payout_fetched_at ?? post.payout_fetched_at,
+          payout_source: payoutPayload.payout_source ?? post.payout_source
         } : post)
       }
     })

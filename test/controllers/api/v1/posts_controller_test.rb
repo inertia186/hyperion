@@ -213,7 +213,8 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
       payout_amount: 1.234,
       payout_currency: 'HBD',
       payout_fetched_at: Time.zone.parse('2026-06-04T12:00:00Z'),
-      payout_unavailable_at: Time.zone.parse('2026-06-05T12:00:00Z')
+      payout_unavailable_at: Time.zone.parse('2026-06-05T12:00:00Z'),
+      payout_source: 'estimated'
     )
 
     get :index, params: {sort: 'latest', limit: 30}
@@ -230,6 +231,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 'HBD', post.fetch('payout_currency')
     assert_equal '2026-06-04T12:00:00Z', post.fetch('payout_fetched_at')
     assert_equal '2026-06-05T12:00:00Z', post.fetch('payout_unavailable_at')
+    assert_equal 'estimated', post.fetch('payout_source')
   end
 
   test 'payout sorts use persisted numeric payout with unknowns last' do
@@ -566,12 +568,14 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal '1.234', response_json.fetch('payout_amount')
     assert_equal 'HBD', response_json.fetch('payout_currency')
     assert response_json.fetch('payout_fetched_at').present?
+    assert_equal 'exact', response_json.fetch('payout_source')
     assert_equal 4200, response_json.fetch('current_vote')
     posts(:allowed_unread).reload
     assert_equal '1.234 HBD', posts(:allowed_unread).payout
     assert_equal BigDecimal('1.234'), posts(:allowed_unread).payout_amount
     assert_equal 'HBD', posts(:allowed_unread).payout_currency
     assert posts(:allowed_unread).payout_fetched_at.present?
+    assert_equal 'exact', posts(:allowed_unread).payout_source
   end
 
   test 'chain stats proxy returns unavailable payload on Hive errors' do
@@ -617,12 +621,14 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal '1.234', response_json.fetch('payout_amount')
     assert_equal 'HBD', response_json.fetch('payout_currency')
     assert response_json.fetch('payout_fetched_at').present?
+    assert_equal 'exact', response_json.fetch('payout_source')
     assert_equal [:get_content], api.calls
     posts(:allowed_unread).reload
     assert_equal '1.234 HBD', posts(:allowed_unread).payout
     assert_equal BigDecimal('1.234'), posts(:allowed_unread).payout_amount
     assert_equal 'HBD', posts(:allowed_unread).payout_currency
     assert posts(:allowed_unread).payout_fetched_at.present?
+    assert_equal 'exact', posts(:allowed_unread).payout_source
   end
 
   test 'payout proxy does not warn for Hive timeouts' do
