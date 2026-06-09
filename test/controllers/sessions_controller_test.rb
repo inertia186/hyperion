@@ -14,6 +14,13 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_routing({ method: 'delete', path: '/sessions/account' }, controller: 'sessions', action: 'destroy', id: 'account')
   end
 
+  def test_new_session_links_agents_to_well_known_manifest
+    get new_session_path
+
+    assert_response :success
+    assert_select 'a[href="/.well-known/hyperion-agent.json"]', text: 'Are you a robot?'
+  end
+
   def test_hivesigner_redirect_uses_current_host
     host! 'hyperion.test'
 
