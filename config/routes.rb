@@ -1,8 +1,30 @@
 Rails.application.routes.draw do
   get '/.well-known/healthcheck.json', to: 'healthcheck#show', defaults: {format: :json}
+  get '/.well-known/hyperion-agent.json', to: 'agent_discovery#show', defaults: {format: :json}, as: :hyperion_agent_discovery
+  get '/llms.txt', to: 'agent_discovery#llms', as: :llms
+  get '/openapi.json', to: 'agent_discovery#openapi', defaults: {format: :json}, as: :openapi
+  match '/mcp', to: 'mcp#create', via: :post, defaults: {format: :json}
+  match '/mcp', to: 'mcp#show', via: :get, defaults: {format: :json}
+  match '/mcp', to: 'mcp#destroy', via: :delete, defaults: {format: :json}
 
   namespace :api do
     namespace :v1 do
+      resources :agent_auth_challenges, path: '/agent/auth_challenges', only: %i(create show) do
+        member do
+          get :hivesigner_callback
+          post :redeem
+          post :keychain
+        end
+      end
+
+      get '/agent/session', to: 'agent#show_session'
+      get '/agent/digest', to: 'agent#digest'
+      get '/agent/posts/:id', to: 'agent#post', as: :agent_post
+      get '/agent/posts/:id/vote_link', to: 'agent#vote_link', as: :agent_post_vote_link
+      post '/agent/read', to: 'agent#mark_read', as: :agent_read
+      post '/agent/ignored_tags', to: 'agent#create_ignored_tags', as: :agent_ignored_tags
+      delete '/agent/ignored_tags', to: 'agent#destroy_ignored_tags'
+
       resource :session, only: :show do
         get :voting_power
       end

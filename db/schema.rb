@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_08_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_09_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -31,6 +31,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_08_000000) do
     t.json "settings", default: {}, null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_name_on_accounts", unique: true
+  end
+
+  create_table "agent_auth_challenges", force: :cascade do |t|
+    t.bigint "account_id"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "nonce", null: false
+    t.datetime "redeemed_at"
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.string "verification_code_digest"
+    t.index ["account_id"], name: "index_agent_auth_challenges_on_account_id"
+    t.index ["expires_at"], name: "index_agent_auth_challenges_on_expires_at"
+    t.index ["token"], name: "index_agent_auth_challenges_on_token", unique: true
   end
 
   create_table "author_reputations", force: :cascade do |t|
@@ -144,4 +158,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_08_000000) do
     t.index ["post_id", "tag"], name: "index_post_id_tag_on_tags", unique: true
     t.index ["tag", "post_id"], name: "index_tags_tag_post_id"
   end
+
+  add_foreign_key "agent_auth_challenges", "accounts"
 end

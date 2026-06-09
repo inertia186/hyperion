@@ -1,0 +1,133 @@
+require 'test_helper'
+
+class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
+  tests Api::V1::AgentAuthChallengesController
+
+  test 'creates an auth challenge without an existing session' do
+    post :create
+
+    assert_response :created
+    payload = response_json
+    assert_equal 'pending', payload.fetch('status')
+    assert payload.fetch('challenge_id').present?
+    assert payload.fetch('expires_at').present?
+    assert_includes payload.fetch('hivesigner_login_url'), 'https://hivesigner.com/oauth2/authorize?'
+    assert_includes payload.fetch('hivesigner_login_url'), CGI.escape(hivesigner_callback_api_v1_agent_auth_challenge_url(payload.fetch('challenge_id')))
+    assert_includes payload.dig('keychain', 'message'), payload.fetch('challenge_id')
+    assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
+  end
+
+  test 'returns challenge status' do
+    challenge = AgentAuthChallenge.issue!
+
+    get :show, params: {id: challenge.token}
+
+    assert_response :success
+    assert_equal challenge.token, response_json.fetch('challenge_id')
+    assert_equal 'pending', response_json.fetch('status')
+  end
+
+  test 'hivesigner callback authorizes challenge and renders copy code' do
+    challenge = AgentAuthChallenge.issue!
+    account = accounts(:curated)
+
+    HivesignerAuthenticator.stub(:new, ->(_token) { FakeHivesignerAuthenticator.new(account) }) do
+      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+    end
+
+    assert_response :success
+    assert_equal 'text/html', response.media_type
+    assert_includes response.body, 'Signed in as'
+    assert_match(/HYP-[A-Z0-9]{6}/, response.body)
+    assert_equal account, challenge.reload.account
+    assert challenge.verification_code_digest.present?
+  end
+
+  test 'redeems hivesigner copy code and sets current session account' do
+    challenge = AgentAuthChallenge.issue!
+    code = challenge.authorize_for_copy_code!(accounts(:curated))
+
+    post :redeem, params: {id: challenge.token, code: code.downcase}
+
+    assert_response :success
+    assert_equal true, response_json.fetch('authenticated')
+    assert_equal 'fixture-curator', response_json.dig('account', 'name')
+    assert_equal accounts(:curated).id, session[:current_account].id
+    assert challenge.reload.redeemed_at.present?
+  end
+
+  test 'redeem rejects invalid copy code' do
+    challenge = AgentAuthChallenge.issue!
+    challenge.authorize_for_copy_code!(accounts(:curated))
+
+    post :redeem, params: {id: challenge.token, code: 'HYP-WRONG1'}
+
+    assert_response :unprocessable_entity
+    assert_equal 'Invalid verification code.', response_json.fetch('error')
+    assert_nil session[:current_account]
+  end
+
+  test 'keychain completion validates challenge digest and signature' do
+    challenge = AgentAuthChallenge.issue!
+
+    HiveKeychainAuthenticator.stub(:valid_signature?, true) do
+      post :keychain, params: {
+        id: challenge.token,
+        account_name: 'fixture-curator',
+        public_key: 'STM1111111111111111111111111111111114T1Anm',
+        digest: challenge.keychain_digest,
+        signature: 'signature'
+      }
+    end
+
+    assert_response :success
+    assert_equal true, response_json.fetch('authenticated')
+    assert_equal 'fixture-curator', response_json.dig('account', 'name')
+    assert_equal accounts(:curated).id, session[:current_account].id
+    assert challenge.reload.redeemed_at.present?
+  end
+
+  test 'keychain completion rejects signatures over the wrong digest' do
+    challenge = AgentAuthChallenge.issue!
+
+    HiveKeychainAuthenticator.stub(:valid_signature?, true) do
+      post :keychain, params: {
+        id: challenge.token,
+        account_name: 'fixture-curator',
+        public_key: 'STM1111111111111111111111111111111114T1Anm',
+        digest: '0' * 64,
+        signature: 'signature'
+      }
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal 'Invalid challenge digest.', response_json.fetch('error')
+    assert_nil session[:current_account]
+  end
+
+  test 'expired challenge is not redeemable' do
+    challenge = AgentAuthChallenge.issue!
+    code = challenge.authorize_for_copy_code!(accounts(:curated))
+    challenge.update!(expires_at: 1.minute.ago)
+
+    post :redeem, params: {id: challenge.token, code: code}
+
+    assert_response :not_found
+  end
+
+  test 'create rejects foreign browser origins' do
+    @request.headers['Origin'] = 'https://evil.example'
+
+    post :create
+
+    assert_response :forbidden
+    assert_equal 'Forbidden origin', response_json.fetch('error')
+  end
+
+private
+  FakeHivesignerAuthenticator = Struct.new(:account)
+
+  def response_json
+    JSON.parse(response.body)
+  end
+end

@@ -1,6 +1,4 @@
 class SessionsController < ApplicationController
-  require 'rbsecp256k1'
-
   skip_before_action :sign_in
   
   def new
@@ -35,18 +33,9 @@ class SessionsController < ApplicationController
     
     # hivesigner
     if !!account_name && !!access_token
-      uri = URI.parse('https://hivesigner.com/api/me')
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == 'https'
-      http.cert_store = hivesigner_cert_store
-      request = Net::HTTP::Get.new(uri.request_uri)
-      request['Authorization'] = access_token
-      response = http.request(request)
-      payload = JSON[response.body]
-      account_name = payload['user']
-      
-      if response.code == '200'
-        account = Account.find_or_create_by(name: account_name)
+      account = HivesignerAuthenticator.new(access_token).account
+
+      if account
         session[:hivesigner_access_token] = access_token
       end
     end
@@ -89,28 +78,15 @@ private
   end
 
   def hivesigner_cert_store
-    store = OpenSSL::X509::Store.new
-    store.set_default_paths
-    store.flags = 0 if store.respond_to?(:flags=)
-    store
+    HivesignerAuthenticator.cert_store
   end
 
   def hive_keychain_signature_valid?(account_name, public_key, digest_hex, signature_hex)
-    return false unless Account.public_keys(account_name).include?(public_key)
-
-    expected_public_key = [Bitcoin.decode_base58(public_key[3..-1])[0, 66]].pack('H*')
-    digest = [digest_hex.to_s].pack('H*')
-    signature = [signature_hex.to_s].pack('H*')
-
-    return false unless digest.bytesize == 32
-    return false unless signature.bytesize == 65
-
-    recovery_id = (signature.bytes.first - 27) & 3
-    compact_signature = signature.byteslice(1, 64)
-    recoverable_signature = Secp256k1::Context.new.recoverable_signature_from_compact(compact_signature, recovery_id)
-
-    recoverable_signature.recover_public_key(digest).compressed == expected_public_key
-  rescue ArgumentError, TypeError, NoMethodError, Secp256k1::Error
-    false
+    HiveKeychainAuthenticator.valid_signature?(
+      account_name: account_name,
+      public_key: public_key,
+      digest_hex: digest_hex,
+      signature_hex: signature_hex
+    )
   end
 end
