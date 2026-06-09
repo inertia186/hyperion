@@ -5,7 +5,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 // tslint:disable max-classes-per-file
 const typescript_chained_error_1 = require("typescript-chained-error");
-const xmldom = require("xmldom");
+const xmldom = require("@xmldom/xmldom");
 const Log_1 = require("../../../Log");
 const LinkSanitizer_1 = require("../../../security/LinkSanitizer");
 const DefaultRendererLocalization_1 = require("../DefaultRendererLocalization");
@@ -18,13 +18,8 @@ const YoutubeEmbedder_1 = require("./videoembedders/YoutubeEmbedder");
 class HtmlDOMParser {
     constructor(options, localization = DefaultRendererLocalization_1.DefaultRendererLocalization.DEFAULT) {
         this.domParser = new xmldom.DOMParser({
-            errorHandler: {
-                warning: () => {
-                    /* */
-                },
-                error: () => {
-                    /* */
-                },
+            onError: () => {
+                /* */
             },
         });
         this.xmlSerializer = new xmldom.XMLSerializer();
@@ -146,7 +141,8 @@ class HtmlDOMParser {
             return;
         }
         const html = this.xmlSerializer.serializeToString(child);
-        child.parentNode.replaceChild(this.domParser.parseFromString(`<div class="videoWrapper">${html}</div>`), child);
+        const wrapper = this.domParser.parseFromString(`<div class="videoWrapper">${html}</div>`, "text/html").documentElement;
+        child.parentNode.replaceChild(wrapper, child);
     }
     reportIframeLink(url) {
         const yt = YoutubeEmbedder_1.YoutubeEmbedder.getYoutubeMetadataFromLink(url);
@@ -191,7 +187,7 @@ class HtmlDOMParser {
             const data = this.xmlSerializer.serializeToString(child);
             const content = this.linkify(data);
             if (this.mutate && content !== data) {
-                const newChild = this.domParser.parseFromString(`<span>${content}</span>`);
+                const newChild = this.domParser.parseFromString(`<span>${content}</span>`, "text/html").documentElement;
                 child.parentNode.replaceChild(newChild, child);
                 return newChild;
             }
