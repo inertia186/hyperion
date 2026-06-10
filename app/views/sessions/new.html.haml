@@ -5,6 +5,8 @@
 .row
   .col-4
   .col-4
+    .text-center.mb-3
+      = link_to 'Are you a robot? Use the Hyperion Agent API', hyperion_agent_discovery_path, class: 'btn btn-outline-secondary btn-block', data: {agent_discovery: true}
     = form_tag sessions_path, remote: true, 'data-controller' => 'sessions', 'data-action' => 'ajax:success->sessions#beginLogin' do
       .form-group
         .form-row
@@ -15,8 +17,6 @@
         .form-row
           .mx-auto= image_submit_tag image_url('hive-keychain.png'), style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
           .mx-auto= image_submit_tag image_url('hivesigner.svg'), name: 'hivesigner', style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
-    .text-center.mt-3
-      = link_to 'Are you a robot?', hyperion_agent_discovery_path, class: 'text-muted small'
     
     #success-alert.alert.alert-primary{style: 'display: none;'}
     #error-alert.alert.alert-danger{style: 'display: none;'}

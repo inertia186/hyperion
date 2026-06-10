@@ -18,7 +18,9 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     get new_session_path
 
     assert_response :success
-    assert_select 'a[href="/.well-known/hyperion-agent.json"]', text: 'Are you a robot?'
+    assert_select 'link[rel="hyperion-agent"][href="/.well-known/hyperion-agent.json"][type="application/json"]'
+    assert_select 'meta[name="hyperion-agent-discovery"][content="/.well-known/hyperion-agent.json"]'
+    assert_select 'a.btn[data-agent-discovery="true"][href="/.well-known/hyperion-agent.json"]', text: 'Are you a robot? Use the Hyperion Agent API'
   end
 
   def test_hivesigner_redirect_uses_current_host
