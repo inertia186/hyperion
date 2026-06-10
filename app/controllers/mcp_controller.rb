@@ -80,7 +80,10 @@ private
           weight: integer_schema('Vote weight from -10000 to 10000. Defaults to 10000.')
         }, required: ['id']),
         tool_schema('hyperion_mark_read', 'Mark posts read.', {
+          id: integer_schema('Single post id to mark read.'),
+          post_id: integer_schema('Single post id to mark read.'),
           post_ids: {type: 'array', items: {type: 'integer'}},
+          ids: {type: 'array', items: {type: 'integer'}},
           all_matching: {type: 'boolean'},
           query: {type: 'object'}
         }),

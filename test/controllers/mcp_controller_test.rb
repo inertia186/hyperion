@@ -113,11 +113,14 @@ class McpControllerTest < ActionController::TestCase
       method: 'tools/call',
       params: {
         name: 'hyperion_mark_read',
-        arguments: {post_ids: [posts(:allowed_unread).id]}
+        arguments: {id: posts(:allowed_unread).id}
       }
     )
 
     assert_response :success
+    payload = tool_payload
+    assert_equal 1, payload.fetch('marked_count')
+    assert_equal [posts(:allowed_unread).id], payload.fetch('post_ids')
     assert accounts(:curated).post_read?(posts(:allowed_unread).id)
   end
 

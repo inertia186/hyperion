@@ -93,10 +93,15 @@ class HyperionAgent
       return {all_matching: true, marked_count: marked_count, read: true, read_posts_count: account.read_posts.count}
     end
 
-    post_ids = Array(params[:post_ids]).compact.map(&:to_i).reject(&:zero?)
-    post_ids.each { |post_id| account.mark_post_as_read!(post_id) }
+    post_ids = normalize_post_ids(params)
+    marked_count = 0
 
-    {post_ids: post_ids, read: true, read_posts_count: account.read_posts.count}
+    post_ids.each do |post_id|
+      account.mark_post_as_read!(post_id)
+      marked_count += 1
+    end
+
+    {post_ids: post_ids, marked_count: marked_count, read: true, read_posts_count: account.read_posts.count}
   end
 
   def ignore_tags(tags)
@@ -252,6 +257,14 @@ private
     values
   rescue NoMethodError
     {limit: DEFAULT_DIGEST_LIMIT}
+  end
+
+  def normalize_post_ids(params)
+    Array(params[:post_ids] || params[:post_id] || params[:id] || params[:ids]).
+      compact.
+      map(&:to_i).
+      reject(&:zero?).
+      uniq
   end
 
   def normalize_vote_weight(value)

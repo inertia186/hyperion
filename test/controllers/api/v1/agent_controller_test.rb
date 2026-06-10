@@ -91,6 +91,18 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_response :success
     assert accounts(:curated).post_read?(posts(:allowed_unread).id)
     assert accounts(:curated).post_read?(posts(:muted_unread).id)
+    assert_equal 2, response_json.fetch('marked_count')
+    assert_equal [posts(:allowed_unread).id, posts(:muted_unread).id], response_json.fetch('post_ids')
+    assert_equal true, response_json.fetch('read')
+  end
+
+  test 'mark read accepts a single post_id parameter from agents' do
+    post :mark_read, params: {post_id: posts(:allowed_unread).id}
+
+    assert_response :success
+    assert accounts(:curated).post_read?(posts(:allowed_unread).id)
+    assert_equal 1, response_json.fetch('marked_count')
+    assert_equal [posts(:allowed_unread).id], response_json.fetch('post_ids')
     assert_equal true, response_json.fetch('read')
   end
 

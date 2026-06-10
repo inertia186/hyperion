@@ -71,7 +71,7 @@ private
       - GET #{api_v1_agent_digest_url}?limit=10
       - GET #{api_v1_agent_post_url(':id')}
       - GET #{api_v1_agent_post_vote_link_url(':id')}?weight=10000
-      - POST #{api_v1_agent_read_url}
+      - POST #{api_v1_agent_read_url} with {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, or {"all_matching":true,"query":{...}}
       - POST #{api_v1_agent_ignored_tags_url}
       - DELETE #{api_v1_agent_ignored_tags_url}
       - POST #{mcp_url}
@@ -174,6 +174,7 @@ private
         '/api/v1/agent/read' => {
           post: {
             summary: 'Mark posts read.',
+            description: 'Accepts {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, {"ids":[123,456]}, or {"all_matching":true,"query":{...}}. Returns post_ids and marked_count.',
             responses: {'200' => json_response('Read mutation result')}
           }
         },

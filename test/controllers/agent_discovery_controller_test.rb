@@ -52,6 +52,7 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_includes response.body, 'Never ask the user for Hive private keys'
     assert_includes response.body, 'Do not paste any Hive key'
     assert_includes response.body, '/api/v1/agent/digest'
+    assert_includes response.body, '{"post_id":123}'
     assert_includes response.body, 'HiveSigner'
   end
 
@@ -70,6 +71,7 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges/{id}/redeem')
     assert payload.fetch('paths').key?('/api/v1/agent/digest')
     assert payload.fetch('paths').key?('/api/v1/agent/posts/{id}/vote_link')
+    assert_includes payload.dig('paths', '/api/v1/agent/read', 'post', 'description'), '{"post_id":123}'
     assert payload.fetch('paths').key?('/mcp')
   end
 
