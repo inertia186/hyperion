@@ -80,8 +80,10 @@ class HyperionAgent
   end
 
   def mark_read(params = {})
-    if truthy?(params[:all_matching])
-      query_params = normalize_query_params(params[:query] || {}).merge(page: 1)
+    normalized_params = normalize_agent_params(params)
+
+    if truthy?(normalized_params[:all_matching])
+      query_params = normalize_query_params(normalized_params[:query] || {}).merge(page: 1)
       result = PostCurationQuery.new(account: account, params: query_params, session: session, track_past_tags: false).call
       marked_count = 0
 
@@ -93,27 +95,38 @@ class HyperionAgent
       return {all_matching: true, marked_count: marked_count, read: true, read_posts_count: account.read_posts.count}
     end
 
-    post_ids = normalize_post_ids(params)
+    post_ids = normalize_post_ids(normalized_params)
     marked_count = 0
+    warnings = []
 
     post_ids.each do |post_id|
       account.mark_post_as_read!(post_id)
       marked_count += 1
     end
 
-    {post_ids: post_ids, marked_count: marked_count, read: true, read_posts_count: account.read_posts.count}
+    warnings << 'No usable post ids were provided.' if post_ids.empty?
+
+    {post_ids: post_ids, marked_count: marked_count, warnings: warnings, read: true, read_posts_count: account.read_posts.count}
   end
 
-  def ignore_tags(tags)
-    tag_values(tags).each { |tag| account.ignored_tags.find_or_create_by!(tag: tag) }
+  def ignore_tags(input)
+    tags = tag_values_from(input)
+    warnings = []
+    before_tags = ignored_tags
 
-    tag_state_payload
+    tags.each { |tag| account.ignored_tags.find_or_create_by!(tag: tag) }
+    warnings << 'No usable tags were provided.' if tags.empty?
+
+    tag_state_payload(tags: tags, changed_count: (tags - before_tags).size, warnings: warnings)
   end
 
-  def unignore_tags(tags)
-    account.ignored_tags.where(tag: tag_values(tags)).destroy_all
+  def unignore_tags(input)
+    tags = tag_values_from(input)
+    warnings = []
+    changed_count = tags.empty? ? 0 : account.ignored_tags.where(tag: tags).destroy_all.size
+    warnings << 'No usable tags were provided.' if tags.empty?
 
-    tag_state_payload
+    tag_state_payload(tags: tags, changed_count: changed_count, warnings: warnings)
   end
 
   def self.normalize_vote_weight(value)
@@ -230,8 +243,11 @@ private
     ActionController::Base.helpers.truncate(text, length: EXCERPT_LENGTH, separator: ' ')
   end
 
-  def tag_state_payload
+  def tag_state_payload(tags: [], changed_count: nil, warnings: [])
     {
+      tags: tags,
+      changed_count: changed_count,
+      warnings: warnings,
       ignored_tags: ignored_tags,
       favorite_tags: favorite_tags,
       past_tags: account.past_tags.pluck(:tag)
@@ -246,10 +262,6 @@ private
     account.favorite_tags.pluck(:tag)
   end
 
-  def tag_values(tags)
-    Array(tags).map(&:to_s).map(&:downcase).map(&:strip).reject(&:blank?).uniq
-  end
-
   def normalize_query_params(params)
     values = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : params.to_h
     values = values.symbolize_keys
@@ -260,11 +272,49 @@ private
   end
 
   def normalize_post_ids(params)
-    Array(params[:post_ids] || params[:post_id] || params[:id] || params[:ids]).
+    Array(params[:post_ids] || params[:post_id] || params[:id] || params[:ids] || params[:post]).
       compact.
       map(&:to_i).
       reject(&:zero?).
       uniq
+  end
+
+  def tag_values_from(input)
+    params = normalize_agent_params(input)
+    values = params[:tags] || params[:tag] || params[:ignored_tags] || params[:ignored_tag]
+
+    Array(values).
+      flat_map { |tag| tag.to_s.split(',') }.
+      map(&:downcase).
+      map(&:strip).
+      reject(&:blank?).
+      uniq
+  end
+
+  def normalize_agent_params(input)
+    values = if input.respond_to?(:to_unsafe_h)
+      input.to_unsafe_h
+    elsif input.respond_to?(:to_h)
+      input.to_h
+    else
+      {}
+    end
+
+    values = values.deep_symbolize_keys
+    nested_values = normalize_hash(values[:agent])
+    values.merge(nested_values.deep_symbolize_keys)
+  rescue NoMethodError
+    {}
+  end
+
+  def normalize_hash(value)
+    if value.respond_to?(:to_unsafe_h)
+      value.to_unsafe_h
+    elsif value.respond_to?(:to_h)
+      value.to_h
+    else
+      {}
+    end
   end
 
   def normalize_vote_weight(value)

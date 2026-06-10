@@ -70,7 +70,8 @@ private
         tool_schema('hyperion_get_digest', 'Return curated unread posts for agent summarization.', {
           limit: integer_schema('Maximum posts to return. Defaults to 10.'),
           tag: string_schema('Optional tag/category filter.'),
-          author: string_schema('Optional author filter.')
+          author: string_schema('Optional author filter.'),
+          query: string_schema('Optional keyword search filter.')
         }),
         tool_schema('hyperion_get_post', 'Return an agent-oriented post detail payload.', {
           id: integer_schema('Post id.')
@@ -79,7 +80,7 @@ private
           id: integer_schema('Post id.'),
           weight: integer_schema('Vote weight from -10000 to 10000. Defaults to 10000.')
         }, required: ['id']),
-        tool_schema('hyperion_mark_read', 'Mark posts read.', {
+        tool_schema('hyperion_mark_read', 'Mark posts read. Accepts id, post_id, ids, post_ids, or all_matching with query. Returns marked_count, normalized post_ids, and warnings.', {
           id: integer_schema('Single post id to mark read.'),
           post_id: integer_schema('Single post id to mark read.'),
           post_ids: {type: 'array', items: {type: 'integer'}},
@@ -87,12 +88,8 @@ private
           all_matching: {type: 'boolean'},
           query: {type: 'object'}
         }),
-        tool_schema('hyperion_ignore_tags', 'Ignore one or more tags.', {
-          tags: {type: 'array', items: {type: 'string'}}
-        }, required: ['tags']),
-        tool_schema('hyperion_unignore_tags', 'Unignore one or more tags.', {
-          tags: {type: 'array', items: {type: 'string'}}
-        }, required: ['tags'])
+        tool_schema('hyperion_ignore_tags', 'Ignore one or more tags. Accepts tag, tags, ignored_tag, or ignored_tags. Returns changed_count, normalized tags, and warnings.', tag_tool_properties),
+        tool_schema('hyperion_unignore_tags', 'Unignore one or more tags. Accepts tag, tags, ignored_tag, or ignored_tags. Returns changed_count, normalized tags, and warnings.', tag_tool_properties)
       ]
     }
   end
@@ -107,8 +104,8 @@ private
     when 'hyperion_get_post' then agent.post_payload(arguments.fetch(:id))
     when 'hyperion_create_vote_link' then agent.vote_link(arguments.fetch(:id), arguments[:weight])
     when 'hyperion_mark_read' then agent.mark_read(arguments)
-    when 'hyperion_ignore_tags' then agent.ignore_tags(arguments.fetch(:tags))
-    when 'hyperion_unignore_tags' then agent.unignore_tags(arguments.fetch(:tags))
+    when 'hyperion_ignore_tags' then agent.ignore_tags(arguments)
+    when 'hyperion_unignore_tags' then agent.unignore_tags(arguments)
     else
       raise ArgumentError, "Unknown tool: #{name}"
     end
@@ -141,6 +138,15 @@ private
 
   def string_schema(description)
     {type: 'string', description: description}
+  end
+
+  def tag_tool_properties
+    {
+      tag: string_schema('Single tag.'),
+      tags: {type: 'array', items: {type: 'string'}},
+      ignored_tag: string_schema('Single ignored tag alias.'),
+      ignored_tags: {type: 'array', items: {type: 'string'}}
+    }
   end
 
   def json_rpc_error(id, code, message)

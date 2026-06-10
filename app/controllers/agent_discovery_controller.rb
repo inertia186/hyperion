@@ -1,6 +1,15 @@
 class AgentDiscoveryController < ApplicationController
   skip_before_action :sign_in
 
+  def index
+    render json: {
+      name: 'Hyperion well-known index',
+      agent_manifest: hyperion_agent_discovery_url,
+      llms_txt: llms_url,
+      openapi: openapi_url
+    }
+  end
+
   def show
     render json: {
       name: 'Hyperion',
@@ -69,11 +78,12 @@ private
       - POST #{api_v1_agent_auth_challenges_url}
       - GET #{api_v1_agent_session_url}
       - GET #{api_v1_agent_digest_url}?limit=10
+      - GET #{api_v1_agent_digest_url}?query=california
       - GET #{api_v1_agent_post_url(':id')}
       - GET #{api_v1_agent_post_vote_link_url(':id')}?weight=10000
-      - POST #{api_v1_agent_read_url} with {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, or {"all_matching":true,"query":{...}}
-      - POST #{api_v1_agent_ignored_tags_url}
-      - DELETE #{api_v1_agent_ignored_tags_url}
+      - POST #{api_v1_agent_read_url} with {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, {"ids":[123,456]}, or {"all_matching":true,"query":{...}}
+      - POST #{api_v1_agent_ignored_tags_url} with {"tag":"spam"}, {"tags":["spam","ai"]}, or {"ignored_tags":"spam, ai"}
+      - DELETE #{api_v1_agent_ignored_tags_url} with {"tag":"spam"}, {"tags":["spam","ai"]}, or {"ignored_tags":"spam, ai"}
       - POST #{mcp_url}
 
       Example curl flow:
@@ -149,7 +159,8 @@ private
             parameters: [
               query_parameter('limit', 'integer', 'Maximum posts to return. Defaults to 10.'),
               query_parameter('tag', 'string', 'Optional tag/category filter.'),
-              query_parameter('author', 'string', 'Optional author filter.')
+              query_parameter('author', 'string', 'Optional author filter.'),
+              query_parameter('query', 'string', 'Optional keyword search filter.')
             ],
             responses: {'200' => json_response('Curated digest')}
           }
@@ -174,17 +185,19 @@ private
         '/api/v1/agent/read' => {
           post: {
             summary: 'Mark posts read.',
-            description: 'Accepts {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, {"ids":[123,456]}, or {"all_matching":true,"query":{...}}. Returns post_ids and marked_count.',
+            description: 'Accepts {"post_id":123}, {"id":123}, {"post_ids":[123,456]}, {"ids":[123,456]}, {"all_matching":true,"query":{...}}, or the same payload nested under {"agent":{...}}. Returns normalized post_ids, marked_count, warnings, and read_posts_count.',
             responses: {'200' => json_response('Read mutation result')}
           }
         },
         '/api/v1/agent/ignored_tags' => {
           post: {
             summary: 'Ignore tags.',
+            description: 'Accepts {"tag":"spam"}, {"tags":["spam","ai"]}, {"ignored_tag":"spam"}, {"ignored_tags":["spam","ai"]}, comma-separated strings, or the same payload nested under {"agent":{...}}. Returns normalized tags, changed_count, warnings, and current tag state.',
             responses: {'201' => json_response('Updated tag state')}
           },
           delete: {
             summary: 'Unignore tags.',
+            description: 'Accepts {"tag":"spam"}, {"tags":["spam","ai"]}, {"ignored_tag":"spam"}, {"ignored_tags":["spam","ai"]}, comma-separated strings, or the same payload nested under {"agent":{...}}. Returns normalized tags, changed_count, warnings, and current tag state.',
             responses: {'200' => json_response('Updated tag state')}
           }
         },
@@ -290,6 +303,39 @@ private
         method: 'GET',
         url: "#{api_v1_agent_digest_url}?limit=10",
         send_session_cookie: true
+      },
+      keyword_digest: {
+        method: 'GET',
+        url: "#{api_v1_agent_digest_url}?query=california",
+        send_session_cookie: true
+      },
+      mark_read_single: {
+        method: 'POST',
+        url: api_v1_agent_read_url,
+        headers: {'Content-Type' => 'application/json'},
+        body: {post_id: 123},
+        returns: %w(post_ids marked_count warnings)
+      },
+      mark_read_batch: {
+        method: 'POST',
+        url: api_v1_agent_read_url,
+        headers: {'Content-Type' => 'application/json'},
+        body: {post_ids: [123, 456]},
+        returns: %w(post_ids marked_count warnings)
+      },
+      ignore_tags: {
+        method: 'POST',
+        url: api_v1_agent_ignored_tags_url,
+        headers: {'Content-Type' => 'application/json'},
+        body: {tags: ['spam', 'ai']},
+        returns: %w(tags changed_count warnings ignored_tags)
+      },
+      unignore_tag: {
+        method: 'DELETE',
+        url: api_v1_agent_ignored_tags_url,
+        headers: {'Content-Type' => 'application/json'},
+        body: {tag: 'spam'},
+        returns: %w(tags changed_count warnings ignored_tags)
       },
       mcp_tool_call: {
         method: 'POST',

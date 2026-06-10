@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   get '/.well-known/healthcheck.json', to: 'healthcheck#show', defaults: {format: :json}
+  get '/.well-known', to: 'agent_discovery#index', defaults: {format: :json}
   get '/.well-known/hyperion-agent.json', to: 'agent_discovery#show', defaults: {format: :json}, as: :hyperion_agent_discovery
   get '/llms.txt', to: 'agent_discovery#llms', as: :llms
   get '/openapi.json', to: 'agent_discovery#openapi', defaults: {format: :json}, as: :openapi

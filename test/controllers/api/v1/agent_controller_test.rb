@@ -106,6 +106,31 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_equal true, response_json.fetch('read')
   end
 
+  test 'mark read accepts nested and aliased post id parameters' do
+    post :mark_read, params: {agent: {post_id: posts(:allowed_unread).id}}
+
+    assert_response :success
+    assert accounts(:curated).post_read?(posts(:allowed_unread).id)
+    assert_equal 1, response_json.fetch('marked_count')
+    assert_equal [posts(:allowed_unread).id], response_json.fetch('post_ids')
+
+    post :mark_read, params: {ids: [posts(:muted_unread).id, 'not-a-post']}
+
+    assert_response :success
+    assert accounts(:curated).post_read?(posts(:muted_unread).id)
+    assert_equal 1, response_json.fetch('marked_count')
+    assert_equal [posts(:muted_unread).id], response_json.fetch('post_ids')
+  end
+
+  test 'mark read reports warnings for empty or invalid post ids' do
+    post :mark_read, params: {post_ids: ['nope', nil, 0]}
+
+    assert_response :success
+    assert_equal 0, response_json.fetch('marked_count')
+    assert_equal [], response_json.fetch('post_ids')
+    assert_includes response_json.fetch('warnings'), 'No usable post ids were provided.'
+  end
+
   test 'mark read can apply to all posts matching a query' do
     post :mark_read, params: {all_matching: true, query: {tag: 'haf', limit: 1, page: 1}}
 
@@ -121,11 +146,49 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
 
     assert_response :created
     assert_includes response_json.fetch('ignored_tags'), 'new-spam'
+    assert_equal ['new-spam'], response_json.fetch('tags')
+    assert_equal 1, response_json.fetch('changed_count')
 
     delete :destroy_ignored_tags, params: {tags: ['new-spam']}
 
     assert_response :success
     assert_not_includes response_json.fetch('ignored_tags'), 'new-spam'
+    assert_equal ['new-spam'], response_json.fetch('tags')
+    assert_equal 1, response_json.fetch('changed_count')
+  end
+
+  test 'ignore and unignore tags accept aliases comma strings and nested payloads' do
+    post :create_ignored_tags, params: {agent: {ignored_tags: 'Alias-Spam, second-tag, alias-spam'}}
+
+    assert_response :created
+    assert_includes response_json.fetch('ignored_tags'), 'alias-spam'
+    assert_includes response_json.fetch('ignored_tags'), 'second-tag'
+    assert_equal ['alias-spam', 'second-tag'], response_json.fetch('tags')
+    assert_equal 2, response_json.fetch('changed_count')
+
+    delete :destroy_ignored_tags, params: {ignored_tag: 'alias-spam'}
+
+    assert_response :success
+    assert_not_includes response_json.fetch('ignored_tags'), 'alias-spam'
+    assert_includes response_json.fetch('ignored_tags'), 'second-tag'
+    assert_equal ['alias-spam'], response_json.fetch('tags')
+    assert_equal 1, response_json.fetch('changed_count')
+  end
+
+  test 'ignore and unignore tags report warnings for empty payloads' do
+    post :create_ignored_tags, params: {tag: ''}
+
+    assert_response :created
+    assert_equal [], response_json.fetch('tags')
+    assert_equal 0, response_json.fetch('changed_count')
+    assert_includes response_json.fetch('warnings'), 'No usable tags were provided.'
+
+    delete :destroy_ignored_tags, params: {tags: []}
+
+    assert_response :success
+    assert_equal [], response_json.fetch('tags')
+    assert_equal 0, response_json.fetch('changed_count')
+    assert_includes response_json.fetch('warnings'), 'No usable tags were provided.'
   end
 
   test 'mutations reject foreign browser origins' do

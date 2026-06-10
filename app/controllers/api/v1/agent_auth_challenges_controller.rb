@@ -18,6 +18,17 @@ class Api::V1::AgentAuthChallengesController < Api::V1::BaseController
 
   def hivesigner_callback
     challenge = AgentAuthChallenge.find_available!(params[:id])
+
+    if challenge.redeemed_at.present?
+      render html: hivesigner_redeemed_html(challenge).html_safe
+      return
+    end
+
+    if challenge.account_id.present? && challenge.verification_code_digest.present?
+      render html: hivesigner_authorized_html(challenge).html_safe
+      return
+    end
+
     account = HivesignerAuthenticator.new(params[:access_token]).account
 
     unless account
@@ -134,6 +145,49 @@ private
             <p>Copy this one-time code back to your agent:</p>
             <pre style="font-size: 2rem; font-weight: bold;">#{escaped_code}</pre>
             <p>This code expires at #{escaped_expires_at}.</p>
+          </main>
+        </body>
+      </html>
+    HTML
+  end
+
+  def hivesigner_authorized_html(challenge)
+    escaped_expires_at = ERB::Util.html_escape(challenge.expires_at.iso8601)
+
+    <<~HTML
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Hyperion Agent Login</title>
+        </head>
+        <body>
+          <main>
+            <h1>Hyperion agent login</h1>
+            <p>This challenge is already authorized.</p>
+            <p>Use the latest HYP-* code already shown for this challenge. Hyperion will not create a new code from a refreshed HiveSigner callback.</p>
+            <p>This code expires at #{escaped_expires_at}.</p>
+          </main>
+        </body>
+      </html>
+    HTML
+  end
+
+  def hivesigner_redeemed_html(challenge)
+    escaped_challenge_id = ERB::Util.html_escape(challenge.token)
+
+    <<~HTML
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Hyperion Agent Login</title>
+        </head>
+        <body>
+          <main>
+            <h1>Hyperion agent login</h1>
+            <p>This challenge has already been redeemed.</p>
+            <p>Your agent should already have the Hyperion session cookie for challenge #{escaped_challenge_id}.</p>
           </main>
         </body>
       </html>

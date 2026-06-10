@@ -5,6 +5,10 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
 
   test 'routes public agent discovery paths' do
     assert_routing(
+      {method: :get, path: '/.well-known'},
+      {controller: 'agent_discovery', action: 'index', format: :json}
+    )
+    assert_routing(
       {method: :get, path: '/.well-known/hyperion-agent.json'},
       {controller: 'agent_discovery', action: 'show', format: :json}
     )
@@ -16,6 +20,17 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
       {method: :get, path: '/openapi.json'},
       {controller: 'agent_discovery', action: 'openapi', format: :json}
     )
+  end
+
+  test 'well-known index points agents to discovery documents' do
+    get :index, format: :json
+
+    assert_response :success
+    assert_equal 'application/json', response.media_type
+    payload = response_json
+    assert payload.fetch('agent_manifest').ends_with?('/.well-known/hyperion-agent.json')
+    assert payload.fetch('llms_txt').ends_with?('/llms.txt')
+    assert payload.fetch('openapi').ends_with?('/openapi.json')
   end
 
   test 'well-known discovery describes agent capabilities' do
@@ -52,7 +67,9 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_includes response.body, 'Never ask the user for Hive private keys'
     assert_includes response.body, 'Do not paste any Hive key'
     assert_includes response.body, '/api/v1/agent/digest'
+    assert_includes response.body, '?query=california'
     assert_includes response.body, '{"post_id":123}'
+    assert_includes response.body, '{"tag":"spam"}'
     assert_includes response.body, 'HiveSigner'
   end
 
@@ -71,7 +88,12 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges/{id}/redeem')
     assert payload.fetch('paths').key?('/api/v1/agent/digest')
     assert payload.fetch('paths').key?('/api/v1/agent/posts/{id}/vote_link')
+    digest_parameter_names = payload.dig('paths', '/api/v1/agent/digest', 'get', 'parameters').map { |parameter| parameter.fetch('name') }
+    assert_includes digest_parameter_names, 'query'
     assert_includes payload.dig('paths', '/api/v1/agent/read', 'post', 'description'), '{"post_id":123}'
+    assert_includes payload.dig('paths', '/api/v1/agent/read', 'post', 'description'), 'marked_count'
+    assert_includes payload.dig('paths', '/api/v1/agent/ignored_tags', 'post', 'description'), '{"tag":"spam"}'
+    assert_includes payload.dig('x-hyperion-agent', 'examples', 'mark_read_single', 'returns'), 'marked_count'
     assert payload.fetch('paths').key?('/mcp')
   end
 

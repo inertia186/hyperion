@@ -34,10 +34,15 @@ class McpControllerTest < ActionController::TestCase
     post_json(jsonrpc: '2.0', id: 2, method: 'tools/list', params: {})
 
     assert_response :success
-    tool_names = response_json.dig('result', 'tools').map { |tool| tool.fetch('name') }
+    tools = response_json.dig('result', 'tools')
+    tool_names = tools.map { |tool| tool.fetch('name') }
     assert_includes tool_names, 'hyperion_get_digest'
     assert_includes tool_names, 'hyperion_create_vote_link'
     assert_includes tool_names, 'hyperion_mark_read'
+    mark_read_tool = tools.find { |tool| tool.fetch('name') == 'hyperion_mark_read' }
+    assert_includes mark_read_tool.dig('inputSchema', 'properties').keys, 'post_id'
+    ignore_tool = tools.find { |tool| tool.fetch('name') == 'hyperion_ignore_tags' }
+    assert_includes ignore_tool.dig('inputSchema', 'properties').keys, 'ignored_tags'
   end
 
   test 'calls digest tool' do
@@ -131,12 +136,14 @@ class McpControllerTest < ActionController::TestCase
       method: 'tools/call',
       params: {
         name: 'hyperion_ignore_tags',
-        arguments: {tags: ['agent-spam']}
+        arguments: {ignored_tags: 'agent-spam, second-agent-spam'}
       }
     )
 
     assert_response :success
     assert_includes tool_payload.fetch('ignored_tags'), 'agent-spam'
+    assert_includes tool_payload.fetch('ignored_tags'), 'second-agent-spam'
+    assert_equal ['agent-spam', 'second-agent-spam'], tool_payload.fetch('tags')
 
     post_json(
       jsonrpc: '2.0',
@@ -144,12 +151,44 @@ class McpControllerTest < ActionController::TestCase
       method: 'tools/call',
       params: {
         name: 'hyperion_unignore_tags',
-        arguments: {tags: ['agent-spam']}
+        arguments: {tag: 'agent-spam'}
       }
     )
 
     assert_response :success
     assert_not_includes tool_payload.fetch('ignored_tags'), 'agent-spam'
+    assert_includes tool_payload.fetch('ignored_tags'), 'second-agent-spam'
+    assert_equal 1, tool_payload.fetch('changed_count')
+  end
+
+  test 'mutation tools return warnings for empty inputs' do
+    post_json(
+      jsonrpc: '2.0',
+      id: 14,
+      method: 'tools/call',
+      params: {
+        name: 'hyperion_mark_read',
+        arguments: {}
+      }
+    )
+
+    assert_response :success
+    assert_equal 0, tool_payload.fetch('marked_count')
+    assert_includes tool_payload.fetch('warnings'), 'No usable post ids were provided.'
+
+    post_json(
+      jsonrpc: '2.0',
+      id: 15,
+      method: 'tools/call',
+      params: {
+        name: 'hyperion_ignore_tags',
+        arguments: {tag: ''}
+      }
+    )
+
+    assert_response :success
+    assert_equal 0, tool_payload.fetch('changed_count')
+    assert_includes tool_payload.fetch('warnings'), 'No usable tags were provided.'
   end
 
   test 'rejects unsupported protocol versions' do

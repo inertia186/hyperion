@@ -43,6 +43,27 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert challenge.verification_code_digest.present?
   end
 
+  test 'hivesigner callback refresh before redeem does not replace copy code' do
+    challenge = AgentAuthChallenge.issue!
+    account = accounts(:curated)
+
+    HivesignerAuthenticator.stub(:new, ->(_token) { FakeHivesignerAuthenticator.new(account) }) do
+      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+    end
+
+    original_digest = challenge.reload.verification_code_digest
+
+    HivesignerAuthenticator.stub(:new, ->(_token) { flunk 'HiveSigner should not be revalidated after challenge authorization' }) do
+      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+    end
+
+    assert_response :success
+    assert_includes response.body, 'already authorized'
+    assert_no_match(/HYP-[A-Z0-9]{6}/, response.body)
+    assert_equal original_digest, challenge.reload.verification_code_digest
+    assert_nil challenge.redeemed_at
+  end
+
   test 'redeems hivesigner copy code and sets current session account' do
     challenge = AgentAuthChallenge.issue!
     code = challenge.authorize_for_copy_code!(accounts(:curated))
@@ -54,6 +75,24 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert_equal 'fixture-curator', response_json.dig('account', 'name')
     assert_equal accounts(:curated).id, session[:current_account].id
     assert challenge.reload.redeemed_at.present?
+  end
+
+  test 'hivesigner callback after redeem does not reset redeemed challenge' do
+    challenge = AgentAuthChallenge.issue!
+    code = challenge.authorize_for_copy_code!(accounts(:curated))
+    challenge.redeem!(code)
+    redeemed_at = challenge.reload.redeemed_at
+    original_digest = challenge.verification_code_digest
+
+    HivesignerAuthenticator.stub(:new, ->(_token) { flunk 'HiveSigner should not be revalidated after challenge redeem' }) do
+      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+    end
+
+    assert_response :success
+    assert_includes response.body, 'already been redeemed'
+    assert_no_match(/HYP-[A-Z0-9]{6}/, response.body)
+    assert_equal redeemed_at.to_i, challenge.reload.redeemed_at.to_i
+    assert_equal original_digest, challenge.verification_code_digest
   end
 
   test 'redeem rejects invalid copy code' do

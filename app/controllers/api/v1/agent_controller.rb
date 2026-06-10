@@ -24,11 +24,11 @@ class Api::V1::AgentController < Api::V1::BaseController
   end
 
   def create_ignored_tags
-    render json: agent.ignore_tags(agent_params[:tags]), status: :created
+    render json: agent.ignore_tags(agent_params), status: :created
   end
 
   def destroy_ignored_tags
-    render json: agent.unignore_tags(agent_params[:tags])
+    render json: agent.unignore_tags(agent_params)
   end
 
 private
