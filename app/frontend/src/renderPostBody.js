@@ -38,6 +38,18 @@ function hardenRenderedEmbeds(html) {
         iframe.remove()
         return
       }
+      if (isPeakdPostPreviewEmbed(url)) {
+        iframe.classList.add('peakd-embed-preview')
+        iframe.setAttribute('width', '100%')
+        iframe.setAttribute('height', '590')
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups')
+        iframe.setAttribute('data-peakd-resize-bound', 'true')
+        iframe.setAttribute('data-peakd-resize-loaded', 'true')
+        iframe.setAttribute('spellcheck', 'false')
+        if (iframe.parentElement?.classList.contains('videoWrapper')) {
+          iframe.parentElement.classList.add('peakd-embed-wrapper')
+        }
+      }
     } catch (_error) {
       iframe.remove()
       return
@@ -58,6 +70,11 @@ function hardenRenderedEmbeds(html) {
   })
 
   return doc.body.innerHTML
+}
+
+function isPeakdPostPreviewEmbed(url) {
+  return url.hostname === 'embed.peakd.com' &&
+    /^\/[A-Za-z0-9_-]+\/@[a-z0-9](?:[a-z0-9.-]{1,14}[a-z0-9])?\/[a-z0-9][a-z0-9-]{0,255}$/i.test(url.pathname)
 }
 
 function absoluteImageProxy(url) {

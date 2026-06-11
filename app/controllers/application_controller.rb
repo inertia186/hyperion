@@ -114,10 +114,30 @@ private
         next
       end
 
+      if peakd_post_preview_embed_uri?(uri)
+        iframe['class'] = [iframe['class'], 'peakd-embed-preview'].compact.join(' ')
+        iframe['width'] = '100%'
+        iframe['height'] = '590'
+        iframe['sandbox'] = 'allow-scripts allow-same-origin allow-popups'
+        iframe['data-peakd-resize-bound'] = 'true'
+        iframe['data-peakd-resize-loaded'] = 'true'
+        iframe['spellcheck'] = 'false'
+        parent = iframe.parent
+        if parent&.element? && parent['class'].to_s.split.include?('videoWrapper')
+          parent['class'] = [parent['class'], 'peakd-embed-wrapper'].compact.join(' ')
+        end
+      end
+
       iframe['loading'] = 'lazy'
     end
 
     fragment.to_html
+  end
+
+  def peakd_post_preview_embed_uri?(uri)
+    uri.is_a?(URI::HTTPS) &&
+      uri.host == 'embed.peakd.com' &&
+      uri.path.match?(%r{\A/[A-Za-z0-9_-]+/@[a-z0-9](?:[a-z0-9.-]{1,14}[a-z0-9])?/[a-z0-9][a-z0-9-]{0,255}\z}i)
   end
   
   def post_read?(post)

@@ -2508,6 +2508,51 @@ describe('App', () => {
     expect(frame).not.toHaveAttribute('referrerpolicy')
   })
 
+  test('renders PeakD post preview iframe embeds', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '<iframe src="https://embed.peakd.com/hive-163399/@asgarth/what-should-we-build-next-on-peakd?utm_source=nope#extra" width="100%"></iframe>',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(document.querySelector('.post-body iframe')).toBeInTheDocument())
+    const frame = document.querySelector('.post-body iframe')
+    expect(frame).toHaveAttribute('src', 'https://embed.peakd.com/hive-163399/@asgarth/what-should-we-build-next-on-peakd')
+    expect(frame).toHaveAttribute('loading', 'lazy')
+    expect(frame).toHaveClass('peakd-embed-preview')
+    expect(frame.parentElement).toHaveClass('peakd-embed-wrapper')
+    expect(frame).toHaveAttribute('width', '100%')
+    expect(frame).toHaveAttribute('height', '590')
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups')
+    expect(frame).toHaveAttribute('data-peakd-resize-bound', 'true')
+    expect(frame).toHaveAttribute('data-peakd-resize-loaded', 'true')
+    expect(frame).toHaveAttribute('spellcheck', 'false')
+    expect(frame).not.toHaveAttribute('referrerpolicy')
+  })
+
+  test('rejects malformed PeakD post preview iframe embeds', async () => {
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '<iframe src="https://embed.peakd.com/hive-163399/asgarth/what-should-we-build-next-on-peakd"></iframe>',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    await waitFor(() => expect(screen.getByText('(Unsupported https://embed.peakd.com/hive-163399/asgarth/what-should-we-build-next-on-peakd)')).toBeInTheDocument())
+    expect(document.querySelector('.post-body iframe')).not.toBeInTheDocument()
+  })
+
   test('renders direct 3Speak links as embedded players', async () => {
     const detail = deferred()
     detailResponses.set(1, detail)

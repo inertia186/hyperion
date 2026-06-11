@@ -66,6 +66,19 @@ StaticConfig.sanitization = {
                 return `https://play.3speak.tv/watch?v=${m[1]}&mode=iframe&layout=desktop`;
             },
         },
+        {
+            re: /^https:\/\/embed\.peakd\.com\/.*/i,
+            fn: (src) => {
+                if (!src) {
+                    return null;
+                }
+                const m = src.match(/^https:\/\/embed\.peakd\.com\/([A-Za-z0-9_-]+)\/@([a-z0-9](?:[a-z0-9.-]{1,14}[a-z0-9])?)\/([a-z0-9][a-z0-9-]{0,255})(?:[/?#].*)?$/i);
+                if (!m || m.length < 4) {
+                    return null;
+                }
+                return `https://embed.peakd.com/${m[1]}/@${m[2]}/${m[3]}`;
+            },
+        },
     ],
     noImageText: "(Image not shown due to low ratings)",
     allowedTags: `

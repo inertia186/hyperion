@@ -113,6 +113,29 @@ body.mobile-preview-open {
   margin: 0;
 }
 
+.post-body iframe.peakd-embed-preview,
+.post-body iframe[src^="https://embed.peakd.com/"] {
+  box-sizing: border-box;
+  width: 100%;
+  height: 590px;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.post-body .videoWrapper.peakd-embed-wrapper {
+  width: 100%;
+  max-width: 640px;
+  height: 590px;
+  aspect-ratio: auto;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.post-body .videoWrapper.peakd-embed-wrapper iframe {
+  width: 100%;
+  height: 100%;
+}
+
 .post-body a {
   color: #2563eb;
   text-decoration: underline;

@@ -493,6 +493,26 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_not_includes body_html, 'sandbox='
   end
 
+  test 'preview preserves PeakD embedded post iframe html' do
+    post = posts(:allowed_unread)
+    post.update!(body: '<iframe src="https://embed.peakd.com/hive-163399/@asgarth/what-should-we-build-next-on-peakd" width="100%"></iframe>')
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    body_html = response_json.fetch('body_html')
+    assert_includes body_html, '<iframe'
+    assert_includes body_html, 'src="https://embed.peakd.com/hive-163399/@asgarth/what-should-we-build-next-on-peakd"'
+    assert_includes body_html, 'class="peakd-embed-preview"'
+    assert_includes body_html, 'width="100%"'
+    assert_includes body_html, 'height="590"'
+    assert_includes body_html, 'sandbox="allow-scripts allow-same-origin allow-popups"'
+    assert_includes body_html, 'data-peakd-resize-bound="true"'
+    assert_includes body_html, 'data-peakd-resize-loaded="true"'
+    assert_includes body_html, 'spellcheck="false"'
+    assert_includes body_html, 'loading="lazy"'
+  end
+
   test 'preview removes embedded iframe html with unsafe src' do
     post = posts(:allowed_unread)
     post.update!(body: '<iframe src="javascript:alert(1)"></iframe>Visible body')
