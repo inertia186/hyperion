@@ -12,7 +12,8 @@ class Post < ApplicationRecord
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
     blacklisted blacklist_reasons author_reputation tags_count payout payout_amount
-    payout_currency payout_fetched_at payout_unavailable_at payout_source created_at updated_at
+    payout_currency payout_fetched_at payout_unavailable_at payout_source net_rshares
+    created_at updated_at
   )
   
   has_many :tags, dependent: :destroy, counter_cache: :tags_count

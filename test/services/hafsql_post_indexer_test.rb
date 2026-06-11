@@ -15,7 +15,8 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
         'trx_id' => 'abc',
         'created_at' => 1.hour.ago,
         'updated_at' => Time.current,
-        'deleted_at' => nil
+        'deleted_at' => nil,
+        'net_rshares' => 12_345_678
       }
     ])
 
@@ -31,6 +32,7 @@ class HafsqlPostIndexerTest < ActiveSupport::TestCase
     assert_equal 'hive-12345', post.category
     assert_equal 123, post.block_num
     assert_equal 'abc', post.trx_id
+    assert_equal BigDecimal('12345678'), post.net_rshares
     assert_equal 42, post.author_reputation
     assert_equal %w(hive-12345 ruby), post.tags.order(:tag).pluck(:tag)
     assert post.tags.find_by!(tag: 'hive-12345').category?

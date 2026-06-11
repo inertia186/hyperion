@@ -106,6 +106,7 @@ private
 
     if payout.present?
       post.capture_payout!(payout, source: 'estimated')
+      persist_net_rshares(post, cashout_info)
       result.updated += 1
     else
       post.mark_payout_unavailable!
@@ -171,6 +172,13 @@ private
     estimate = [estimate, BigDecimal('0')].max.round(3)
 
     format('%.3f HBD', estimate)
+  end
+
+  def persist_net_rshares(post, cashout_info)
+    value = chain_value(cashout_info, :net_rshares)
+    return if value.nil?
+
+    post.update!(net_rshares: BigDecimal(value.to_s))
   end
 
   def asset_amount(asset, expected_nai: nil)

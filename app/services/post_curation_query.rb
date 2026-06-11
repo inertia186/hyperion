@@ -164,7 +164,7 @@ private
     when :read
       without_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
     when :keyword
-      @query.present? ? keyword_filter(Post.all) : Post.none
+      @query.present? ? keyword_filter(Post.all) : Post.all
     when :ignored
       ignored_relation = without_blacklist_sources(relation.active)
       ignored_relation.where(id: Tag.where(tag: ignored_tags).select(:post_id)).

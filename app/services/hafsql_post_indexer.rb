@@ -7,7 +7,7 @@ class HafsqlPostIndexer
 
   Row = Struct.new(
     :id, :author, :permlink, :title, :body, :category, :metadata, :block_num,
-    :trx_id, :created_at, :updated_at, :deleted_at, keyword_init: true
+    :trx_id, :created_at, :updated_at, :deleted_at, :net_rshares, keyword_init: true
   )
 
   def perform
@@ -80,7 +80,8 @@ private
           #{select_expr(trx_id_column, 'trx_id')},
           #{select_expr(created_column, 'created_at')},
           #{updated_expression} AS #{quote_column('updated_at')},
-          #{deleted_at_expression} AS #{quote_column('deleted_at')}
+          #{deleted_at_expression} AS #{quote_column('deleted_at')},
+          #{select_expr(net_rshares_column, 'net_rshares')}
         FROM #{quoted_relation}
         WHERE #{predicates.join(' AND ')}
         ORDER BY #{updated_expression} ASC
@@ -110,7 +111,8 @@ private
       blacklist_reasons: blacklist_reasons.any? ? blacklist_reasons : post.blacklist_reasons,
       author_reputation: author_reputation,
       created_at: row.created_at,
-      deleted_at: row.deleted_at
+      deleted_at: row.deleted_at,
+      net_rshares: row.net_rshares
     )
     post.save!
 
@@ -148,7 +150,8 @@ private
       trx_id: attributes['trx_id'] || '',
       created_at: attributes['created_at'],
       updated_at: attributes['updated_at'] || attributes['created_at'],
-      deleted_at: attributes['deleted_at']
+      deleted_at: attributes['deleted_at'],
+      net_rshares: attributes['net_rshares']
     )
   end
 
@@ -229,4 +232,5 @@ private
   def deleted_at_column = ENV['HAFSQL_COMMENTS_DELETED_AT_COLUMN']
   def deleted_column = ENV.fetch('HAFSQL_COMMENTS_DELETED_COLUMN', 'deleted')
   def parent_author_column = ENV.fetch('HAFSQL_COMMENTS_PARENT_AUTHOR_COLUMN', 'parent_author')
+  def net_rshares_column = ENV.fetch('HAFSQL_COMMENTS_NET_RSHARES_COLUMN', 'net_rshares')
 end

@@ -34,7 +34,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal(
       {
         'unread' => 2,
-        'keyword' => 0,
+        'keyword' => Post.count,
         'read' => 1,
         'ignored' => 1,
         'deleted' => 1,
@@ -51,7 +51,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal(
       {
         'unread' => 2,
-        'keyword' => 0,
+        'keyword' => Post.count,
         'read' => 1,
         'ignored' => 0,
         'deleted' => 1,
@@ -100,6 +100,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal ['Allowed Unread', 'Blacklisted Allowed', 'Ignored Unread', 'Read Allowed'], response_json.fetch('posts').map { |post| post.fetch('title') }.sort
   end
 
+  test 'blank keyword mode returns all posts without curation filters' do
+    get :index, params: {only_keyword: true, query: '', tag: 'haf', sort: 'latest', limit: 30}
+
+    assert_response :success
+    assert_equal true, response_json.dig('query', 'only_keyword')
+    assert_equal Post.count, response_json.fetch('pagination').fetch('total_count')
+    assert_equal Post.count, response_json.fetch('mode_counts').fetch('keyword')
+  end
+
   test 'keyword mode treats leading at signs as user mention syntax' do
     posts(:allowed_unread).update!(body: 'This post mentions alice without the punctuation.')
 
@@ -117,6 +126,52 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_response :success
     assert_empty response_json.fetch('posts')
     assert_equal 'needlecraft', response_json.fetch('keyword_suggestion')
+  end
+
+  test 'timeline returns 168 hourly browser-local buckets with overlapping status series and payout coverage' do
+    travel_to Time.utc(2026, 6, 10, 20, 30, 0) do
+      posts(:allowed_unread).update!(created_at: Time.utc(2026, 6, 10, 20, 15, 0), payout_amount: 1.25, payout: '1.250 HBD', net_rshares: 100)
+      posts(:deleted_allowed).update!(created_at: Time.utc(2026, 6, 10, 20, 20, 0), deleted_at: Time.utc(2026, 6, 10, 20, 25, 0), payout_amount: 2.5, payout: '2.500 HBD', net_rshares: -25)
+      posts(:blacklisted_allowed).update!(created_at: Time.utc(2026, 6, 10, 20, 35, 0), blacklisted: true, payout_amount: nil, payout: nil, net_rshares: nil)
+      posts(:muted_unread).update!(created_at: Time.utc(2026, 6, 10, 20, 45, 0), payout_amount: 0.25, payout: '0.250 HBD', net_rshares: 150)
+      posts(:old_allowed).update!(created_at: Time.utc(2026, 6, 3, 19, 59, 0), payout_amount: 9.0, payout: '9.000 HBD')
+
+      get :timeline, params: {time_zone: 'America/Los_Angeles'}
+    end
+
+    assert_response :success
+    assert_equal 'America/Los_Angeles', response_json.fetch('time_zone')
+    assert_equal 'hour', response_json.fetch('bucket_granularity')
+    assert_equal 168, response_json.fetch('bucket_count')
+    assert_equal 168, response_json.fetch('buckets').size
+
+    bucket = response_json.fetch('buckets').find { |item| item.fetch('starts_at').start_with?('2026-06-10T13:00:00') }
+    assert bucket, 'Expected a 1pm Los Angeles bucket.'
+
+    unfiltered = bucket.dig('series', 'unfiltered')
+    deleted = bucket.dig('series', 'deleted')
+    blacklisted = bucket.dig('series', 'blacklisted')
+
+    assert_equal 4, unfiltered.fetch('posts_count')
+    assert_equal '4.0', unfiltered.fetch('payout_sum')
+    assert_equal 3, unfiltered.fetch('payout_count')
+    assert_equal 1, unfiltered.fetch('missing_payout_count')
+    assert_equal '225.0', unfiltered.fetch('net_rshares_sum')
+    assert_equal 3, unfiltered.fetch('net_rshares_count')
+    assert_equal 1, unfiltered.fetch('missing_net_rshares_count')
+    assert_equal [posts(:muted_unread).author, posts(:allowed_unread).author], unfiltered.fetch('reward_share_authors')
+    assert_equal 1, deleted.fetch('posts_count')
+    assert_equal '2.5', deleted.fetch('payout_sum')
+    assert_equal '-25.0', deleted.fetch('net_rshares_sum')
+    assert_equal 1, blacklisted.fetch('posts_count')
+    assert_equal '0.0', blacklisted.fetch('payout_sum')
+    assert_equal 1, blacklisted.fetch('missing_payout_count')
+    assert_equal '0.0', blacklisted.fetch('net_rshares_sum')
+    assert_equal 1, blacklisted.fetch('missing_net_rshares_count')
+
+    assert_operator response_json.dig('summary', 'unfiltered', 'posts_count'), :>=, 4
+    assert_operator BigDecimal(response_json.dig('summary', 'unfiltered', 'payout_sum')), :>=, BigDecimal('4.0')
+    assert_operator BigDecimal(response_json.dig('summary', 'unfiltered', 'net_rshares_sum')), :>=, BigDecimal('225')
   end
 
   test 'ignored view includes posts below minimum reputation' do

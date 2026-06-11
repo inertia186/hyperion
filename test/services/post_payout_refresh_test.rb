@@ -25,6 +25,7 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
     assert_equal BigDecimal('2.000'), posts(:muted_unread).payout_amount
     assert_equal 'HBD', posts(:muted_unread).payout_currency
     assert_equal 'estimated', posts(:muted_unread).payout_source
+    assert_equal BigDecimal('4'), posts(:muted_unread).net_rshares
     assert_nil posts(:allowed_unread).reload.payout
     assert_nil posts(:old_allowed).reload.payout
   end
@@ -170,6 +171,8 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
     assert_equal 2, result.updated
     assert_equal '3.000 HBD', posts(:muted_unread).reload.payout
     assert_equal '0.000 HBD', posts(:allowed_unread).reload.payout
+    assert_equal BigDecimal('400'), posts(:muted_unread).net_rshares
+    assert_equal BigDecimal('-10'), posts(:allowed_unread).net_rshares
   end
 
 private

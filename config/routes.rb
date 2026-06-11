@@ -42,6 +42,7 @@ Rails.application.routes.draw do
         end
 
         collection do
+          get :timeline
           patch :read, action: :mark_many_read
         end
       end

@@ -100,6 +100,21 @@ class Api::V1::PostsController < Api::V1::BaseController
     }
   end
 
+  def timeline
+    result = PostTimelineQuery.new(account: current_account, params: params).call
+
+    render json: {
+      time_zone: result.time_zone.tzinfo.name,
+      started_at: result.started_at,
+      ended_at: result.ended_at,
+      bucket_granularity: 'hour',
+      bucket_count: result.buckets.size,
+      series: PostTimelineQuery::SERIES.transform_values { |series| {label: series.fetch(:label)} },
+      buckets: result.buckets,
+      summary: result.summary
+    }
+  end
+
   def mark_read
     current_account.mark_post_as_read!(params[:id])
 
