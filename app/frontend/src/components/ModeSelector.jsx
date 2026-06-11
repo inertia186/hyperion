@@ -1,4 +1,4 @@
-const modeOptions = [
+export const modeOptions = [
   {key: 'unread', countKey: 'unread', label: 'Unread', updates: {only_read: false, only_keyword: false, only_ignored: false, only_deleted: false, only_blacklisted: false}},
   {key: 'only_read', countKey: 'read', label: 'Read', updates: {only_read: true, only_keyword: false, only_ignored: false, only_deleted: false, only_blacklisted: false}},
   {key: 'only_ignored', countKey: 'ignored', label: 'Ignored', updates: {only_ignored: true, only_read: false, only_keyword: false, only_deleted: false, only_blacklisted: false}},
@@ -52,6 +52,6 @@ function modeLabel(mode, counts) {
   return `${mode.label} (${modeCount(mode, counts)})`
 }
 
-function modeCount(mode, counts) {
+export function modeCount(mode, counts) {
   return counts?.[mode.countKey] ?? 0
 }

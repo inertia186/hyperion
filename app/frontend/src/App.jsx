@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Laptop, LogOut, Moon, Settings, Sun, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CalendarDays, CircleHelp, Laptop, LogOut, Menu, Moon, Settings, Sun, Tags, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
+import ShortcutsPanel from './components/ShortcutsPanel'
+import TimelineModal from './components/TimelineModal'
 import { imageProxy } from './format'
 import { applyTheme, normalizeTheme, storedTheme, writeStoredTheme } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
@@ -13,11 +15,14 @@ export default function App() {
   const [error, setError] = useState(null)
   const [votingPower, setVotingPower] = useState({status: 'loading', percent: null})
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [timelineOpen, setTimelineOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [resetKey, setResetKey] = useState(0)
   const [theme, setTheme] = useState(() => storedTheme())
   const [effectiveTheme, setEffectiveTheme] = useState(() => applyTheme(storedTheme()))
   const [themeSaving, setThemeSaving] = useState(false)
+  const inboxRef = useRef(null)
 
   useEffect(() => {
     setEffectiveTheme(applyTheme(theme))
@@ -156,32 +161,60 @@ export default function App() {
   return (
     <div className="safe-area-shell min-h-screen bg-[#f6f7f9] text-slate-800 [min-height:100dvh] dark:bg-slate-950 dark:text-slate-200">
       <header className="safe-area-top border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
-          <button className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-1.5 text-xl font-semibold tracking-normal text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900" type="button" onClick={() => setResetKey((key) => key + 1)} title="Reset">
+        <div className="mx-auto flex max-w-[1800px] items-center gap-2 px-2 py-2.5 sm:gap-4 sm:px-4 sm:py-3">
+          <button className="inline-flex h-10 min-w-0 shrink items-center gap-2 rounded-md px-1.5 text-lg font-semibold tracking-normal text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-xl dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900" type="button" onClick={() => setResetKey((key) => key + 1)} title="Reset">
             <img className="h-7 w-7 object-contain dark:invert" src={hyperionLogo} alt="" />
-            <span>Hyperion</span>
+            <span className="truncate">Hyperion</span>
           </button>
-          <div className="ml-auto flex min-w-0 items-center gap-3">
-            <img className="h-8 w-8 rounded-full" src={imageProxy(session.account.avatar_url, '0x64')} alt="" />
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-3">
+            <img className="hidden h-8 w-8 rounded-full min-[420px]:block" src={imageProxy(session.account.avatar_url, '0x64')} alt="" />
             <VotingPowerBadge votingPower={votingPower} />
             <span className="hidden truncate text-sm font-medium sm:inline">{session.account.name}</span>
-            <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
-            <button className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 sm:h-9 sm:w-9 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
-              <Settings size={16} />
-            </button>
-            <form action={`/sessions/${session.account.name}`} method="post">
-              <input type="hidden" name="_method" value="delete" />
-              <input type="hidden" name="authenticity_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
-              <button className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 sm:h-9 dark:border-slate-700 dark:hover:bg-slate-800" type="submit">
-                <LogOut size={16} />
-                <span className="hidden sm:inline">Log out</span>
+            <div className="hidden items-center gap-3 min-[560px]:flex">
+              <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
+              <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+                <Settings size={16} />
               </button>
-            </form>
+              <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => inboxRef.current?.openTags()}>
+                <Tags size={16} />
+                <span>Tags</span>
+              </button>
+              <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setTimelineOpen(true)}>
+                <CalendarDays size={16} />
+                <span>This Week</span>
+              </button>
+              <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setHelpOpen(true)}>
+                <CircleHelp size={16} />
+                <span>Help</span>
+              </button>
+              <LogoutForm accountName={session.account.name} />
+            </div>
+            <HeaderMenu
+              accountName={session.account.name}
+              theme={theme}
+              themeSaving={themeSaving}
+              onThemeChange={updateTheme}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenTags={() => inboxRef.current?.openTags()}
+              onOpenTimeline={() => setTimelineOpen(true)}
+              onOpenHelp={() => setHelpOpen(true)}
+            />
           </div>
         </div>
       </header>
 
-      <CurationInbox session={session} refreshKey={refreshKey} resetKey={resetKey} theme={effectiveTheme} onRefreshVotingPower={refreshVotingPower} />
+      <CurationInbox
+        ref={inboxRef}
+        session={session}
+        refreshKey={refreshKey}
+        resetKey={resetKey}
+        theme={effectiveTheme}
+        helpVisible={helpOpen}
+        setHelpVisible={setHelpOpen}
+        onRefreshVotingPower={refreshVotingPower}
+      />
+      <ShortcutsPanel visible={helpOpen} onClose={() => setHelpOpen(false)} />
+      <TimelineModal visible={timelineOpen} onClose={() => setTimelineOpen(false)} onSelectAuthor={(author) => inboxRef.current?.focusAuthor(author)} />
       {settingsOpen && (
         <SettingsModal
           session={session}
@@ -234,6 +267,86 @@ function ThemeSelector({theme, onChange, disabled}) {
         <option value="dark">Dark</option>
       </select>
     </label>
+  )
+}
+
+function HeaderMenu({accountName, theme, themeSaving, onThemeChange, onOpenSettings, onOpenTags, onOpenTimeline, onOpenHelp}) {
+  const [open, setOpen] = useState(false)
+  useModalDismiss(open, () => setOpen(false))
+
+  const openSettings = () => {
+    setOpen(false)
+    onOpenSettings()
+  }
+  const openHelp = () => {
+    setOpen(false)
+    onOpenHelp()
+  }
+  const openTimeline = () => {
+    setOpen(false)
+    onOpenTimeline()
+  }
+  const openTags = () => {
+    setOpen(false)
+    onOpenTags()
+  }
+
+  return (
+    <div className="relative min-[560px]:hidden">
+      <button
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-label="Account menu"
+        aria-expanded={open}
+        aria-haspopup="true"
+      >
+        <Menu size={18} />
+      </button>
+      {open && (
+        <>
+          <button className="fixed inset-0 z-30 cursor-default" type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-12 z-40 w-56 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900" aria-label="Account menu">
+            <div className="flex items-center gap-3 px-3 py-2">
+              <span className="min-w-0 flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">Theme</span>
+              <ThemeSelector theme={theme} onChange={onThemeChange} disabled={themeSaving} />
+            </div>
+            <button className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800" type="button" onClick={openSettings}>
+              <Settings size={16} />
+              Open settings
+            </button>
+            <button className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800" type="button" onClick={openTags}>
+              <Tags size={16} />
+              Tags
+            </button>
+            <button className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800" type="button" onClick={openTimeline}>
+              <CalendarDays size={16} />
+              This Week
+            </button>
+            <button className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800" type="button" onClick={openHelp}>
+              <CircleHelp size={16} />
+              Help
+            </button>
+            <div className="border-t border-slate-100 px-1 py-1 dark:border-slate-800">
+              <LogoutForm accountName={accountName} className="flex w-full items-center gap-3 rounded px-2 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800" />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LogoutForm({accountName, className = 'inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}) {
+  return (
+    <form action={`/sessions/${accountName}`} method="post">
+      <input type="hidden" name="_method" value="delete" />
+      <input type="hidden" name="authenticity_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
+      <button className={className} type="submit">
+        <LogOut size={16} />
+        <span>Log out</span>
+      </button>
+    </form>
   )
 }
 

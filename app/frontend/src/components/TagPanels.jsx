@@ -23,6 +23,9 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
     const total = displayedRelatedTags.reduce((sum, item) => sum + Math.max(Number(item.count) || 1, 1), 0)
     return total / displayedRelatedTags.length
   }, [displayedRelatedTags])
+  const cloudTags = useMemo(() => (
+    [...displayedRelatedTags].sort((left, right) => cloudHash(left.tag) - cloudHash(right.tag))
+  ), [displayedRelatedTags])
 
   return (
     <div className={compact ? 'grid gap-4' : 'mt-4 grid gap-4 md:grid-cols-2'}>
@@ -39,15 +42,15 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
           </div>
         </div>
         {relatedMode === 'cloud' ? (
-          <div className="max-h-56 overflow-auto rounded-md border border-slate-100 bg-white px-3 py-2 leading-loose">
-            {displayedRelatedTags.map(({name, tag, count, image_url}) => (
-              <button key={tag} className={`mx-1 align-middle hover:text-blue-700 hover:underline ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} style={{fontSize: cloudFontSize(count, cloudAverage)}} type="button" onClick={() => updateQuery({tag: relatedTagQuery(activeTag, tag)})} title={`${count || 0} posts`}>
+          <div className="flex max-h-72 flex-wrap content-start items-center gap-x-1 gap-y-2 overflow-auto rounded-md border border-slate-100 bg-white px-3 py-3 sm:max-h-[28rem]">
+            {cloudTags.map(({name, tag, count, image_url}) => (
+              <button key={tag} className={`relative rounded px-1 py-0.5 align-middle leading-tight hover:text-blue-700 hover:underline ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} style={{...cloudPlacement(tag), fontSize: cloudFontSize(count, cloudAverage)}} type="button" onClick={() => updateQuery({tag: relatedTagQuery(activeTag, tag)})} title={`${count || 0} posts`}>
                 <CommunityLabel name={name} imageUrl={image_url} />
               </button>
             ))}
           </div>
         ) : (
-          <div className="flex max-h-44 flex-wrap gap-2 overflow-auto">
+          <div className="flex max-h-72 flex-wrap gap-2 overflow-auto sm:max-h-[28rem]">
             {displayedRelatedTags.map(({name, tag, image_url}) => (
               <button key={tag} className={`min-h-9 rounded-md border bg-white px-2 py-1 text-xs hover:bg-slate-50 sm:min-h-0 ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`} type="button" onClick={() => updateQuery({tag: relatedTagQuery(activeTag, tag)})}>
                 <CommunityLabel name={name} imageUrl={image_url} />
@@ -58,7 +61,7 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
       </section>
       <section>
         <div className="mb-2 flex items-center gap-2">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Star size={16} /> Past</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Star size={16} /> Tag History</h2>
           <div className="ml-auto flex gap-2">
             {hasIgnoredPastTags && (
               <button className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs hover:bg-slate-50 sm:h-7" type="button" onClick={() => clearPastTags(true)}>
@@ -73,7 +76,7 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
             </button>
           </div>
         </div>
-        <div className="flex max-h-44 flex-wrap gap-2 overflow-auto">
+        <div className="flex max-h-72 flex-wrap gap-2 overflow-auto sm:max-h-[28rem]">
           {pastTags.map(({name, tag, image_url}) => (
             <span key={tag} className={`inline-flex items-center rounded-md border bg-white text-xs ${ignoredTags.includes(tag) ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
               <button className="min-h-9 px-2 py-1 sm:min-h-0" type="button" onClick={() => updateQuery({tag})}>
@@ -101,7 +104,7 @@ export default function TagPanels({relatedTags, pastTags, favoriteTags, ignoredT
           )}
         </div>
         <p className="mb-2 text-xs text-slate-500">Tip: Setting a tag as poison will ignore all posts by authors that have used a poisoned tag (until they stop).</p>
-        <div className="flex max-h-44 flex-wrap gap-2 overflow-auto">
+        <div className="flex max-h-56 flex-wrap gap-2 overflow-auto sm:max-h-72">
           {poisonedPillTags.length === 0 ? (
             <div className="rounded-md border border-slate-100 bg-white px-3 py-2 text-xs text-slate-500">No poisoned-pill tags.</div>
           ) : poisonedPillTags.map((tag) => (
@@ -125,6 +128,27 @@ function cloudFontSize(count, average) {
   const size = Math.min(Math.max(0.75 + ratio * 0.35, 0.75), 1.8)
 
   return `${size.toFixed(2)}rem`
+}
+
+function cloudPlacement(tag) {
+  const hash = cloudHash(tag)
+  const x = hash % 7 - 3
+  const y = Math.floor(hash / 7) % 9 - 4
+  const rotate = Math.floor(hash / 221) % 7 - 3
+  const marginLeft = Math.floor(hash / 1547) % 7
+  const marginRight = Math.floor(hash / 27846) % 5
+
+  return {
+    marginLeft: `${marginLeft}px`,
+    marginRight: `${marginRight}px`,
+    transform: `translate(${x}px, ${y}px) rotate(${rotate}deg)`
+  }
+}
+
+function cloudHash(value) {
+  return String(value || '').split('').reduce((hash, character) => (
+    ((hash << 5) - hash + character.charCodeAt(0)) >>> 0
+  ), 2166136261)
 }
 
 function relatedTagQuery(activeTag, relatedTag) {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckSquare, Square } from 'lucide-react'
+import { CheckSquare, Loader2, Square } from 'lucide-react'
 import { api } from '../api'
 import { imageProxy, relativeAge, tagLabel } from '../format'
 import CategoryTagsControl from './CategoryTagsControl'
@@ -35,14 +35,14 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
         const tagsExpanded = expandedTagRows.has(post.id)
 
         return (
-          <div key={post.id} data-post-list-row={post.id} data-selected={selectedId === post.id ? 'true' : undefined} className={`post-list-row grid w-full grid-cols-[40px_minmax(0,1fr)_72px] items-center gap-3 px-3 py-3 text-left text-sm hover:bg-slate-50 md:grid-cols-[40px_82px_56px_minmax(180px,1fr)_minmax(112px,160px)_minmax(130px,190px)_82px] md:py-2 xl:grid-cols-[40px_92px_56px_minmax(220px,1fr)_170px_200px_90px] ${selectedId === post.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}>
+          <div key={post.id} data-post-list-row={post.id} data-selected={selectedId === post.id ? 'true' : undefined} className={`post-list-row grid w-full grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-3 text-left text-sm hover:bg-slate-50 sm:gap-3 sm:px-3 md:grid-cols-[40px_82px_56px_minmax(180px,1fr)_minmax(112px,160px)_minmax(130px,190px)_82px] md:py-2 xl:grid-cols-[40px_92px_56px_minmax(220px,1fr)_170px_200px_90px] ${selectedId === post.id ? 'bg-blue-50 ring-1 ring-inset ring-blue-200' : ''}`}>
             <button className="flex h-10 w-10 items-center justify-center rounded text-blue-700 hover:bg-blue-100 md:h-auto md:w-auto md:p-1" type="button" onClick={() => onToggleSelected(post.id)} aria-label={`${checked ? 'Deselect' : 'Select'} ${post.title}`} aria-pressed={checked}>
               {checked ? <CheckSquare size={18} /> : <Square size={18} />}
             </button>
             <PostPayout post={post} onPayoutRefresh={onPayoutRefresh} />
             <PostThumbnail post={post} />
             <div className="min-w-0">
-              <button className="block w-full truncate text-left font-medium text-slate-900" type="button" onClick={() => onSelect(post.id)}>
+              <button className="block w-full overflow-hidden text-left font-medium leading-snug text-slate-900 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] md:truncate md:[display:block]" type="button" onClick={() => onSelect(post.id)}>
                 {post.title}
               </button>
               <span className="post-row-mobile-meta mt-1 flex flex-wrap items-center gap-1 md:hidden">
@@ -66,7 +66,7 @@ export default function PostList({posts, selectedId, selectedPostIds, allMatchin
               className="post-row-tags hidden min-w-0 md:block"
               testId={`post-tags-${post.id}`}
             />
-            <button className="text-right text-xs text-slate-500" type="button" onClick={() => onSelect(post.id)}>{relativeAge(post.created_at)}</button>
+            <button className="whitespace-nowrap text-right text-xs text-slate-500" type="button" onClick={() => onSelect(post.id)}>{relativeAge(post.created_at)}</button>
           </div>
         )
       })}
@@ -80,6 +80,7 @@ function PostPayout({post, onPayoutRefresh}) {
   const [payout, setPayout] = useState(displayPayout(post))
   const payoutFresh = freshPayout(post.payout_fetched_at)
   const payoutUnavailable = Boolean(post.payout_unavailable_at)
+  const payoutEstimated = post.payout_source === 'estimated'
 
   useEffect(() => {
     setPayout(displayPayout(post))
@@ -91,13 +92,13 @@ function PostPayout({post, onPayoutRefresh}) {
       setPayout(displayPayout(post))
       return undefined
     }
-    if (post.payout && payoutFresh) {
+    if (post.payout && payoutFresh && !payoutEstimated) {
       setPayout(displayPayout(post))
       return undefined
     }
 
     const abortController = new AbortController()
-    if (!post.payout) setPayout('...')
+    if (!post.payout) setPayout({text: '...', estimated: false})
 
     api.postPayout(post.id, {}, {signal: abortController.signal})
       .then((payload) => {
@@ -111,19 +112,20 @@ function PostPayout({post, onPayoutRefresh}) {
     return () => {
       abortController.abort()
     }
-  }, [onPayoutRefresh, payoutFresh, payoutUnavailable, post.id, post.author, post.permlink, post.payout, post.payout_source, visible])
+  }, [onPayoutRefresh, payoutEstimated, payoutFresh, payoutUnavailable, post.id, post.author, post.permlink, post.payout, post.payout_source, visible])
 
   return (
     <span ref={payoutRef} data-testid={`post-payout-${post.id}`} className="post-row-payout hidden h-7 min-w-0 items-center justify-center rounded bg-slate-100 px-2 text-center text-[11px] font-medium text-slate-600 md:inline-flex">
-      <span className="truncate">{payout}</span>
+      {payout.estimated && <Loader2 className="mr-1 shrink-0 animate-spin text-slate-400" size={11} aria-label="Estimated payout" role="img" />}
+      <span className="truncate">{payout.text}</span>
     </span>
   )
 }
 
 function displayPayout(post) {
-  if (!post.payout) return '...'
+  if (!post.payout) return {text: '...', estimated: false}
 
-  return post.payout_source === 'estimated' ? `~${post.payout}` : post.payout
+  return {text: post.payout, estimated: post.payout_source === 'estimated'}
 }
 
 function freshPayout(fetchedAt) {

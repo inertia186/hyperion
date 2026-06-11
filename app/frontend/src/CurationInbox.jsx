@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { CheckSquare, Loader2, Square, X } from 'lucide-react'
 import { api } from './api'
 import { initialQuery } from './constants'
@@ -7,9 +7,9 @@ import { useCurationKeyboard } from './useCurationKeyboard'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
 import PostList from './components/PostList'
 import PreviewPane from './components/PreviewPane'
-import ShortcutsPanel from './components/ShortcutsPanel'
 import TagPanels from './components/TagPanels'
 import Toolbar from './components/Toolbar'
+import { activeModeKey, modeCount, modeOptions } from './components/ModeSelector'
 
 const emptyPreviewState = {postId: null, status: 'idle', html: '', detail: null, error: null}
 const DESKTOP_PREVIEW_STORAGE_KEY = 'hyperion.desktopPreviewPercent'
@@ -18,7 +18,7 @@ const MIN_DESKTOP_PREVIEW_PERCENT = 28
 const MAX_DESKTOP_PREVIEW_PERCENT = 65
 const COMPACT_MODE_SELECTOR_PREVIEW_PERCENT = 50
 
-export default function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', onRefreshVotingPower}) {
+const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
   const [query, setQuery] = useState(initialQuery)
   const [draftTag, setDraftTag] = useState('')
   const [draftQuery, setDraftQuery] = useState('')
@@ -36,7 +36,6 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
   const [previewActive, setPreviewActive] = useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
-  const [shortcutsVisible, setShortcutsVisible] = useState(false)
   const [desktopPreviewPercent, setDesktopPreviewPercent] = useState(readDesktopPreviewPercent)
   const desktopLayoutRef = useRef(null)
   const listScrollRef = useRef(null)
@@ -63,6 +62,7 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
   const resultCountLabel = postsPayload ? postsResultCountLabel(postsPayload.query, totalPosts, loadedPostsCount, hasMorePosts) : ''
   const keywordSearchSuggestion = postsPayload && !postsPayload.query?.only_keyword ? keywordSuggestionFromFilterQuery(postsPayload.query) : ''
   const keywordDidYouMean = postsPayload?.query?.only_keyword ? postsPayload.keyword_suggestion : ''
+  const contextSuggestions = postsPayload && !postsPayload.query?.only_keyword ? emptyContextSuggestions(postsPayload.query, postsPayload.mode_counts) : []
   const visibleSelectionCount = allMatchingSelected ? totalPosts : selectedPostIds.size
   const allLoadedSelected = posts.length > 0 && posts.every((post) => selectedPostIds.has(post.id))
   const canSelectAllMatching = allLoadedSelected && !allMatchingSelected && totalPosts > loadedPostsCount
@@ -646,6 +646,11 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
     setTagsOpen(false)
   }
 
+  useImperativeHandle(ref, () => ({
+    openTags: () => setTagsOpen(true),
+    focusAuthor
+  }), [focusAuthor])
+
   const markSelectedReadAndMove = useCallback((direction) => {
     markPostReadAndMove(selectedPostRef.current, direction)
   }, [markPostReadAndMove])
@@ -687,8 +692,8 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
     moveSelection,
     markSelectedReadAndMove,
     scrollPreview,
-    shortcutsVisible,
-    setShortcutsVisible
+    shortcutsVisible: helpVisible,
+    setShortcutsVisible: setHelpVisible
   })
 
   const updateTagPanelQuery = (updates) => {
@@ -739,7 +744,6 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
             payload={postsPayload}
             toggleMute={toggleMute}
             toggleOnlyFavorites={toggleOnlyFavorites}
-            onOpenTags={() => setTagsOpen(true)}
             compactModeSelector={compactModeSelector}
           />
 
@@ -774,6 +778,15 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
             ) : posts.length === 0 ? (
               <div className="px-4 py-12 text-center text-sm text-slate-500">
                 <div>All caught up for this view.</div>
+                {contextSuggestions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {contextSuggestions.map((mode) => (
+                      <button key={mode.key} className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => updateQuery(mode.updates)}>
+                        View {mode.label} ({mode.count})
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {keywordSearchSuggestion && (
                   <div className="mt-3">
                     <button className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={searchKeywordsFromFilters}>
@@ -877,18 +890,19 @@ export default function CurationInbox({session, refreshKey = 0, resetKey = 0, th
         tagPanelProps={tagPanelProps}
       />
 
-      <ShortcutsPanel visible={shortcutsVisible} onClose={() => setShortcutsVisible(false)} />
     </>
   )
-}
+})
+
+export default CurationInbox
 
 function TagsModal({open, onClose, tagPanelProps}) {
   useModalDismiss(open, onClose)
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-16 sm:pt-24" role="dialog" aria-modal="true" aria-label="Tags" onClick={closeOnBackdropClick(onClose)}>
-      <div className="flex max-h-[calc(100vh-5rem)] w-full max-w-4xl flex-col rounded-md border border-slate-200 bg-white shadow-xl sm:max-h-[calc(100vh-7rem)]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-8 sm:p-4 sm:pt-10" role="dialog" aria-modal="true" aria-label="Tags" onClick={closeOnBackdropClick(onClose)}>
+      <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col rounded-md border border-slate-200 bg-white shadow-xl sm:max-h-[calc(100vh-3.5rem)]">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <div className="text-sm font-semibold text-slate-900">Tags</div>
           <button className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close tags">
@@ -1074,6 +1088,15 @@ function parseQueryInput(value) {
 
 function keywordSuggestionFromFilterQuery(query = {}) {
   return [query.tag, ...(query.other_tags || [])].filter(Boolean).join(' ').trim()
+}
+
+function emptyContextSuggestions(query, counts) {
+  const activeMode = activeModeKey(query)
+
+  return modeOptions
+    .filter((mode) => mode.key !== activeMode)
+    .map((mode) => ({...mode, count: modeCount(mode, counts)}))
+    .filter((mode) => mode.count > 0)
 }
 
 function adjustReadCounts(payload, query, readDelta) {

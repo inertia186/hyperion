@@ -236,6 +236,8 @@ let votingPowerFailure
 let chainStatsPayload
 let chainStatsResponses
 let payoutResponses
+let timelineFailure
+let timelineOverride
 
 const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
@@ -266,7 +268,7 @@ const postsPayload = (params = new URLSearchParams()) => {
     },
     keyword_suggestion: onlyKeyword && query === 'frist' ? 'first' : null,
     pagination: {page, limit, total_count: filteredPosts.length, total_pages: Math.max(Math.ceil(filteredPosts.length / limit), 1)},
-    mode_counts: {unread: filteredPosts.length, keyword: query ? filteredPosts.length : 0, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
+    mode_counts: {unread: filteredPosts.length, keyword: query || onlyKeyword ? filteredPosts.length : 0, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
     posts: pagePosts,
     related_tags: [{name: 'haf', tag: 'haf', count: 24}, {name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png', count: 6}],
     related_authors: ['visible-author'],
@@ -277,6 +279,50 @@ const postsPayload = (params = new URLSearchParams()) => {
     counts: {read_posts: 1, ignored_tags: 1, poisoned_pill_tags: 0, muted_posts: 2, tags: 3}
   }
 }
+
+const timelinePayload = () => ({
+  time_zone: 'America/Los_Angeles',
+  started_at: '2026-06-03T13:00:00-07:00',
+  ended_at: '2026-06-10T14:00:00-07:00',
+  bucket_granularity: 'hour',
+  bucket_count: 3,
+  series: {
+    unfiltered: {label: 'Unfiltered'},
+    deleted: {label: 'Deleted'},
+    blacklisted: {label: 'Blacklisted'}
+  },
+  buckets: [
+    {
+      starts_at: '2026-06-03T13:00:00-07:00',
+      series: {
+        unfiltered: {posts_count: 2, payout_sum: '3.25', payout_count: 2, missing_payout_count: 0, net_rshares_sum: '1200000000', net_rshares_count: 2, missing_net_rshares_count: 0, reward_share_authors: ['visible-author', 'middle-author']},
+        deleted: {posts_count: 0, payout_sum: '0.0', payout_count: 0, missing_payout_count: 0, net_rshares_sum: '0.0', net_rshares_count: 0, missing_net_rshares_count: 0},
+        blacklisted: {posts_count: 1, payout_sum: '1.0', payout_count: 1, missing_payout_count: 0, net_rshares_sum: '250000000', net_rshares_count: 1, missing_net_rshares_count: 0}
+      }
+    },
+    {
+      starts_at: '2026-06-07T01:00:00-07:00',
+      series: {
+        unfiltered: {posts_count: 4, payout_sum: '8.5', payout_count: 3, missing_payout_count: 1, net_rshares_sum: '3400000000', net_rshares_count: 3, missing_net_rshares_count: 1, reward_share_authors: ['last-author', 'visible-author']},
+        deleted: {posts_count: 1, payout_sum: '2.5', payout_count: 1, missing_payout_count: 0, net_rshares_sum: '-500000000', net_rshares_count: 1, missing_net_rshares_count: 0},
+        blacklisted: {posts_count: 0, payout_sum: '0.0', payout_count: 0, missing_payout_count: 0, net_rshares_sum: '0.0', net_rshares_count: 0, missing_net_rshares_count: 0}
+      }
+    },
+    {
+      starts_at: '2026-06-10T13:00:00-07:00',
+      series: {
+        unfiltered: {posts_count: 3, payout_sum: '4.0', payout_count: 2, missing_payout_count: 1, net_rshares_sum: '900000000', net_rshares_count: 2, missing_net_rshares_count: 1, reward_share_authors: ['middle-author']},
+        deleted: {posts_count: 1, payout_sum: '0.0', payout_count: 0, missing_payout_count: 1, net_rshares_sum: '-100000000', net_rshares_count: 1, missing_net_rshares_count: 0},
+        blacklisted: {posts_count: 1, payout_sum: '0.5', payout_count: 1, missing_payout_count: 0, net_rshares_sum: '50000000', net_rshares_count: 1, missing_net_rshares_count: 0}
+      }
+    }
+  ],
+  summary: {
+    unfiltered: {posts_count: 9, payout_sum: '15.75', payout_count: 7, missing_payout_count: 2, net_rshares_sum: '5500000000', net_rshares_count: 7, missing_net_rshares_count: 2},
+    deleted: {posts_count: 2, payout_sum: '2.5', payout_count: 1, missing_payout_count: 1, net_rshares_sum: '-600000000', net_rshares_count: 2, missing_net_rshares_count: 0},
+    blacklisted: {posts_count: 2, payout_sum: '1.5', payout_count: 2, missing_payout_count: 0, net_rshares_sum: '300000000', net_rshares_count: 2, missing_net_rshares_count: 0}
+  }
+})
 
 const renderApp = async ({waitForPreview = true} = {}) => {
   render(<App />)
@@ -305,6 +351,8 @@ describe('App', () => {
     chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 10000}
     chainStatsResponses = new Map()
     payoutResponses = new Map()
+    timelineFailure = false
+    timelineOverride = null
     window.confirm = vi.fn(() => true)
     window.alert = vi.fn()
     window.open = vi.fn()
@@ -348,6 +396,11 @@ describe('App', () => {
       }
 
       if (url.toString().startsWith('/api/v1/posts?')) return jsonResponse(postsPayload(new URLSearchParams(url.toString().split('?')[1])))
+
+      if (url.toString().startsWith('/api/v1/posts/timeline?')) {
+        if (timelineFailure) return jsonError({error: 'Timeline unavailable'}, 503)
+        return jsonResponse(timelineOverride || timelinePayload())
+      }
 
       const detailMatch = url.toString().match(/\/api\/v1\/posts\/(\d+)$/)
       if (detailMatch) {
@@ -880,11 +933,14 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('Votes: 2')).toBeInTheDocument())
     expect(screen.getByRole('link', {name: 'Replies: 2'})).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/post-1#comments')
     expect(screen.getAllByText('1.234 HBD').length).toBeGreaterThan(1)
-    expect(screen.getByRole('link', {name: /canonical.example/i})).toHaveAttribute('href', 'https://canonical.example/1')
-    expect(screen.queryByRole('link', {name: /^Canonical$/i})).not.toBeInTheDocument()
-    expect(screen.getByRole('link', {name: /hive.blog/i})).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/post-1')
-    expect(screen.getByRole('link', {name: /hivehub.dev/i})).toHaveAttribute('href', 'https://hivehub.dev/hive-13323/@visible-author/post-1')
-    expect(screen.getByRole('button', {name: /Diff/i})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    const linksDialog = screen.getByRole('dialog', {name: 'Post actions'})
+    expect(within(linksDialog).getByRole('link', {name: /canonical.example/i})).toHaveAttribute('href', 'https://canonical.example/1')
+    expect(within(linksDialog).queryByRole('link', {name: /^Canonical$/i})).not.toBeInTheDocument()
+    expect(within(linksDialog).getByRole('link', {name: /hive.blog/i})).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/post-1')
+    expect(within(linksDialog).getByRole('link', {name: /hivehub.dev/i})).toHaveAttribute('href', 'https://hivehub.dev/hive-13323/@visible-author/post-1')
+    expect(within(linksDialog).getByRole('button', {name: /Diff/i})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', {name: 'Close post actions'}))
     expect(screen.queryByRole('link', {name: /scribe/i})).not.toBeInTheDocument()
   })
 
@@ -1013,25 +1069,26 @@ describe('App', () => {
     await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/2/payout?']))
   })
 
-  test('marks fresh persisted estimated list payouts without fetching them again', async () => {
+  test('lazy-refreshes fresh persisted estimated list payouts when they become visible', async () => {
     const visibility = installIntersectionObserverMock()
     currentPosts = [
       {...posts[0], payout: '5.000 HBD', payout_amount: '5.000', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString(), payout_source: 'estimated'},
       posts[1],
       posts[2]
     ]
+    payoutResponses.set(1, {status: 'ready', payout: '5.125 HBD', payout_amount: '5.125', payout_currency: 'HBD', payout_fetched_at: new Date().toISOString(), payout_source: 'exact'})
 
     await renderApp()
 
     const payoutUrls = () => global.fetch.mock.calls.filter(([url]) => url.toString().includes('/payout')).map(([url]) => url)
     const firstPayout = screen.getByTestId('post-payout-1')
 
-    expect(firstPayout).toHaveTextContent('~5.000 HBD')
+    expect(firstPayout).toHaveTextContent('5.000 HBD')
+    expect(within(firstPayout).getByRole('img', {name: 'Estimated payout'})).toBeInTheDocument()
     visibility.trigger(firstPayout)
-    await act(async () => {
-      await Promise.resolve()
-    })
-    expect(payoutUrls()).toEqual([])
+    await waitFor(() => expect(payoutUrls()).toEqual(['/api/v1/posts/1/payout?']))
+    await waitFor(() => expect(firstPayout).toHaveTextContent('5.125 HBD'))
+    expect(within(firstPayout).queryByRole('img', {name: 'Estimated payout'})).not.toBeInTheDocument()
   })
 
   test('skips payout fetches for rows marked payout unavailable', async () => {
@@ -1104,7 +1161,8 @@ describe('App', () => {
   test('opens a rendered revision diff modal', async () => {
     await renderApp()
 
-    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    fireEvent.click(within(screen.getByRole('dialog', {name: 'Post actions'})).getByRole('button', {name: /Diff/i}))
 
     const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
     expect(within(dialog).getByText('-middle source line')).toBeInTheDocument()
@@ -1123,12 +1181,14 @@ describe('App', () => {
   test('dismisses the revision diff modal with Escape and click-away', async () => {
     await renderApp()
 
-    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    fireEvent.click(within(screen.getByRole('dialog', {name: 'Post actions'})).getByRole('button', {name: /Diff/i}))
     expect(await screen.findByRole('dialog', {name: 'Revision diff'})).toBeInTheDocument()
     fireEvent.keyDown(document, {key: 'Escape'})
     expect(screen.queryByRole('dialog', {name: 'Revision diff'})).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    fireEvent.click(within(screen.getByRole('dialog', {name: 'Post actions'})).getByRole('button', {name: /Diff/i}))
     const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
     fireEvent.click(dialog)
     expect(screen.queryByRole('dialog', {name: 'Revision diff'})).not.toBeInTheDocument()
@@ -1138,7 +1198,8 @@ describe('App', () => {
     revisionFailures.add(1)
     await renderApp()
 
-    fireEvent.click(screen.getByRole('button', {name: /Diff/i}))
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    fireEvent.click(within(screen.getByRole('dialog', {name: 'Post actions'})).getByRole('button', {name: /Diff/i}))
 
     const dialog = await screen.findByRole('dialog', {name: 'Revision diff'})
     expect(within(dialog).getByText('Diff service is not configured.')).toBeInTheDocument()
@@ -1160,7 +1221,9 @@ describe('App', () => {
 
     await renderApp()
 
-    const hiveBlogLinks = screen.getAllByRole('link', {name: /hive.blog/i})
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    const linksDialog = screen.getByRole('dialog', {name: 'Post actions'})
+    const hiveBlogLinks = within(linksDialog).getAllByRole('link', {name: /hive.blog/i})
     expect(hiveBlogLinks).toHaveLength(1)
     expect(hiveBlogLinks[0]).toHaveAttribute('href', 'https://hive.blog/hive-13323/@visible-author/first-post')
   })
@@ -1181,7 +1244,9 @@ describe('App', () => {
 
     await renderApp()
 
-    const peakdLinks = screen.getAllByRole('link', {name: /peakd/i})
+    fireEvent.click(screen.getByRole('button', {name: 'Open post actions'}))
+    const linksDialog = screen.getByRole('dialog', {name: 'Post actions'})
+    const peakdLinks = within(linksDialog).getAllByRole('link', {name: /peakd/i})
     expect(peakdLinks).toHaveLength(1)
     expect(peakdLinks[0]).toHaveTextContent('peakd')
   })
@@ -1363,11 +1428,22 @@ describe('App', () => {
     expect(screen.queryByRole('button', {name: 'Ignore tag'})).not.toBeInTheDocument()
     expect(screen.queryByRole('button', {name: 'Mute'})).not.toBeInTheDocument()
     expect(screen.queryByRole('button', {name: 'Favorites'})).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', {name: 'Tags'})).not.toBeInTheDocument()
-    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'hive engine'}})
+    expect(screen.getByRole('button', {name: 'Tags'})).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Search title or body keywords'), {target: {value: 'hive engine'}})
     fireEvent.click(screen.getByRole('button', {name: 'Search'}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=hive+engine'), expect.any(Object)))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_keyword=true'), expect.any(Object)))
+  })
+
+  test('allows blank keyword search to return unfiltered posts', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_keyword=true'), expect.any(Object)))
+    expect(screen.queryByText('All caught up for this view.')).not.toBeInTheDocument()
+    expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
   test('keeps the keyword form selected when the initial filters response finishes late', async () => {
@@ -1387,12 +1463,12 @@ describe('App', () => {
     await renderApp({waitForPreview: false})
 
     fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
-    expect(screen.getByPlaceholderText('title or body keywords')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search title or body keywords')).toBeInTheDocument()
 
     await act(async () => resolvePosts())
     await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
 
-    expect(screen.getByPlaceholderText('title or body keywords')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search title or body keywords')).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('photography @author app:peakd -contests')).not.toBeInTheDocument()
   })
 
@@ -1402,7 +1478,7 @@ describe('App', () => {
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
-    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'frist'}})
+    fireEvent.change(screen.getByPlaceholderText('Search title or body keywords'), {target: {value: 'frist'}})
     fireEvent.click(screen.getByRole('button', {name: 'Search'}))
 
     await waitFor(() => expect(screen.getByText('All caught up for this view.')).toBeInTheDocument())
@@ -1412,7 +1488,7 @@ describe('App', () => {
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
     await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
-    expect(screen.getByPlaceholderText('title or body keywords')).toHaveValue('first')
+    expect(screen.getByPlaceholderText('Search title or body keywords')).toHaveValue('first')
   })
 
   test('supports the Hyperion Goes Live tag discovery and favorites workflow', async () => {
@@ -1442,7 +1518,7 @@ describe('App', () => {
     await waitFor(() => expect(within(poisonSection).getByRole('button', {name: 'Remove poisoned pill hive-13323'})).toBeInTheDocument())
     expect(within(poisonSection).getByRole('button', {name: 'Hive'})).toBeInTheDocument()
 
-    const pastSection = screen.getByRole('heading', {name: 'Past'}).closest('section')
+    const pastSection = screen.getByRole('heading', {name: 'Tag History'}).closest('section')
     expect(within(pastSection).queryByTitle('Poison tag')).not.toBeInTheDocument()
 
     fireEvent.click(within(pastSection).getByTitle('Favorite tag'))
@@ -1500,7 +1576,7 @@ describe('App', () => {
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
-    fireEvent.change(screen.getByPlaceholderText('title or body keywords'), {target: {value: 'needlecraft'}})
+    fireEvent.change(screen.getByPlaceholderText('Search title or body keywords'), {target: {value: 'needlecraft'}})
 
     const previewTags = screen.getByTestId('preview-tags-1')
     fireEvent.click(within(previewTags).getByRole('button', {name: 'Expand tags for preview First Post'}))
@@ -1509,7 +1585,7 @@ describe('App', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object)))
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('only_keyword=true'), expect.any(Object)))
     expect(screen.getByPlaceholderText('photography @author app:peakd -contests')).toHaveValue('haf')
-    expect(screen.queryByPlaceholderText('title or body keywords')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Search title or body keywords')).not.toBeInTheDocument()
   })
 
   test('focuses the query from a preview author', async () => {
@@ -1756,7 +1832,7 @@ describe('App', () => {
     await renderApp()
 
     expect(screen.queryByText('Preview focus')).not.toBeInTheDocument()
-    expect(screen.getByText(/\? shortcuts/)).toBeInTheDocument()
+    expect(screen.queryByText(/\? shortcuts/)).not.toBeInTheDocument()
     expect(screen.getByTestId('preview-pane')).not.toHaveClass('ring-2')
 
     fireEvent.keyDown(document, {key: 'Enter'})
@@ -1975,22 +2051,216 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', {name: 'Search keywords for "haf"'}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=haf'), expect.any(Object)))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_keyword=true'), expect.any(Object)))
-    expect(screen.getByPlaceholderText('title or body keywords')).toHaveValue('haf')
+    expect(screen.getByPlaceholderText('Search title or body keywords')).toHaveValue('haf')
     await waitFor(() => expect(screen.getByText('Preview 1')).toBeInTheDocument())
     expect(screen.getByText('Hyperion')).toBeInTheDocument()
+  })
+
+  test('suggests non-empty view contexts when the current view has no posts', async () => {
+    emptyTags.add('haf')
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Tags'}))
+
+    const relatedSection = screen.getByRole('heading', {name: 'Related Tags'}).closest('section')
+    fireEvent.click(within(relatedSection).getByRole('button', {name: 'haf'}))
+
+    await waitFor(() => expect(screen.getByText('All caught up for this view.')).toBeInTheDocument())
+    expect(screen.queryByRole('button', {name: 'View Unread (0)'})).not.toBeInTheDocument()
+    expect(screen.getByRole('button', {name: 'View Read (1)'})).toBeInTheDocument()
+    expect(screen.getByRole('button', {name: 'View Ignored (2)'})).toBeInTheDocument()
+    expect(screen.getByRole('button', {name: 'View Deleted (3)'})).toBeInTheDocument()
+    expect(screen.getByRole('button', {name: 'View Blacklisted (4)'})).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'View Ignored (2)'}))
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_ignored=true'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=haf'), expect.any(Object))
   })
 
   test('toggles keyboard shortcut help with question mark', async () => {
     await renderApp()
 
-    expect(screen.queryByText('Keyboard shortcuts')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', {name: 'Help'})).not.toBeInTheDocument()
 
     fireEvent.keyDown(document, {key: '?'})
-    await waitFor(() => expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument())
-    expect(screen.getByText('toggle shortcuts')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('dialog', {name: 'Help'})).toBeInTheDocument())
+    expect(screen.getByText(/Hyperion is a focused curation inbox for Hive/)).toBeInTheDocument()
+    expect(screen.getByText(/your curation state, not a global Hive-wide read count/)).toBeInTheDocument()
+    expect(screen.getByText(/title\/body keyword search/)).toBeInTheDocument()
+    expect(screen.queryByText(/Quick controls:/)).not.toBeInTheDocument()
+    expect(screen.getByText('help')).toBeInTheDocument()
 
     fireEvent.keyDown(document, {key: 'Escape'})
-    await waitFor(() => expect(screen.queryByText('Keyboard shortcuts')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'Help'})).not.toBeInTheDocument())
+  })
+
+  test('opens help from the toolbar button', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    expect(screen.getByRole('button', {name: 'Help'})).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Help'}))
+
+    expect(screen.getByRole('dialog', {name: 'Help'})).toBeInTheDocument()
+    expect(screen.getByText('j / down')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'Close help'}))
+    expect(screen.queryByRole('dialog', {name: 'Help'})).not.toBeInTheDocument()
+  })
+
+  test('opens the This Week timeline modal and requests browser-local buckets', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    expect(within(dialog).getByText('All posts')).toBeInTheDocument()
+    expect(within(dialog).getByText('15.75 HBD payout')).toBeInTheDocument()
+    expect(within(dialog).getByText('Reward share')).toBeInTheDocument()
+    expect(within(dialog).getByText('5.5B')).toBeInTheDocument()
+    expect(within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})).toBeInTheDocument()
+    expect(within(dialog).getByText(/pending root-post rewards/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', {name: 'HiveHub reward stats'})).toHaveAttribute('href', 'https://hivehub.dev/stats?metric=comment_rewards&timeframe=daily')
+
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Reward share info'}))
+    expect(within(dialog).getByText(/signed net rshares total/)).toBeInTheDocument()
+
+    const expectedTimeZone = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC')
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(`/api/v1/posts/timeline?time_zone=${expectedTimeZone}`), expect.any(Object)))
+
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Close timeline'}))
+    expect(screen.queryByRole('dialog', {name: 'This Week on Hive'})).not.toBeInTheDocument()
+  })
+
+  test('switches the This Week timeline between payout and post count metrics with reward share signposts', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    expect(within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})).toBeInTheDocument()
+    expect(within(dialog).getAllByText(/@last-author, @visible-author/).length).toBeGreaterThan(0)
+    expect(within(dialog).queryByText(/High reward share/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', {name: 'Reward share'})).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Posts'}))
+
+    expect(within(dialog).getByRole('img', {name: 'This Week on Hive post count timeline'})).toBeInTheDocument()
+    expect(within(dialog).getByText('Hourly post count')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/High reward share/)).not.toBeInTheDocument()
+  })
+
+  test('adds and removes manual timeline signposts by clicking the graph', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    const chart = within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})
+    chart.getBoundingClientRect = vi.fn(() => ({left: 0, top: 0, width: 720, height: 260, right: 720, bottom: 260}))
+
+    fireEvent.click(chart, {clientX: 48, clientY: 120})
+
+    expect(within(dialog).getByRole('button', {name: 'Focus author @middle-author'})).toBeInTheDocument()
+
+    fireEvent.click(chart, {clientX: 48, clientY: 120})
+
+    expect(within(dialog).queryByRole('button', {name: 'Focus author @middle-author'})).not.toBeInTheDocument()
+  })
+
+  test('keeps manual timeline signposts across metric switches and clears them when reopened', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    let dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    let chart = within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})
+    chart.getBoundingClientRect = vi.fn(() => ({left: 0, top: 0, width: 720, height: 260, right: 720, bottom: 260}))
+
+    fireEvent.click(chart, {clientX: 48, clientY: 120})
+    expect(within(dialog).getByRole('button', {name: 'Focus author @middle-author'})).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Posts'}))
+
+    expect(within(dialog).getByRole('img', {name: 'This Week on Hive post count timeline'})).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', {name: 'Focus author @middle-author'})).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Close timeline'}))
+    expect(screen.queryByRole('dialog', {name: 'This Week on Hive'})).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    expect(within(dialog).queryByRole('button', {name: 'Focus author @middle-author'})).not.toBeInTheDocument()
+  })
+
+  test('filters the inbox from a manual timeline signpost author', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    const chart = within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})
+    chart.getBoundingClientRect = vi.fn(() => ({left: 0, top: 0, width: 720, height: 260, right: 720, bottom: 260}))
+
+    fireEvent.click(chart, {clientX: 48, clientY: 120})
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Focus author @middle-author'}))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'This Week on Hive'})).not.toBeInTheDocument())
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('author=middle-author'), expect.any(Object)))
+  })
+
+  test('shows an empty author label for manual timeline signposts without reward-share authors', async () => {
+    const payload = timelinePayload()
+    payload.buckets[0].series.unfiltered.reward_share_authors = []
+    timelineOverride = payload
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    const chart = within(dialog).getByRole('img', {name: 'This Week on Hive payout timeline'})
+    chart.getBoundingClientRect = vi.fn(() => ({left: 0, top: 0, width: 720, height: 260, right: 720, bottom: 260}))
+
+    fireEvent.click(chart, {clientX: 48, clientY: 120})
+
+    expect(within(dialog).getAllByText(/No reward-share authors/).length).toBeGreaterThan(0)
+  })
+
+  test('filters the inbox from a timeline reward share author signpost', async () => {
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    fireEvent.click(within(dialog).getByRole('button', {name: 'Focus author @last-author'}))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', {name: 'This Week on Hive'})).not.toBeInTheDocument())
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('author=last-author'), expect.any(Object)))
+  })
+
+  test('shows timeline errors without disrupting the inbox', async () => {
+    timelineFailure = true
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    expect(await within(dialog).findByText('Timeline unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Preview 1')).toBeInTheDocument()
+  })
+
+  test('shows an empty timeline state without disrupting the inbox', async () => {
+    timelineOverride = {...timelinePayload(), buckets: [], bucket_count: 0, summary: {}}
+    await renderApp()
+
+    fireEvent.click(screen.getByRole('button', {name: 'This Week'}))
+
+    const dialog = await screen.findByRole('dialog', {name: 'This Week on Hive'})
+    expect(await within(dialog).findByText('No timeline data for this week.')).toBeInTheDocument()
+    expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
   test('toggles keyboard shortcut help from an empty list', async () => {
@@ -2000,8 +2270,8 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('All caught up for this view.')).toBeInTheDocument())
     fireEvent.keyDown(document, {key: '?'})
 
-    await waitFor(() => expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument())
-    expect(screen.getByText('toggle shortcuts')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('dialog', {name: 'Help'})).toBeInTheDocument())
+    expect(screen.getByText('help')).toBeInTheDocument()
   })
 
   test('ignores stale preview responses after fast selection changes', async () => {

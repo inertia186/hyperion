@@ -28,6 +28,7 @@ export const api = {
   session: () => request('/api/v1/session'),
   votingPower: () => request('/api/v1/session/voting_power'),
   posts: (params) => request(`/api/v1/posts?${params.toString()}`),
+  postTimeline: (params = {}) => request(`/api/v1/posts/timeline?${new URLSearchParams(params).toString()}`),
   post: (id) => request(`/api/v1/posts/${id}`),
   postRevisions: (id) => request(`/api/v1/posts/${id}/revisions`),
   postPayout: (id, params = {}, options = {}) => request(`/api/v1/posts/${id}/payout?${new URLSearchParams(params).toString()}`, options),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, FileDiff, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, ExternalLink, FileDiff, MessageSquare, MoreVertical, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { api } from '../api'
 import { imageProxy } from '../format'
 import { renderPostBody } from '../renderPostBody'
@@ -38,7 +38,7 @@ export default function PreviewPane({
 
     return {...post, ...detail.display_post, id: post.id, tags: post.tags}
   }, [detail?.display_post, post])
-  const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost), [displayPost, urls])
+  const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost).filter((link) => link.href), [displayPost, urls])
   const commentsUrl = useMemo(() => replyCommentsUrl(urls, displayPost), [displayPost, urls])
   const previewHtml = useMemo(() => {
     if (!detail?.body_markdown) return previewState.html
@@ -56,11 +56,13 @@ export default function PreviewPane({
   const [voteBusy, setVoteBusy] = useState(false)
   const [hivesignerModal, setHivesignerModal] = useState(null)
   const [diffModal, setDiffModal] = useState(null)
+  const [postActionsOpen, setPostActionsOpen] = useState(false)
   const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
   const voteRefreshRef = useRef({id: 0, timeoutId: null})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)
+    setPostActionsOpen(false)
   }, [post?.id])
 
   useEffect(() => {
@@ -152,6 +154,7 @@ export default function PreviewPane({
   }
 
   useModalDismiss(!!hivesignerModal, () => closeHivesignerModal())
+  useModalDismiss(postActionsOpen, () => setPostActionsOpen(false))
 
   const castVote = (direction) => {
     if (!displayPost || !accountName) return
@@ -210,6 +213,29 @@ export default function PreviewPane({
   return (
     <div className={`flex h-full min-h-[420px] flex-col ${previewActive ? 'ring-2 ring-blue-500 ring-inset' : ''}`} data-testid="preview-pane">
       <div className="border-b border-slate-200 p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-xs disabled:opacity-50" type="button" onClick={onPrevious} disabled={!hasPrevious} aria-label="Previous"><ArrowUp size={14} /></button>
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-xs disabled:opacity-50" type="button" onClick={onNext} disabled={!hasNext} aria-label="Next"><ArrowDown size={14} /></button>
+          <button className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-xs disabled:opacity-50" type="button" onClick={onMarkReadNext} disabled={readBusy}>
+            <CheckSquare size={14} /> Mark read + next
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+              type="button"
+              onClick={() => setPostActionsOpen(true)}
+              aria-label="Open post actions"
+              aria-haspopup="dialog"
+            >
+              <MoreVertical size={14} />
+            </button>
+            {onClose && (
+              <button className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close preview">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex items-start gap-3">
           <img className="h-10 w-10 rounded-full" src={imageProxy(`https://images.hive.blog/u/${displayPost.author}/avatar`, '0x80')} alt="" />
           <div className="min-w-0 flex-1">
@@ -231,11 +257,6 @@ export default function PreviewPane({
               <span className="pt-1">using {displayPost.app}</span>
             </div>
           </div>
-          {onClose && (
-            <button className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close preview">
-              <X size={16} />
-            </button>
-          )}
         </div>
         {post.blacklisted && (
           <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -243,27 +264,12 @@ export default function PreviewPane({
             <span>{blacklistReasonText(blacklistReasons)}</span>
           </div>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-xs disabled:opacity-50" type="button" onClick={onPrevious} disabled={!hasPrevious}><ArrowUp size={14} /> Previous</button>
-          <button className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-xs disabled:opacity-50" type="button" onClick={onNext} disabled={!hasNext}>Next <ArrowDown size={14} /></button>
-          <button className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-xs disabled:opacity-50" type="button" onClick={onMarkReadNext} disabled={readBusy}>
-            <CheckSquare size={14} /> Mark read + next
-          </button>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {externalLinks.map((link) => (
-              <ExternalLinkButton key={link.key} href={link.href} label={link.label} />
-            ))}
-            <button className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline" type="button" onClick={openDiffModal}>
-              <FileDiff size={12} /> Diff
-            </button>
-          </div>
-        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
           <button className={`inline-flex h-8 items-center gap-1 rounded-md border px-2 disabled:opacity-50 ${stats.currentVote > 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300'}`} type="button" onClick={() => setVotePanel(votePanel === 'up' ? null : 'up')} disabled={voteBusy}>
             <ThumbsUp size={14} /> Votes: {stats.votes ?? '...'} {votePanel === 'up' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
-          <button className={`inline-flex h-8 items-center gap-1 rounded-md border px-2 disabled:opacity-50 ${stats.currentVote < 0 ? 'border-red-300 bg-red-50 text-red-800' : 'border-slate-300'}`} type="button" onClick={() => setVotePanel(votePanel === 'down' ? null : 'down')} disabled={voteBusy}>
-            <ThumbsDown size={14} /> Downvote {votePanel === 'down' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          <button className={`inline-flex h-8 w-12 items-center justify-center gap-1 rounded-md border disabled:opacity-50 ${stats.currentVote < 0 ? 'border-red-300 bg-red-50 text-red-800' : 'border-slate-300'}`} type="button" onClick={() => setVotePanel(votePanel === 'down' ? null : 'down')} disabled={voteBusy} aria-label="Downvote">
+            <ThumbsDown size={14} /> {votePanel === 'down' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
           <a className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-slate-700 hover:bg-slate-50 hover:text-blue-700" href={commentsUrl} target="_blank" rel="noopener noreferrer">
             <MessageSquare size={14} /> Replies: {stats.replies ?? '...'}
@@ -279,7 +285,6 @@ export default function PreviewPane({
             </button>
           </div>
         )}
-        <div className="mt-2 text-[11px] text-slate-500">? shortcuts · j/k move · Enter preview · Esc list · &gt; mark read + next · Space scroll</div>
       </div>
       <div ref={previewScrollRef} className="safe-area-bottom touch-scroll min-h-0 flex-1 overflow-auto p-4" tabIndex={-1}>
         {previewReady ? (
@@ -311,6 +316,13 @@ export default function PreviewPane({
           modal={diffModal}
           onClose={() => setDiffModal(null)}
           onSelectPair={(selectedIndex) => setDiffModal((current) => ({...current, selectedIndex}))}
+        />
+      )}
+      {postActionsOpen && (
+        <PostActionsDrawer
+          links={externalLinks}
+          onClose={() => setPostActionsOpen(false)}
+          onOpenDiff={openDiffModal}
         />
       )}
     </div>
@@ -354,13 +366,49 @@ function normalizedHost(href) {
   }
 }
 
-function ExternalLinkButton({href, label}) {
-  if (!href) return null
+function PostActionsDrawer({links, onClose, onOpenDiff}) {
+  const openDiff = () => {
+    onClose()
+    onOpenDiff()
+  }
 
   return (
-    <a className="inline-flex items-center gap-1 text-xs text-blue-700 hover:underline" href={href} target="_blank" rel="noreferrer">
-      <ExternalLink size={12} /> {label}
-    </a>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="Post actions" onClick={closeOnBackdropClick(onClose)}>
+      <div className="safe-area-bottom w-full max-w-sm overflow-hidden rounded-t-lg border border-slate-200 bg-white shadow-xl sm:rounded-lg">
+        <div className="flex min-h-12 items-center gap-3 border-b border-slate-200 px-3">
+          <div className="min-w-0 flex-1 text-sm font-semibold text-slate-900">Post actions</div>
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close post actions">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="grid gap-1 p-2">
+          {links.length > 0 && <div className="px-3 pb-1 pt-1 text-xs font-semibold uppercase text-slate-400">Open in</div>}
+          {links.map((link) => (
+            <a
+              key={link.key}
+              className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-700"
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={onClose}
+            >
+              <ExternalLink className="shrink-0" size={16} />
+              <span className="min-w-0 flex-1 truncate">{link.label}</span>
+            </a>
+          ))}
+          <div className="mt-1 border-t border-slate-100 pt-1">
+            <button
+              className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-700"
+              type="button"
+              onClick={openDiff}
+            >
+              <FileDiff className="shrink-0" size={16} />
+              <span className="min-w-0 flex-1 truncate">Diff</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
