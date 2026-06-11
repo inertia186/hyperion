@@ -66,6 +66,62 @@ export default function PreviewPane({
   }, [post?.id])
 
   useEffect(() => {
+    if (!previewReady) return
+    const previewNode = previewScrollRef?.current
+    if (!previewNode) return
+
+    const cleanupCallbacks = []
+
+    previewNode.querySelectorAll('.post-body img.bbs-image-source').forEach((image) => {
+      const originalSrc = image.dataset.bbsOriginalSrc || image.getAttribute('src') || ''
+      const pixelSrc = image.dataset.bbsPixelSrc || originalSrc
+
+      if (!image.dataset.bbsOriginalSrc) image.dataset.bbsOriginalSrc = originalSrc
+      if (!image.dataset.bbsOriginalSrcset && image.getAttribute('srcset')) {
+        image.dataset.bbsOriginalSrcset = image.getAttribute('srcset')
+      }
+
+      if (theme === 'bbs' && pixelSrc) {
+        const applyPixelSource = () => {
+          const renderedWidth = Math.ceil(image.getBoundingClientRect().width)
+          const fallbackWidth = Math.min(
+            image.naturalWidth || 0,
+            image.parentElement?.clientWidth || image.naturalWidth || 0
+          )
+          const targetWidth = renderedWidth || fallbackWidth
+
+          if (targetWidth > 0) image.style.width = `${targetWidth}px`
+          image.style.height = 'auto'
+          image.setAttribute('src', pixelSrc)
+          image.removeAttribute('srcset')
+          image.dataset.bbsImage = 'pixel'
+        }
+
+        if (image.complete && image.naturalWidth > 0) {
+          applyPixelSource()
+        } else {
+          image.setAttribute('src', originalSrc)
+          const handleLoad = () => applyPixelSource()
+          image.addEventListener('load', handleLoad, {once: true})
+          cleanupCallbacks.push(() => image.removeEventListener('load', handleLoad))
+        }
+      } else {
+        image.setAttribute('src', originalSrc)
+        if (image.dataset.bbsOriginalSrcset) {
+          image.setAttribute('srcset', image.dataset.bbsOriginalSrcset)
+        }
+        image.style.width = ''
+        image.style.height = ''
+        image.dataset.bbsImage = 'source'
+      }
+    })
+
+    return () => {
+      cleanupCallbacks.forEach((callback) => callback())
+    }
+  }, [previewHtml, previewReady, previewScrollRef, theme])
+
+  useEffect(() => {
     setStats(post ? loadingStats : emptyStats)
     voteRefreshRef.current.id += 1
     window.clearTimeout(voteRefreshRef.current.timeoutId)
@@ -422,7 +478,7 @@ function DiffModal({modal, onClose, onSelectPair}) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Revision diff" onClick={closeOnBackdropClick(onClose)}>
-      <div className="flex h-[min(860px,calc(100vh-24px))] w-[min(1120px,calc(100vw-24px))] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div className="diff-modal flex h-[min(860px,calc(100vh-24px))] w-[min(1120px,calc(100vw-24px))] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
         <div className="flex min-h-12 items-center gap-3 border-b border-slate-200 px-3">
           <div className="min-w-0 flex-1 text-sm font-semibold text-slate-900">Revision diff</div>
           {pairCount > 1 && (
@@ -441,7 +497,7 @@ function DiffModal({modal, onClose, onSelectPair}) {
             <X size={15} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3">
+        <div className="diff-modal-body min-h-0 flex-1 overflow-auto bg-slate-50 p-3">
           {modal.status === 'loading' ? (
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">Loading revisions...</div>
           ) : modal.status === 'error' ? (
@@ -463,8 +519,8 @@ function CodeRevision({revision}) {
   if (!revision) return null
 
   return (
-    <section className="flex min-h-[360px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
-      <div className="border-b border-slate-800 bg-slate-900 px-3 py-2">
+    <section className="code-revision flex min-h-[360px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
+      <div className="code-revision-header border-b border-slate-800 bg-slate-900 px-3 py-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Only revision</div>
         <div className="mt-0.5 text-sm font-medium text-slate-100">{revision.label}</div>
         <div className="mt-0.5 text-xs text-slate-400">{revisionDetail(revision)}</div>
@@ -478,8 +534,8 @@ function CodeDiff({previousRevision, currentRevision}) {
   const lines = lineDiff(previousRevision?.body || '', currentRevision?.body || '')
 
   return (
-    <section className="flex min-h-[520px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
-      <div className="grid border-b border-slate-800 bg-slate-900 text-xs text-slate-300 sm:grid-cols-2">
+    <section className="code-diff flex min-h-[520px] flex-col overflow-hidden rounded-md border border-slate-800 bg-slate-950 text-slate-100">
+      <div className="code-diff-header grid border-b border-slate-800 bg-slate-900 text-xs text-slate-300 sm:grid-cols-2">
         <div className="border-b border-slate-800 px-3 py-2 sm:border-b-0 sm:border-r">
           <div className="font-semibold">{previousRevision?.label || 'Before'}</div>
           <div className="mt-0.5 text-slate-400">{revisionDetail(previousRevision || {})}</div>

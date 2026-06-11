@@ -63,13 +63,13 @@ export default function TimelineModal({visible, onClose, onSelectAuthor}) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-3" role="dialog" aria-modal="true" aria-label="This Week on Hive" onClick={closeOnBackdropClick(onClose)}>
-      <div className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="timeline-modal flex max-h-[calc(100vh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl">
+        <div className="timeline-modal-header flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-slate-900">This Week on Hive</h2>
             <div className="text-xs text-slate-500">{payload ? timelineRange(payload) : 'Rolling 7 days · hourly'}</div>
           </div>
-          <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-xs" role="group" aria-label="Timeline metric">
+          <div className="timeline-metric-toggle inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-xs" role="group" aria-label="Timeline metric">
             <button className={`h-8 rounded px-3 ${metric === 'payout' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`} type="button" onClick={() => setMetric('payout')} aria-pressed={metric === 'payout'}>Payout</button>
             <button className={`h-8 rounded px-3 ${metric === 'posts' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`} type="button" onClick={() => setMetric('posts')} aria-pressed={metric === 'posts'}>Posts</button>
           </div>
@@ -77,7 +77,7 @@ export default function TimelineModal({visible, onClose, onSelectAuthor}) {
             <X size={15} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-4">
+        <div className="timeline-modal-body min-h-0 flex-1 overflow-auto p-4">
           {state.status === 'loading' ? (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-8 text-center text-sm text-slate-500">Loading timeline...</div>
           ) : state.status === 'error' ? (
@@ -122,7 +122,7 @@ function TimelineContent({payload, metric, manualSignpostKeys, onToggleManualSig
 
 function SummaryCard({label, metrics = {}}) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="timeline-summary-card rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
       <CardLabel label={label} />
       <div className="mt-1 text-lg font-semibold tabular-nums text-slate-900">{formatInteger(metrics.posts_count)}</div>
       <div className="mt-0.5 text-xs tabular-nums text-slate-600">{formatPayout(metrics.payout_sum)} payout</div>
@@ -132,7 +132,7 @@ function SummaryCard({label, metrics = {}}) {
 
 function RewardShareCard({metrics = {}}) {
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="timeline-summary-card rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
       <CardLabel label="Reward share" />
       <div className="mt-1 text-lg font-semibold tabular-nums text-slate-900">{formatCompact(metrics.net_rshares_sum)}</div>
       <div className="mt-0.5 text-xs tabular-nums text-slate-600">net rshares</div>
@@ -171,7 +171,7 @@ function TimelineChart({buckets, metric, manualSignpostKeys, onToggleManualSignp
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3">
+    <div className="timeline-chart-card rounded-md border border-slate-200 bg-white p-3">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="text-xs font-medium text-slate-500">{title}</div>
         <div className="ml-auto flex flex-wrap gap-3">

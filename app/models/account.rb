@@ -3,7 +3,7 @@ class Account < ApplicationRecord
   extend Memoist
 
   THEME_SETTING = 'theme'
-  THEMES = %w(light dark system).freeze
+  THEMES = %w(light dark system mist linen sage sky orchid carbon navy pine plum copper norton franklin-amber franklin-green darkula lcars bbs).freeze
   MINIMUM_REPUTATION_SETTING = 'minimum_reputation'
   DEFAULT_MINIMUM_REPUTATION = HiveReputation::DEFAULT_REPUTATION
   MINIMUM_REPUTATION_RANGE = (-100..100)

@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from './App'
 import { imageProxy } from './format'
+import { PROFESSIONAL_THEMES, THEME_OPTIONS, THEMES } from './theme'
 
 const posts = [
   {
@@ -525,7 +526,7 @@ describe('App', () => {
 
       if (url === '/api/v1/preferences/theme' && options.method === 'PATCH') {
         const theme = JSON.parse(options.body).theme
-        sessionTheme = ['light', 'dark', 'system'].includes(theme) ? theme : 'system'
+        sessionTheme = THEMES.includes(theme) ? theme : 'system'
         return jsonResponse({theme: sessionTheme})
       }
 
@@ -567,6 +568,11 @@ describe('App', () => {
   afterEach(() => {
     cleanup()
     document.documentElement.classList.remove('dark')
+    document.documentElement.classList.remove('theme-pro')
+    THEME_OPTIONS.forEach((theme) => {
+      if (theme.rootClass) document.documentElement.classList.remove(theme.rootClass)
+    })
+    document.documentElement.classList.remove('theme-franklin')
     document.documentElement.style.colorScheme = ''
     window.localStorage?.clear?.()
     delete window.IntersectionObserver
@@ -690,6 +696,112 @@ describe('App', () => {
     act(() => setSystemDark(false))
 
     expect(document.documentElement).not.toHaveClass('dark')
+  })
+
+  test.each(PROFESSIONAL_THEMES)('saves $label professional theme from the header selector', async ({id, mode, rootClass}) => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: id}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: id})
+    })))
+    if (mode === 'dark') {
+      expect(document.documentElement).toHaveClass('dark')
+    } else {
+      expect(document.documentElement).not.toHaveClass('dark')
+    }
+    expect(document.documentElement).toHaveClass('theme-pro')
+    expect(document.documentElement).toHaveClass(rootClass)
+    expect(window.localStorage.getItem('hyperion.theme')).toBe(id)
+  })
+
+  test('saves Norton Commander theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'norton'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'norton'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-norton')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('norton')
+  })
+
+  test('saves Franklin Amber theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'franklin-amber'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'franklin-amber'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-franklin')
+    expect(document.documentElement).toHaveClass('theme-franklin-amber')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('franklin-amber')
+  })
+
+  test('saves Franklin Green theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'franklin-green'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'franklin-green'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-franklin')
+    expect(document.documentElement).toHaveClass('theme-franklin-green')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('franklin-green')
+  })
+
+  test('saves Darkula theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'darkula'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'darkula'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-darkula')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('darkula')
+  })
+
+  test('saves LCARS theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'lcars'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'lcars'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-lcars')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('lcars')
+  })
+
+  test('saves BBS theme from the header selector', async () => {
+    await renderApp()
+
+    fireEvent.change(screen.getByRole('combobox', {name: 'Theme'}), {target: {value: 'bbs'}})
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/preferences/theme', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({theme: 'bbs'})
+    })))
+    expect(document.documentElement).toHaveClass('dark')
+    expect(document.documentElement).toHaveClass('theme-bbs')
+    expect(document.documentElement).not.toHaveClass('theme-pro')
+    expect(window.localStorage.getItem('hyperion.theme')).toBe('bbs')
   })
 
   test('dismisses settings with Escape and click-away', async () => {
@@ -2347,6 +2459,32 @@ describe('App', () => {
     expect(image).toHaveAttribute('loading', 'lazy')
     expect(image).toHaveAttribute('decoding', 'async')
     expect(image).toHaveAttribute('referrerpolicy', 'no-referrer')
+    expect(image).toHaveClass('bbs-image-source')
+    expect(image).toHaveAttribute('data-bbs-image', 'source')
+    expect(image).toHaveAttribute('data-bbs-original-src', new URL(proxiedImage('https://example.com/body.png', '1280x0'), window.location.origin).toString().replace(/^http:/, ''))
+    expect(image).toHaveAttribute('data-bbs-pixel-src', new URL(proxiedImage('https://example.com/body.png', '160x0'), window.location.origin).toString())
+  })
+
+  test('uses low-resolution post body images in BBS theme', async () => {
+    sessionTheme = 'bbs'
+    vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true)
+    vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(640)
+    const detail = deferred()
+    detailResponses.set(1, detail)
+    detail.resolve({
+      id: 1,
+      title: 'First Post',
+      body_markdown: '![Alt text](https://example.com/body.png)',
+      body_html: '<p>Fallback preview</p>',
+      urls: {}
+    })
+
+    await renderApp({waitForPreview: false})
+
+    const image = await screen.findByRole('img', {name: 'Alt text'})
+    await waitFor(() => expect(image).toHaveAttribute('data-bbs-image', 'pixel'))
+    expect(image).toHaveAttribute('src', new URL(proxiedImage('https://example.com/body.png', '160x0'), window.location.origin).toString())
+    expect(image.style.width).not.toBe('')
   })
 
   test('renders YouTube embeds without sandboxing the player iframe', async () => {

@@ -65,7 +65,7 @@ export default function Toolbar({
   }
 
   return (
-    <div className="mb-3 rounded-md border border-slate-200 bg-white p-2.5 sm:p-3">
+    <div className="toolbar-shell mb-3 rounded-md border border-slate-200 bg-white p-2.5 sm:p-3">
       <div ref={actionRowRef} className="mb-2 flex flex-wrap items-center gap-2">
         {compactSearchForm ? (
           <label className="inline-flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm sm:h-9 sm:flex-none">
@@ -103,17 +103,17 @@ export default function Toolbar({
 
       <form className="flex flex-wrap gap-2" onSubmit={submitQuery} role="search" aria-label={keywordMode ? 'Keyword search' : 'Post query'}>
         {keywordMode ? (
-          <label className="min-w-[18rem] flex-[999_1_24rem] max-[520px]:min-w-full">
-            <span className="mb-1 block text-xs font-medium text-slate-500">Keyword search</span>
-            <div className="flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
+          <label className="toolbar-search-field min-w-[18rem] flex-[999_1_24rem] max-[520px]:min-w-full">
+            <span className="toolbar-search-label mb-1 block text-xs font-medium text-slate-500">Keyword search</span>
+            <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Search size={16} className="text-slate-400" />
               <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Search title or body keywords" />
             </div>
           </label>
         ) : (
-          <label className="min-w-[18rem] flex-[999_1_24rem] max-[520px]:min-w-full">
+          <label className="toolbar-search-field min-w-[18rem] flex-[999_1_24rem] max-[520px]:min-w-full">
             <span className="sr-only">Tag, author, app, excluded tags</span>
-            <div className="flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
+            <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Search size={16} className="text-slate-400" />
               <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
             </div>

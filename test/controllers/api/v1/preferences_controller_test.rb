@@ -38,7 +38,7 @@ class Api::V1::PreferencesControllerTest < ActionController::TestCase
   end
 
   test 'updates theme preference' do
-    %w(light dark system).each do |theme|
+    Account::THEMES.each do |theme|
       patch :theme, params: {theme: theme}
 
       assert_response :success
