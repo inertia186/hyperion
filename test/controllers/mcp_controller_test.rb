@@ -21,6 +21,39 @@ class McpControllerTest < ActionController::TestCase
     assert_equal false, response_json.fetch('authenticated')
   end
 
+  test 'authenticates with bearer token' do
+    @request.session[:current_account] = nil
+    _token_record, bearer_token = AgentAccessToken.issue_for!(accounts(:curated))
+    @request.headers['Authorization'] = "Bearer #{bearer_token}"
+
+    post_json(jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'hyperion_get_session', arguments: {}})
+
+    assert_response :success
+    assert_equal 'fixture-curator', tool_payload.dig('account', 'name')
+  end
+
+  test 'rejects invalid bearer token without session' do
+    @request.session[:current_account] = nil
+    @request.headers['Authorization'] = 'Bearer invalid-token'
+
+    post_json(jsonrpc: '2.0', id: 1, method: 'tools/list')
+
+    assert_response :unauthorized
+    assert_equal false, response_json.fetch('authenticated')
+  end
+
+  test 'rejects revoked bearer token without session' do
+    @request.session[:current_account] = nil
+    token_record, bearer_token = AgentAccessToken.issue_for!(accounts(:curated))
+    token_record.update!(revoked_at: Time.current)
+    @request.headers['Authorization'] = "Bearer #{bearer_token}"
+
+    post_json(jsonrpc: '2.0', id: 1, method: 'tools/list')
+
+    assert_response :unauthorized
+    assert_equal false, response_json.fetch('authenticated')
+  end
+
   test 'initializes mcp session' do
     post_json(jsonrpc: '2.0', id: 1, method: 'initialize', params: {})
 

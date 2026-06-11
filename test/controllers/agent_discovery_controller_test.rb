@@ -40,9 +40,11 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_equal 'application/json', response.media_type
     payload = response_json
     assert_equal 'Hyperion', payload.fetch('name')
-    assert_equal 'session_cookie', payload.dig('authentication', 'type')
+    assert_equal 'session_cookie_or_bearer', payload.dig('authentication', 'type')
     assert payload.dig('authentication', 'auth_challenge_url').ends_with?('/api/v1/agent/auth_challenges')
+    assert_equal 'Authorization: Bearer <bearer_token>', payload.dig('authentication', 'bearer_header')
     assert_includes payload.dig('authentication', 'instructions').join(' '), 'POST /api/v1/agent/auth_challenges'
+    assert_includes payload.dig('authentication', 'instructions').join(' '), 'Authorization: Bearer'
     assert_includes payload.dig('authentication', 'instructions').join(' '), 'Never ask for or accept Hive private keys'
     assert_equal 'HYP-* one-time Hyperion code', payload.dig('authentication', 'credential_handling', 'user_only_pastes_to_agent')
     assert_includes payload.dig('authentication', 'credential_handling', 'user_prompt'), 'paste only that code'
@@ -64,6 +66,8 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_includes response.body, 'Hyperion Agent Guide'
     assert_includes response.body, 'Recommended TUI/CLI authentication flow'
     assert_includes response.body, 'same cookie jar'
+    assert_includes response.body, 'bearer_token'
+    assert_includes response.body, "Authorization: Bearer"
     assert_includes response.body, 'Never ask the user for Hive private keys'
     assert_includes response.body, 'Do not paste any Hive key'
     assert_includes response.body, '/api/v1/agent/digest'
@@ -82,7 +86,9 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_includes payload.dig('info', 'description'), 'auth challenge flow'
     assert_includes payload.dig('info', 'description'), 'must never ask for or handle Hive private keys'
     assert_includes payload.dig('x-hyperion-agent', 'authentication', 'instructions').join(' '), 'HYP-* code'
+    assert_equal 'Authorization: Bearer <bearer_token>', payload.dig('x-hyperion-agent', 'authentication', 'bearer_header')
     assert_includes payload.dig('x-hyperion-agent', 'authentication', 'credential_handling', 'agent_must_never_request'), 'HiveSigner password'
+    assert_equal 'Bearer <bearer_token>', payload.dig('x-hyperion-agent', 'examples', 'mcp_tool_call', 'headers', 'Authorization')
     assert payload.dig('x-hyperion-agent', 'examples', 'mcp_tool_call', 'send_session_cookie')
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges')
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges/{id}/redeem')

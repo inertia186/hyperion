@@ -72,9 +72,12 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal true, response_json.fetch('authenticated')
+    assert_equal 'Bearer', response_json.fetch('token_type')
+    assert_match(/\Ahyp_at_/, response_json.fetch('bearer_token'))
     assert_equal 'fixture-curator', response_json.dig('account', 'name')
     assert_equal accounts(:curated).id, session[:current_account].id
     assert challenge.reload.redeemed_at.present?
+    assert_equal accounts(:curated), AgentAccessToken.account_for(response_json.fetch('bearer_token'))
   end
 
   test 'hivesigner callback after redeem does not reset redeemed challenge' do
@@ -121,9 +124,12 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal true, response_json.fetch('authenticated')
+    assert_equal 'Bearer', response_json.fetch('token_type')
+    assert_match(/\Ahyp_at_/, response_json.fetch('bearer_token'))
     assert_equal 'fixture-curator', response_json.dig('account', 'name')
     assert_equal accounts(:curated).id, session[:current_account].id
     assert challenge.reload.redeemed_at.present?
+    assert_equal accounts(:curated), AgentAccessToken.account_for(response_json.fetch('bearer_token'))
   end
 
   test 'keychain completion rejects signatures over the wrong digest' do

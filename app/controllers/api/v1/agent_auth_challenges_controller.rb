@@ -95,9 +95,13 @@ private
   end
 
   def authenticated_payload(challenge, account)
+    _token_record, bearer_token = AgentAccessToken.issue_for!(account)
+
     {
       challenge_id: challenge.token,
       authenticated: true,
+      token_type: 'Bearer',
+      bearer_token: bearer_token,
       account: {
         id: account.id,
         name: account.name,

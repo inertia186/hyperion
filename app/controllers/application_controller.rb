@@ -62,7 +62,21 @@ private
   end
   
   def current_account
-    session[:current_account]
+    session[:current_account] || bearer_token_account
+  end
+
+  def bearer_token_account
+    return @bearer_token_account if defined?(@bearer_token_account)
+
+    @bearer_token_account = AgentAccessToken.account_for(bearer_token)
+  end
+
+  def bearer_token
+    pattern = /\ABearer\s+(.+)\z/i
+    authorization = request.authorization.to_s
+    match = authorization.match(pattern)
+
+    match && match[1].strip
   end
   
   def post_to_slug(*args)

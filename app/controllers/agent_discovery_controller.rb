@@ -15,10 +15,11 @@ class AgentDiscoveryController < ApplicationController
       name: 'Hyperion',
       description: 'Agent-friendly curation API for Hyperion unread posts, tags, read state, and HiveSigner vote links.',
       authentication: {
-        type: 'session_cookie',
+        type: 'session_cookie_or_bearer',
         login_url: new_session_url,
         auth_challenge_url: api_v1_agent_auth_challenges_url,
         cookie_name: Rails.application.config.session_options[:key],
+        bearer_header: 'Authorization: Bearer <bearer_token>',
         instructions: auth_instructions,
         credential_handling: credential_handling_metadata,
         hivesigner_flow: hivesigner_flow_metadata,
@@ -50,7 +51,7 @@ private
     <<~TEXT
       # Hyperion Agent Guide
 
-      Hyperion exposes a session-cookie authenticated JSON API for AI agents. Do not scrape the SPA.
+      Hyperion exposes a session-cookie or bearer-token authenticated JSON API for AI agents. Do not scrape the SPA.
 
       Recommended TUI/CLI authentication flow:
       1. Start an HTTP client that stores cookies.
@@ -60,7 +61,7 @@ private
       5. After HiveSigner redirects back to Hyperion, the user sees a one-time code like HYP-ABC123.
       6. Ask the user to paste only that HYP-* code back to you.
       7. POST {"code":"HYP-ABC123"} to /api/v1/agent/auth_challenges/{challenge_id}/redeem with the same cookie jar.
-      8. Keep the returned _hyperion cookie and use it for all subsequent API and MCP requests.
+      8. Keep the returned bearer_token or _hyperion cookie and use it for subsequent API and MCP requests.
 
       Suggested user-facing prompt:
       "#{hivesigner_user_prompt}"
@@ -90,7 +91,7 @@ private
       curl -c hyperion.cookies -X POST #{api_v1_agent_auth_challenges_url}
       ask the user to open hivesigner_login_url privately, then:
       curl -b hyperion.cookies -c hyperion.cookies -H 'Content-Type: application/json' -d '{"code":"HYP-ABC123"}' #{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}
-      curl -b hyperion.cookies #{api_v1_agent_digest_url}?limit=5
+      curl -H 'Authorization: Bearer hyp_at_...' #{api_v1_agent_digest_url}?limit=5
 
       Vote broadcasting is done through HiveSigner links. Hyperion does not store posting keys or broadcast votes server-side.
     TEXT
@@ -107,6 +108,7 @@ private
       'x-hyperion-agent' => {
         authentication: {
           cookie_name: Rails.application.config.session_options[:key],
+          bearer_header: 'Authorization: Bearer <bearer_token>',
           instructions: auth_instructions,
           credential_handling: credential_handling_metadata,
           hivesigner_flow: hivesigner_flow_metadata,
@@ -139,8 +141,8 @@ private
         },
         '/api/v1/agent/auth_challenges/{id}/redeem' => {
           post: {
-            summary: 'Redeem a HiveSigner copy/paste code and receive a Rails session cookie.',
-            description: 'Unauthenticated before redeem. Submit the HYP-* code shown to the user after they open hivesigner_login_url. The response sets the _hyperion cookie; keep it for all later agent requests.',
+            summary: 'Redeem a HiveSigner copy/paste code and receive agent credentials.',
+            description: 'Unauthenticated before redeem. Submit the HYP-* code shown to the user after they open hivesigner_login_url. The response includes bearer_token and sets the _hyperion cookie; use either for later agent requests.',
             parameters: [path_parameter('id', 'string', 'Challenge id')],
             responses: {'200' => json_response('Authenticated account state')}
           }
@@ -148,7 +150,7 @@ private
         '/api/v1/agent/auth_challenges/{id}/keychain' => {
           post: {
             summary: 'Complete an auth challenge with a Hive Keychain signature.',
-            description: 'Unauthenticated before completion. Submit account_name, public_key, digest, and signature for the exact keychain.message returned by the challenge. The response sets the _hyperion cookie.',
+            description: 'Unauthenticated before completion. Submit account_name, public_key, digest, and signature for the exact keychain.message returned by the challenge. The response includes bearer_token and sets the _hyperion cookie.',
             parameters: [path_parameter('id', 'string', 'Challenge id')],
             responses: {'200' => json_response('Authenticated account state')}
           }
@@ -237,7 +239,7 @@ private
       'For HiveSigner, show hivesigner_login_url to the user and ask them to complete HiveSigner privately in their own browser.',
       'Only ask the user to paste the displayed HYP-* code. Never ask for or accept Hive private keys, HiveSigner passwords, or signing credentials.',
       'POST the pasted code to /api/v1/agent/auth_challenges/{challenge_id}/redeem.',
-      'After redeem succeeds, use the _hyperion cookie for HTTP API and MCP requests.',
+      'After redeem succeeds, use either Authorization: Bearer <bearer_token> or the _hyperion cookie for HTTP API and MCP requests.',
       'Do not ask the user for Hive private keys. Hyperion only creates HiveSigner vote links; it does not broadcast votes server-side.'
     ]
   end
@@ -257,7 +259,7 @@ private
       start: 'POST /api/v1/agent/auth_challenges',
       user_action: 'Open hivesigner_login_url, complete HiveSigner privately in your browser, then copy only the displayed HYP-* code.',
       redeem: 'POST /api/v1/agent/auth_challenges/{challenge_id}/redeem with {"code":"HYP-ABC123"} using the same cookie jar.',
-      result: 'The redeem response sets the _hyperion session cookie.',
+      result: 'The redeem response returns bearer_token and sets the _hyperion session cookie.',
       user_prompt: hivesigner_user_prompt,
       credential_handling: 'The agent must never ask for or receive Hive private keys, HiveSigner passwords, or signing credentials.'
     }
@@ -268,7 +270,7 @@ private
       start: 'POST /api/v1/agent/auth_challenges',
       sign: 'Ask Hive Keychain to sign keychain.message with Posting authority.',
       submit: 'POST /api/v1/agent/auth_challenges/{challenge_id}/keychain with account_name, public_key, digest, and signature.',
-      result: 'The keychain response sets the _hyperion session cookie.'
+      result: 'The keychain response returns bearer_token and sets the _hyperion session cookie.'
     }
   end
 
@@ -302,11 +304,13 @@ private
       get_digest: {
         method: 'GET',
         url: "#{api_v1_agent_digest_url}?limit=10",
+        authorization: 'Bearer <bearer_token>',
         send_session_cookie: true
       },
       keyword_digest: {
         method: 'GET',
         url: "#{api_v1_agent_digest_url}?query=california",
+        authorization: 'Bearer <bearer_token>',
         send_session_cookie: true
       },
       mark_read_single: {
@@ -340,7 +344,7 @@ private
       mcp_tool_call: {
         method: 'POST',
         url: mcp_url,
-        headers: {'Content-Type' => 'application/json', 'MCP-Protocol-Version' => '2025-06-18'},
+        headers: {'Content-Type' => 'application/json', 'MCP-Protocol-Version' => '2025-06-18', 'Authorization' => 'Bearer <bearer_token>'},
         body: {jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'hyperion_get_digest', arguments: {limit: 10}}},
         send_session_cookie: true
       }
@@ -350,7 +354,7 @@ private
   def openapi_description
     <<~TEXT.squish
       Hyperion agent API. Agents should not scrape the SPA. Use the auth challenge flow when no _hyperion session cookie exists:
-      POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code with the same cookie jar, then use the resulting _hyperion cookie for API and MCP requests.
+      POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
       Agents must never ask for or handle Hive private keys, HiveSigner passwords, or signing credentials. The user completes HiveSigner privately and gives the agent only the HYP-* code.
     TEXT
   end

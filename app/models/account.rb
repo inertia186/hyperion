@@ -11,6 +11,7 @@ class Account < ApplicationRecord
   
   has_many :read_posts, dependent: :destroy, counter_cache: :read_posts_count
   has_many :account_tags, dependent: :destroy, counter_cache: :account_tags_count
+  has_many :agent_access_tokens, dependent: :destroy
   has_many :past_tags, -> { past }, class_name: 'AccountTag::Past'
   has_many :ignored_tags, -> { ignored }, class_name: 'AccountTag::Ignored'
   has_many :poisoned_pill_tags, -> { poisoned_pill }, class_name: 'AccountTag::PoisonedPill'
