@@ -26,6 +26,16 @@ namespace :index do
   task once: :environment do
     PostCleanupJob.perform_now
     PostIndexJob.perform_now
+    newest_post_created_at = Post.maximum(:created_at)
+    message = if newest_post_created_at
+      age_seconds = Time.current - newest_post_created_at
+      age = ActiveSupport::Duration.build(age_seconds).parts.slice(:days, :hours, :minutes).map { |unit, value| "#{value.to_i} #{unit}" }.join(', ')
+      "Newest indexed post: #{newest_post_created_at.iso8601} (#{age.presence || 'under 1 minute'} old)"
+    else
+      'Newest indexed post: none'
+    end
+
+    puts message
   end
 
   desc 'Main index process.'
