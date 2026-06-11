@@ -177,7 +177,96 @@ class PostTest < ActiveSupport::TestCase
     assert_not_includes unread_without_muted, posts(:muted_unread)
   end
 
+  test 'refresh latest revision persists newest revision fields' do
+    post = create_post(author: 'alice', permlink: 'revision-refresh')
+    post.update!(
+      title: 'Old title',
+      body: 'Old body',
+      category: 'hive-1',
+      metadata: {'tags' => ['old']},
+      block_num: 10,
+      trx_id: 'old-trx',
+      updated_at: Time.utc(2026, 1, 1)
+    )
+    service = RevisionService.new([
+      {
+        body: 'New body',
+        title: 'New title',
+        json_metadata: {'tags' => ['new']},
+        json_metadata_present: true,
+        parent_permlink: 'hive-2',
+        published_at_time: Time.utc(2026, 1, 2),
+        block_num: 20,
+        trx_id: 'new-trx'
+      }
+    ])
+
+    post.refresh_latest_revision!(revisions_service: service)
+    post.reload
+
+    assert_equal 'New body', post.body
+    assert_equal 'New title', post.title
+    assert_equal 'hive-2', post.category
+    assert_equal({'tags' => ['new']}, post.metadata)
+    assert_equal 20, post.block_num
+    assert_equal 'new-trx', post.trx_id
+    assert_equal Time.utc(2026, 1, 2), post.updated_at
+  end
+
+  test 'refresh latest revision preserves category when latest parent permlink is blank' do
+    post = create_post(author: 'igormuba', permlink: 'hive-all-time-low-just-d0e9837a15ed9')
+    post.update!(title: 'Original', body: 'Original body', category: 'hive-125125', metadata: {'tags' => ['hive-125125']})
+    service = RevisionService.new([
+      {
+        body: '\\[DELETED\\] accidental repost',
+        title: '[DELETED] accidental repost',
+        json_metadata: {'tags' => [], 'description' => 'DELETED'},
+        json_metadata_present: true,
+        parent_permlink: '',
+        published_at_time: Time.utc(2026, 6, 5, 16, 58, 18),
+        block_num: 107011827,
+        trx_id: 'deleted-trx'
+      }
+    ])
+
+    post.refresh_latest_revision!(revisions_service: service)
+    post.reload
+
+    assert_equal '[DELETED] accidental repost', post.title
+    assert_equal '\\[DELETED\\] accidental repost', post.body
+    assert_equal 'hive-125125', post.category
+    assert_equal({'tags' => [], 'description' => 'DELETED'}, post.metadata)
+  end
+
+  test 'refresh latest revision falls back without losing existing body when HAFBE fails' do
+    post = create_post(author: 'alice', permlink: 'revision-fallback')
+    post.update!(body: 'Existing body')
+    service = FailingRevisionService.new
+
+    post.stub(:fetch_latest, -> { raise Hive::UnknownError, 'fallback unavailable' }) do
+      assert_equal 'Existing body', post.refresh_latest_revision!(revisions_service: service)
+    end
+
+    assert_equal 'Existing body', post.reload.body
+  end
+
 private
+  class RevisionService
+    def initialize(revisions)
+      @revisions = revisions
+    end
+
+    def revisions_for(_post)
+      @revisions
+    end
+  end
+
+  class FailingRevisionService
+    def revisions_for(_post)
+      raise HafbePostRevisions::FetchError, 'boom'
+    end
+  end
+
   def create_post(author:, permlink:, tags_count: 0, tags: [])
     post = Post.create!(
       author: author,

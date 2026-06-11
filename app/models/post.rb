@@ -353,6 +353,39 @@ class Post < ApplicationRecord
     save! if changed?
     body
   end
+
+  def refresh_latest_revision!(revisions_service: HafbePostRevisions.new)
+    load_body!
+
+    revision = revisions_service.revisions_for(self).last
+    unless revision
+      fetch_latest_revision_fallback if body.blank? || body.to_s.match?(DIFF_MATCH_PATCH_PATTERN)
+      save! if changed?
+      return body
+    end
+
+    self.body = revision[:body].to_s if revision[:body].to_s.present? && body.to_s != revision[:body].to_s
+    self.title = revision[:title].to_s if revision[:title].to_s.present? && title.to_s != revision[:title].to_s
+    self.metadata = revision[:json_metadata] if revision[:json_metadata_present] && metadata != revision[:json_metadata]
+    self.category = revision[:parent_permlink].to_s if revision[:parent_permlink].to_s.present? && category.to_s != revision[:parent_permlink].to_s
+    self.block_num = revision[:block_num].to_i if revision[:block_num].present? && block_num.to_i != revision[:block_num].to_i
+    self.trx_id = revision[:trx_id].to_s if revision[:trx_id].to_s.present? && trx_id.to_s != revision[:trx_id].to_s
+    self.updated_at = revision[:published_at_time] if revision[:published_at_time] && updated_at != revision[:published_at_time]
+
+    save! if changed?
+    body
+  rescue HafbePostRevisions::MissingBaseUrl, HafbePostRevisions::FetchError => e
+    Rails.logger.debug "Unable to refresh latest revision for #{author}/#{permlink}: #{e.class}: #{e.message}"
+    fetch_latest_revision_fallback if body.blank? || body.to_s.match?(DIFF_MATCH_PATCH_PATTERN)
+    save! if changed?
+    body
+  end
+
+  def fetch_latest_revision_fallback
+    fetch_latest
+  rescue => e
+    Rails.logger.debug "Unable to fetch latest post fallback for #{author}/#{permlink}: #{e.class}: #{e.message}"
+  end
   
   # Checks if this post is in the latest blog with roughly the same timestamp.
   def in_blog?(limit = 100)

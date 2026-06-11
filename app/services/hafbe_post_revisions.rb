@@ -14,7 +14,7 @@ class HafbePostRevisions
   def call(post:, local_body:, render_body:)
     raise MissingBaseUrl, 'HAFBE_BASE_URL is not configured' if @base_url.blank?
 
-    revisions = operation_revisions(fetch_operations(post.author, post.permlink), post)
+    revisions = revisions_for(post)
     local_body = local_body.to_s
     if local_body.present? && revisions.none? { |revision| revision[:body].to_s.strip == local_body.strip }
       revisions << {
@@ -26,6 +26,16 @@ class HafbePostRevisions
       }
     end
 
+    render_revisions(revisions, post: post, render_body: render_body)
+  end
+
+  def revisions_for(post)
+    raise MissingBaseUrl, 'HAFBE_BASE_URL is not configured' if @base_url.blank?
+
+    operation_revisions(fetch_operations(post.author, post.permlink), post)
+  end
+
+  def render_revisions(revisions, post:, render_body:)
     revisions.each_with_index.map do |revision, index|
       {
         index: index,
@@ -89,14 +99,35 @@ private
     return nil unless value.is_a?(Hash)
     return nil unless value['author'].to_s == post.author && value['permlink'].to_s == post.permlink
 
+    published_at = wrapper['timestamp'] || wrapper['block_time'] || value['timestamp']
+
     {
       sequence: sequence,
       body: value['body'],
       title: value['title'],
-      published_at: wrapper['timestamp'] || wrapper['block_time'] || value['timestamp'],
+      json_metadata: parse_metadata(value['json_metadata']),
+      json_metadata_present: value.key?('json_metadata'),
+      parent_permlink: value['parent_permlink'],
+      published_at: published_at,
+      published_at_time: parse_time(published_at),
       block_num: wrapper['block_num'] || wrapper['block'] || value['block_num'] || value['block'],
       trx_id: wrapper['trx_id'] || wrapper['transaction_id'] || value['trx_id']
     }
+  end
+
+  def parse_metadata(metadata)
+    case metadata
+    when Hash then metadata
+    when String then JSON[metadata] rescue {}
+    else
+      {}
+    end
+  end
+
+  def parse_time(value)
+    Time.parse("#{value}Z")
+  rescue
+    nil
   end
 
   def comment_value(operation)

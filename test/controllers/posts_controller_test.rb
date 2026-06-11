@@ -39,7 +39,7 @@ class PostsControllerTest < ActionController::TestCase
     post = posts(:allowed_unread)
     post.body = 'Sandbox body'
 
-    post.stub(:load_body!, -> {}) do
+    post.stub(:refresh_latest_revision!, -> {}) do
       Post.stub(:find, post) do
         get :content_sandbox, params: {id: post.id, theme: 'dark'}
       end

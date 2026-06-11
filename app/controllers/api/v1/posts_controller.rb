@@ -36,21 +36,14 @@ class Api::V1::PostsController < Api::V1::BaseController
 
   def show
     post = Post.find(params[:id])
-    post.load_body!
+    display_post = refresh_post_for_display(post)
 
-    if post.body.to_s =~ Post::DIFF_MATCH_PATCH_PATTERN
-      post.fetch_latest
-      post.save
-    end
-
-    render json: post_detail_json(post, post.display_post)
+    render json: post_detail_json(post, display_post)
   end
 
   def revisions
     post = Post.find(params[:id])
-    post.load_body!
-    display_post = post.display_post
-    display_post.load_body! if display_post.persisted?
+    display_post = refresh_post_for_display(post)
 
     revisions = HafbePostRevisions.new.call(
       post: display_post,
@@ -151,6 +144,13 @@ class Api::V1::PostsController < Api::V1::BaseController
 private
   def truthy?(value)
     value == true || value.to_s == 'true' || value.to_s == '1'
+  end
+
+  def refresh_post_for_display(post)
+    post.refresh_latest_revision!
+    display_post = post.display_post
+    display_post.refresh_latest_revision! if display_post.persisted? && display_post != post
+    display_post
   end
 
   def chain_identity(post, allow_override: true)

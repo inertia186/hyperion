@@ -10,6 +10,14 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     end
     @request.session[:current_account] = account
     posts(:blacklisted_allowed).update!(blacklist_reasons: [{'account' => 'fixture-curator'}])
+    @net_http_get_response = Net::HTTP.method(:get_response)
+    empty_hafbe_response = Struct.new(:code, :body).new('200', {'operations' => []}.to_json)
+    Net::HTTP.define_singleton_method(:get_response) { |_uri| empty_hafbe_response }
+  end
+
+  teardown do
+    original_get_response = @net_http_get_response
+    Net::HTTP.define_singleton_method(:get_response) { |*args| original_get_response.call(*args) } if original_get_response
   end
 
   test 'normal unread results exclude posts from current blacklist sources' do
@@ -130,6 +138,15 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
   test 'timeline returns 168 hourly browser-local buckets with overlapping status series and payout coverage' do
     travel_to Time.utc(2026, 6, 10, 20, 30, 0) do
+      Post.update_all(
+        created_at: Time.utc(2026, 6, 3, 19, 0, 0),
+        updated_at: Time.utc(2026, 6, 3, 19, 0, 0),
+        deleted_at: nil,
+        blacklisted: false,
+        payout: nil,
+        payout_amount: nil,
+        net_rshares: nil
+      )
       posts(:allowed_unread).update!(created_at: Time.utc(2026, 6, 10, 20, 15, 0), payout_amount: 1.25, payout: '1.250 HBD', net_rshares: 100)
       posts(:deleted_allowed).update!(created_at: Time.utc(2026, 6, 10, 20, 20, 0), deleted_at: Time.utc(2026, 6, 10, 20, 25, 0), payout_amount: 2.5, payout: '2.500 HBD', net_rshares: -25)
       posts(:blacklisted_allowed).update!(created_at: Time.utc(2026, 6, 10, 20, 35, 0), blacklisted: true, payout_amount: nil, payout: nil, net_rshares: nil)
@@ -463,6 +480,73 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_not response_json.fetch('urls').key?('scribe')
   end
 
+  test 'preview persists newer HAFBE revision for non diff local body' do
+    post = posts(:allowed_unread)
+    post.update!(title: 'Old title', body: 'Old body', category: 'hive-13323', metadata: {'tags' => ['old']})
+    response = hafbe_response(
+      'operations_result' => [
+        hafbe_comment_op(post, body: 'Old body', title: 'Old title', block: 10, timestamp: '2026-01-01T00:00:00', json_metadata: '{"tags":["old"]}', parent_permlink: 'hive-13323'),
+        hafbe_comment_op(post, body: 'New body', title: 'New title', block: 11, timestamp: '2026-01-02T00:00:00', json_metadata: '{"tags":["new"]}', parent_permlink: 'hive-13323')
+      ]
+    )
+
+    Net::HTTP.stub(:get_response, response) do
+      get :show, params: {id: post.id}
+    end
+
+    assert_response :success
+    assert_equal 'New body', response_json.fetch('body_markdown')
+    post.reload
+    assert_equal 'New body', post.body
+    assert_equal 'New title', post.title
+    assert_equal({'tags' => ['new']}, post.metadata)
+  end
+
+  test 'preview persists linked post deleted placeholder revision without erasing category' do
+    post = posts(:allowed_unread)
+    post.update!(
+      author: 'igormuba',
+      permlink: 'hive-all-time-low-just-d0e9837a15ed9',
+      title: 'HIVE all time low',
+      body: 'Original long body',
+      category: 'hive-125125',
+      metadata: {'tags' => ['hive-125125']}
+    )
+    response = hafbe_response(
+      'operations_result' => [
+        hafbe_comment_op(post, body: 'Original long body', title: 'HIVE all time low', block: 107011262, timestamp: '2026-06-05T16:30:00', json_metadata: '{"tags":["hive-125125"]}', parent_permlink: 'hive-125125'),
+        hafbe_comment_op(post, body: '\\[DELETED\\] accidental repost', title: '[DELETED] accidental repost', block: 107011827, timestamp: '2026-06-05T16:58:18', json_metadata: '{"tags":[],"description":"DELETED"}', parent_permlink: '')
+      ]
+    )
+
+    Net::HTTP.stub(:get_response, response) do
+      get :show, params: {id: post.id}
+    end
+
+    assert_response :success
+    assert_equal '[DELETED] accidental repost', response_json.fetch('title')
+    assert_equal '\\[DELETED\\] accidental repost', response_json.fetch('body_markdown')
+    post.reload
+    assert_equal '[DELETED] accidental repost', post.title
+    assert_equal '\\[DELETED\\] accidental repost', post.body
+    assert_equal 'hive-125125', post.category
+    assert_equal({'tags' => [], 'description' => 'DELETED'}, post.metadata)
+  end
+
+  test 'preview keeps existing body when HAFBE refresh fails' do
+    post = posts(:allowed_unread)
+    post.update!(body: 'Existing body')
+    response = Struct.new(:code, :body).new('502', 'bad gateway')
+
+    Net::HTTP.stub(:get_response, response) do
+      get :show, params: {id: post.id}
+    end
+
+    assert_response :success
+    assert_equal 'Existing body', response_json.fetch('body_markdown')
+    assert_equal 'Existing body', post.reload.body
+  end
+
   test 'preview only renders hash headings when marker is followed by whitespace' do
     post = posts(:allowed_unread)
     post.update!(body: "# Real Heading\n\n#c-c-c #hivegc #gaming\n\n###Welcome without space")
@@ -525,7 +609,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_includes body_html, 'Visible body'
   end
 
-  test 'revisions returns rendered HAFBE revisions and local fallback' do
+  test 'revisions returns rendered HAFBE revisions after refreshing local body' do
     post = posts(:allowed_unread)
     post.update!(body: 'Current **local** body')
     payload = {
@@ -548,13 +632,14 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     revisions = response_json.fetch('revisions')
-    assert_equal 4, revisions.size
-    assert_equal ['Revision 1', 'Revision 2', 'Revision 3', 'Revision 4'], revisions.map { |revision| revision.fetch('label') }
+    assert_equal 3, revisions.size
+    assert_equal ['Revision 1', 'Revision 2', 'Revision 3'], revisions.map { |revision| revision.fetch('label') }
     assert_equal 10, revisions.first.fetch('block_num')
     assert_equal "Hello world\nBye", revisions.first.fetch('body')
     assert_equal "Hello brave world\nBye", revisions.second.fetch('body')
     assert_includes revisions.second.fetch('body_html'), 'Hello brave world'
-    assert_includes revisions.last.fetch('body_html'), '<strong>local</strong>'
+    assert_equal 'New body', revisions.last.fetch('body')
+    assert_equal 'New body', post.reload.body
     assert_equal post.author, response_json.fetch('author')
     assert_equal post.permlink, response_json.fetch('permlink')
   end
@@ -792,6 +877,29 @@ private
     )
     post.tags.create!(tag: tag, category: true)
     post
+  end
+
+  def hafbe_response(payload)
+    Struct.new(:code, :body).new('200', payload.to_json)
+  end
+
+  def hafbe_comment_op(post, body:, title:, block:, timestamp:, json_metadata:, parent_permlink:)
+    {
+      'op' => {
+        'type' => 'comment_operation',
+        'value' => {
+          'author' => post.author,
+          'permlink' => post.permlink,
+          'title' => title,
+          'body' => body,
+          'json_metadata' => json_metadata,
+          'parent_permlink' => parent_permlink
+        }
+      },
+      'block' => block,
+      'timestamp' => timestamp,
+      'trx_id' => "trx-#{block}"
+    }
   end
 
   def response_json
