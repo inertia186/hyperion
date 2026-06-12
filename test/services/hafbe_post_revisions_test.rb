@@ -92,6 +92,25 @@ class HafbePostRevisionsTest < ActiveSupport::TestCase
     end
   end
 
+  test 'applies diff match patch hunks with minor whitespace drift' do
+    post = Post.new(author: 'seattlea', permlink: 'introducing-hivelytics-2-0-or', title: 'Current title')
+    response = hafbe_response(
+      'operations_result' => [
+        comment_op(post, body: 'Why I have created the[  2.0 Version](https://example.com)?', block: 20, timestamp: '2026-01-02T00:00:00'),
+        comment_op(post, body: "@@ -19,10 +19,9 @@\n the\n-[ \n+[\n 2.0 \n", block: 21, timestamp: '2026-01-03T00:00:00')
+      ]
+    )
+
+    Net::HTTP.stub(:get_response, response) do
+      revisions = HafbePostRevisions.new(base_url: 'https://hafbe.example').revisions_for(post)
+
+      assert_equal [
+        'Why I have created the[  2.0 Version](https://example.com)?',
+        'Why I have created the[2.0 Version](https://example.com)?'
+      ], revisions.map { |revision| revision.fetch(:body) }
+    end
+  end
+
 private
   def hafbe_response(payload)
     Struct.new(:code, :body).new('200', payload.to_json)

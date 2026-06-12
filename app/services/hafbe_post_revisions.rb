@@ -159,11 +159,11 @@ private
       expected = patch[:lines].select { |line| [' ', '-'].include?(line[:action]) }.map { |line| line[:text] }.join
       replacement = patch[:lines].select { |line| [' ', '+'].include?(line[:action]) }.map { |line| line[:text] }.join
       expected_index = [patch[:old_start] - 1 + offset, 0].max
-      expected_index = locate_patch(patched_body, expected, expected_index)
-      return nil unless expected_index
+      match_index, match_length = locate_patch(patched_body, patch, expected, expected_index)
+      return nil unless match_index
 
-      patched_body[expected_index, expected.length] = replacement
-      offset += replacement.length - expected.length
+      patched_body[match_index, match_length] = replacement
+      offset += replacement.length - match_length
     end
 
     patched_body
@@ -191,7 +191,7 @@ private
       end
 
       next unless current_patch
-      next if line.blank?
+      next if line.empty?
 
       action = line[0]
       next unless [' ', '-', '+'].include?(action)
@@ -202,14 +202,67 @@ private
     patches
   end
 
-  def locate_patch(body, expected, expected_index)
-    return expected_index if expected.blank?
-    return expected_index if body[expected_index, expected.length] == expected
+  def locate_patch(body, patch, expected, expected_index)
+    return [expected_index, 0] if expected.empty?
+    return [expected_index, expected.length] if body[expected_index, expected.length] == expected
 
     nearby_start = [expected_index - 256, 0].max
-    nearby_index = body.index(expected, nearby_start)
-    return nearby_index if nearby_index && nearby_index <= expected_index + 256
+    nearby_index = nearest_index(body, expected, expected_index, nearby_start, expected_index + 256)
+    return [nearby_index, expected.length] if nearby_index
 
-    body.index(expected)
+    whitespace_match = locate_with_flexible_spaces(body, expected, expected_index, nearby_start, expected_index + 256)
+    return whitespace_match if whitespace_match
+
+    anchored_patch_match(body, patch, expected_index) || body.index(expected)&.then { |index| [index, expected.length] }
+  end
+
+  def nearest_index(body, needle, expected_index, start_index, end_index)
+    return nil if needle.empty?
+
+    indexes = []
+    index = body.index(needle, start_index)
+    while index && index <= end_index
+      indexes << index
+      index = body.index(needle, index + 1)
+    end
+
+    indexes.min_by { |candidate| (candidate - expected_index).abs }
+  end
+
+  def anchored_patch_match(body, patch, expected_index)
+    prefix = patch[:lines].take_while { |line| line[:action] == ' ' }.map { |line| line[:text] }.join
+    suffix = patch[:lines].reverse.take_while { |line| line[:action] == ' ' }.reverse.map { |line| line[:text] }.join
+    return nil if prefix.length < 8 || suffix.length < 8
+
+    window_start = [expected_index - 512, 0].max
+    window_end = expected_index + 512
+    prefix_index = prefix.present? ? nearest_index(body, prefix, expected_index, window_start, window_end) : expected_index
+    return nil unless prefix_index
+
+    suffix_start = prefix_index + prefix.length
+    suffix_index = suffix.present? ? body.index(suffix, suffix_start) : suffix_start
+    return nil unless suffix_index && suffix_index <= window_end + prefix.length
+
+    [prefix_index, suffix_index + suffix.length - prefix_index]
+  end
+
+  def locate_with_flexible_spaces(body, expected, expected_index, start_index, end_index)
+    return nil unless expected.include?(' ')
+
+    window = body[start_index, end_index - start_index + expected.length] || ''
+    pattern = Regexp.new(flexible_space_pattern(expected))
+    matches = []
+    window.to_enum(:scan, pattern).each do
+      match = Regexp.last_match
+      matches << [start_index + match.begin(0), match[0].length]
+    end
+
+    matches.min_by { |index, _length| (index - expected_index).abs }
+  end
+
+  def flexible_space_pattern(value)
+    value.each_char.chunk { |char| char == ' ' }.map do |space, chars|
+      space ? ' +' : Regexp.escape(chars.join)
+    end.join
   end
 end
