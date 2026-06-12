@@ -1,5 +1,6 @@
 import { Controller } from '@hotwired/stimulus'
 import { diffPairOptions, escapeHtml, lineDiff, normalizePairIndex, renderCodeDiff, renderCodeRevision, revisionDetail } from './posts_diff'
+import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
 
 import $ from 'jquery';
 
@@ -107,59 +108,23 @@ export default class extends Controller {
   }
   
   previewPrevious(e) {
-    var element = $(this.element);
-    var previous_element = element.prev();
-    var previous_post_id = previous_element.data('posts-id-value');
-    var previous_link = document.getElementById(`#show-${previous_post_id}`);
-    
-    if ( !!previous_link ) {
-      previous_link.focus();
-      previous_link.click();
-    }
+    focusAndClickLink(adjacentPostActionLink(this.element, -1, 'show'));
   }
   
   previewNext(e) {
-    var element = $(this.element);
-    var next_element = element.next();
-    var next_post_id = next_element.data('posts-id-value');
-    var next_link = document.getElementById(`#show-${next_post_id}`);
-    
-    if ( !!next_link ) {
-      next_link.focus();
-      next_link.click();
-    }
+    focusAndClickLink(adjacentPostActionLink(this.element, 1, 'show'));
   }
   
   focusPrevious(e) {
-    var element = $(this.element);
-    var previous_element = element.prev();
-    var previous_post_id = previous_element.data('posts-id-value');
-    var previous_link = document.getElementById(`#show-${previous_post_id}`);
-    
-    if ( !!previous_link ) {
-      previous_link.focus();
-    }
+    focusLink(adjacentPostActionLink(this.element, -1, 'show'));
   }
   
   focusCurrent(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#show-${post_id}`);
-    
-    if ( !!link ) {
-      link.focus();
-    }
+    focusLink(postActionLink(this.element, 'show'));
   }
   
   focusNext(e) {
-    var element = $(this.element);
-    var next_element = element.next();
-    var next_post_id = next_element.data('posts-id-value');
-    var next_link = document.getElementById(`#show-${next_post_id}`);
-    
-    if ( !!next_link ) {
-      next_link.focus();
-    }
+    focusLink(adjacentPostActionLink(this.element, 1, 'show'));
   }
   
   previewPreviousKey(e) {
@@ -358,23 +323,13 @@ export default class extends Controller {
   }
   
   markRowAsRead(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#mark-as-read-${post_id}`);
-    
-    if ( !!link ) {
-      link.click();
-    }
+    const link = postActionLink(this.element, 'mark-as-read');
+    if (link) link.click();
   }
   
   markRowAsUnread(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#mark-as-unread-${post_id}`);
-    
-    if ( !!link ) {
-      link.click();
-    }
+    const link = postActionLink(this.element, 'mark-as-unread');
+    if (link) link.click();
   }
   
   // Also see posts#mark_as_read.js.erb
