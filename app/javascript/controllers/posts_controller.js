@@ -1,5 +1,5 @@
 import { Controller } from '@hotwired/stimulus'
-import { diffPairOptions, escapeHtml, lineDiff, normalizePairIndex, renderCodeDiff, renderCodeRevision, revisionDetail } from './posts_diff'
+import { diffPairOptions, escapeHtml, normalizePairIndex, renderCodeDiff, renderCodeRevision } from './posts_diff'
 import {
   isFocusNextKey,
   isFocusPreviousKey,
@@ -266,7 +266,7 @@ export default class extends Controller {
       if (!response.ok) throw new Error(payload.error || response.statusText);
       this.renderDiff(payload.revisions || []);
     })).catch((error) => {
-      this.diffBodyTarget.innerHTML = `<div class="alert alert-danger">${this.escapeHtml(error.message || 'Diff failed to load.')}</div>`;
+      this.diffBodyTarget.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message || 'Diff failed to load.')}</div>`;
     });
   }
 
@@ -295,26 +295,6 @@ export default class extends Controller {
     this.diffPairTarget.innerHTML = diffPairOptions(revisions, pairIndex);
 
     this.diffBodyTarget.innerHTML = renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
-  }
-
-  renderCodeRevision(revision) {
-    return renderCodeRevision(revision);
-  }
-
-  renderCodeDiff(previousRevision, currentRevision) {
-    return renderCodeDiff(previousRevision, currentRevision);
-  }
-
-  lineDiff(before, after) {
-    return lineDiff(before, after);
-  }
-
-  revisionDetail(revision) {
-    return revisionDetail(revision);
-  }
-
-  escapeHtml(value) {
-    return escapeHtml(value);
   }
   
   markRowAsRead(e) {
