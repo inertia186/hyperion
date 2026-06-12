@@ -6,8 +6,9 @@ import FullPageState from './components/FullPageState'
 import ShortcutsPanel from './components/ShortcutsPanel'
 import TimelineModal from './components/TimelineModal'
 import { imageProxy } from './format'
-import { THEME_OPTIONS, applyTheme, normalizeTheme, storedTheme, themeOption, writeStoredTheme } from './theme'
+import { THEME_OPTIONS, themeOption } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
+import { useThemePreference } from './useThemePreference'
 import { useVotingPower } from './useVotingPower'
 import hyperionLogo from '../../assets/images/favicon.svg'
 
@@ -19,31 +20,9 @@ export default function App() {
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [resetKey, setResetKey] = useState(0)
-  const [theme, setTheme] = useState(() => storedTheme())
-  const [effectiveTheme, setEffectiveTheme] = useState(() => applyTheme(storedTheme()))
-  const [themeSaving, setThemeSaving] = useState(false)
   const inboxRef = useRef(null)
   const {votingPower, refreshVotingPower} = useVotingPower({authenticated: !!session?.authenticated})
-
-  useEffect(() => {
-    setEffectiveTheme(applyTheme(theme))
-    writeStoredTheme(theme)
-
-    if (theme !== 'system' || !window.matchMedia) return undefined
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => setEffectiveTheme(applyTheme('system'))
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange)
-      return () => mediaQuery.removeEventListener('change', handleChange)
-    }
-
-    mediaQuery.addListener?.(handleChange)
-
-    return () => {
-      mediaQuery.removeListener?.(handleChange)
-    }
-  }, [theme])
+  const {theme, effectiveTheme, themeSaving, applySessionTheme, updateTheme} = useThemePreference({setSession, onError: setError})
 
   useEffect(() => {
     api.session()
@@ -53,15 +32,7 @@ export default function App() {
           return
         }
 
-        const nextTheme = normalizeTheme(payload.preferences?.theme)
-        setTheme(nextTheme)
-        setSession({
-          ...payload,
-          preferences: {
-            ...payload.preferences,
-            theme: nextTheme
-          }
-        })
+        setSession(applySessionTheme(payload))
       })
       .catch((err) => {
         if (err.status === 401 && err.payload?.login_url) {
@@ -71,7 +42,7 @@ export default function App() {
 
         setError(err.message || 'Request failed')
       })
-  }, [])
+  }, [applySessionTheme])
 
   if (error) {
     return <FullPageState label={error} />
@@ -79,46 +50,6 @@ export default function App() {
 
   if (!session) {
     return <FullPageState label="Loading" />
-  }
-
-  const updateTheme = async (nextTheme) => {
-    const normalizedTheme = normalizeTheme(nextTheme)
-    const previousTheme = theme
-
-    setTheme(normalizedTheme)
-    setSession((current) => current ? {
-      ...current,
-      preferences: {
-        ...current.preferences,
-        theme: normalizedTheme
-      }
-    } : current)
-    setThemeSaving(true)
-
-    try {
-      const payload = await api.setTheme(normalizedTheme)
-      const savedTheme = normalizeTheme(payload.theme)
-      setTheme(savedTheme)
-      setSession((current) => current ? {
-        ...current,
-        preferences: {
-          ...current.preferences,
-          theme: savedTheme
-        }
-      } : current)
-    } catch (err) {
-      setTheme(previousTheme)
-      setSession((current) => current ? {
-        ...current,
-        preferences: {
-          ...current.preferences,
-          theme: previousTheme
-        }
-      } : current)
-      setError(err.message || 'Request failed')
-    } finally {
-      setThemeSaving(false)
-    }
   }
 
   return (
