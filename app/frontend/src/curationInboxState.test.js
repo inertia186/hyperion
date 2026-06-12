@@ -8,7 +8,10 @@ import {
   postsResultCountLabel,
   queryInputValue,
   readDesktopPreviewPercent,
+  selectionAfterAllMatching,
+  selectionAfterLoadedToggle,
   selectionAfterPostRemoval,
+  selectionAfterPostToggle,
   selectionAfterPostsRemoval,
   writeDesktopPreviewPercent
 } from './curationInboxState'
@@ -106,6 +109,44 @@ describe('curation inbox state helpers', () => {
       posts: [],
       selectedId: null,
       cleared: true
+    })
+  })
+
+  test('toggles individual post selection and exits all-matching mode', () => {
+    const posts = [{id: 1}, {id: 2}, {id: 3}]
+
+    expect(selectionAfterPostToggle(2, posts, new Set([1]), false)).toEqual({
+      selectedPostIds: new Set([1, 2]),
+      allMatchingSelected: false
+    })
+    expect(selectionAfterPostToggle(1, posts, new Set([1, 2]), false)).toEqual({
+      selectedPostIds: new Set([2]),
+      allMatchingSelected: false
+    })
+    expect(selectionAfterPostToggle(2, posts, new Set([1, 2, 3]), true)).toEqual({
+      selectedPostIds: new Set([1, 3]),
+      allMatchingSelected: false
+    })
+  })
+
+  test('toggles loaded selection and all matching selection state', () => {
+    const posts = [{id: 1}, {id: 2}]
+
+    expect(selectionAfterLoadedToggle(posts, false, false)).toEqual({
+      selectedPostIds: new Set([1, 2]),
+      allMatchingSelected: false
+    })
+    expect(selectionAfterLoadedToggle(posts, true, false)).toEqual({
+      selectedPostIds: new Set(),
+      allMatchingSelected: false
+    })
+    expect(selectionAfterLoadedToggle(posts, false, true)).toEqual({
+      selectedPostIds: new Set(),
+      allMatchingSelected: false
+    })
+    expect(selectionAfterAllMatching(posts)).toEqual({
+      selectedPostIds: new Set([1, 2]),
+      allMatchingSelected: true
     })
   })
 

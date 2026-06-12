@@ -123,6 +123,43 @@ export function selectionAfterPostsRemoval(removedIds, selectedId, sourcePosts) 
   return {posts: nextPosts, selectedId: nextPosts[nextIndex]?.id || null, cleared: false}
 }
 
+export function selectionAfterPostToggle(postId, posts, selectedPostIds, allMatchingSelected) {
+  if (allMatchingSelected) {
+    return {
+      selectedPostIds: new Set(posts.filter((post) => post.id !== postId).map((post) => post.id)),
+      allMatchingSelected: false
+    }
+  }
+
+  const next = new Set(selectedPostIds)
+
+  if (next.has(postId)) {
+    next.delete(postId)
+  } else {
+    next.add(postId)
+  }
+
+  return {selectedPostIds: next, allMatchingSelected: false}
+}
+
+export function selectionAfterLoadedToggle(posts, allLoadedSelected, allMatchingSelected) {
+  if (allMatchingSelected || allLoadedSelected) {
+    return {selectedPostIds: new Set(), allMatchingSelected: false}
+  }
+
+  return {
+    selectedPostIds: new Set(posts.map((post) => post.id)),
+    allMatchingSelected: false
+  }
+}
+
+export function selectionAfterAllMatching(posts) {
+  return {
+    selectedPostIds: new Set(posts.map((post) => post.id)),
+    allMatchingSelected: true
+  }
+}
+
 export function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {
   const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
   const loadedSuffix = hasMorePosts ? ` · ${loadedPostsCount} loaded` : ''

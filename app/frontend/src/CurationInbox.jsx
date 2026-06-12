@@ -22,7 +22,10 @@ import {
   keywordSuggestionFromFilterQuery,
   postsResultCountLabel,
   queryInputValue,
+  selectionAfterAllMatching,
+  selectionAfterLoadedToggle,
   selectionAfterPostRemoval,
+  selectionAfterPostToggle,
   selectionAfterPostsRemoval
 } from './curationInboxState'
 
@@ -287,39 +290,21 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   }, [handleError, query.only_keyword, query.only_read, selectAfterRemoval])
 
   const togglePostSelection = (postId) => {
-    if (allMatchingSelected) {
-      setAllMatchingSelected(false)
-      setSelectedPostIds(new Set(posts.filter((post) => post.id !== postId).map((post) => post.id)))
-      return
-    }
-
-    setSelectedPostIds((current) => {
-      const next = new Set(current)
-
-      if (next.has(postId)) {
-        next.delete(postId)
-      } else {
-        next.add(postId)
-      }
-
-      return next
-    })
+    const selection = selectionAfterPostToggle(postId, posts, selectedPostIds, allMatchingSelected)
+    setAllMatchingSelected(selection.allMatchingSelected)
+    setSelectedPostIds(selection.selectedPostIds)
   }
 
   const toggleLoadedSelection = () => {
-    if (allMatchingSelected || allLoadedSelected) {
-      setAllMatchingSelected(false)
-      setSelectedPostIds(new Set())
-      return
-    }
-
-    setAllMatchingSelected(false)
-    setSelectedPostIds(new Set(posts.map((post) => post.id)))
+    const selection = selectionAfterLoadedToggle(posts, allLoadedSelected, allMatchingSelected)
+    setAllMatchingSelected(selection.allMatchingSelected)
+    setSelectedPostIds(selection.selectedPostIds)
   }
 
   const selectAllMatching = () => {
-    setSelectedPostIds(new Set(posts.map((post) => post.id)))
-    setAllMatchingSelected(true)
+    const selection = selectionAfterAllMatching(posts)
+    setSelectedPostIds(selection.selectedPostIds)
+    setAllMatchingSelected(selection.allMatchingSelected)
   }
 
   const clearSelection = () => {
