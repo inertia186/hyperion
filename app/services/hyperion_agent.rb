@@ -37,6 +37,8 @@ class HyperionAgent
         total_count: result.total_count,
         total_pages: (result.total_count.to_f / result.limit).ceil
       },
+      mode_counts: result.mode_counts,
+      context_matches: context_matches(result),
       posts: result.posts.map { |post| digest_post_payload(post, result) },
       ignored_tags: result.ignored_tags,
       favorite_tags: result.favorite_tag_set.to_a
@@ -260,6 +262,53 @@ private
 
   def favorite_tags
     account.favorite_tags.pluck(:tag)
+  end
+
+  def context_matches(result)
+    return [] if result.posts.any?
+
+    active_context = active_context(result.query_state)
+
+    context_match_options(result.query_state).filter_map do |option|
+      next if option.fetch(:context) == active_context
+
+      count = result.mode_counts[option.fetch(:count_key)].to_i
+      next unless count.positive?
+
+      {
+        context: option.fetch(:context).to_s,
+        count: count,
+        query: result.query_state.merge(option.fetch(:query_updates))
+      }
+    end
+  end
+
+  def active_context(query_state)
+    return :read if query_state[:only_read]
+    return :ignored if query_state[:only_ignored]
+    return :deleted if query_state[:only_deleted]
+    return :blacklisted if query_state[:only_blacklisted]
+
+    :unread
+  end
+
+  def context_match_options(query_state)
+    base_false_flags = {
+      only_read: false,
+      only_ignored: false,
+      only_deleted: false,
+      only_blacklisted: false
+    }
+
+    [
+      {context: :unread, count_key: :unread, query_updates: base_false_flags},
+      {context: :read, count_key: :read, query_updates: base_false_flags.merge(only_read: true)},
+      {context: :ignored, count_key: :ignored, query_updates: base_false_flags.merge(only_ignored: true)},
+      {context: :deleted, count_key: :deleted, query_updates: base_false_flags.merge(only_deleted: true)},
+      {context: :blacklisted, count_key: :blacklisted, query_updates: base_false_flags.merge(only_blacklisted: true)}
+    ].reject do |option|
+      option.fetch(:context) == :unread && query_state[:only_keyword]
+    end
   end
 
   def normalize_query_params(params)

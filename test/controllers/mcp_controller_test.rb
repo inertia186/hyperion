@@ -95,6 +95,34 @@ class McpControllerTest < ActionController::TestCase
     payload = tool_payload
     assert_equal 1, payload.fetch('posts').size
     assert_equal 'Allowed Unread', payload.fetch('posts').first.fetch('title')
+    assert payload.fetch('mode_counts').fetch('unread') >= 1
+    assert_equal [], payload.fetch('context_matches')
+  end
+
+  test 'digest reports matches available in another context when current context is empty' do
+    posts(:read_allowed).update!(author: 'jmjury')
+
+    post_json(
+      jsonrpc: '2.0',
+      id: 16,
+      method: 'tools/call',
+      params: {
+        name: 'hyperion_get_digest',
+        arguments: {tag: '@jmjury'}
+      }
+    )
+
+    assert_response :success
+    payload = tool_payload
+    assert_equal [], payload.fetch('posts')
+    assert_equal 0, payload.fetch('mode_counts').fetch('unread')
+    assert_equal 1, payload.fetch('mode_counts').fetch('read')
+
+    read_match = payload.fetch('context_matches').find { |match| match.fetch('context') == 'read' }
+    assert_not_nil read_match
+    assert_equal 1, read_match.fetch('count')
+    assert_equal true, read_match.dig('query', 'only_read')
+    assert_equal 'jmjury', read_match.dig('query', 'author')
   end
 
   test 'calls session and post tools' do
