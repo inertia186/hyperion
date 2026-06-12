@@ -1,4 +1,5 @@
 import { Controller } from '@hotwired/stimulus'
+import { diffPairOptions, escapeHtml, lineDiff, normalizePairIndex, renderCodeDiff, renderCodeRevision, revisionDetail } from './posts_diff'
 
 import $ from 'jquery';
 
@@ -324,113 +325,36 @@ export default class extends Controller {
 
     if (revisions.length === 1) {
       this.diffPairTarget.innerHTML = '';
-      this.diffBodyTarget.innerHTML = this.renderCodeRevision(revisions[0]);
+      this.diffBodyTarget.innerHTML = renderCodeRevision(revisions[0]);
       return;
     }
 
     var pairCount = revisions.length - 1;
-    var pairIndex = selectedIndex === null || isNaN(selectedIndex) ? pairCount - 1 : selectedIndex;
-    pairIndex = Math.min(Math.max(pairIndex, 0), pairCount - 1);
+    var pairIndex = normalizePairIndex(revisions, selectedIndex);
 
-    if (pairCount > 1) {
-      this.diffPairTarget.innerHTML = `<select class="custom-select custom-select-sm w-auto" data-action="posts#diffPairChanged">${Array.from({length: pairCount}, (_item, index) => {
-        var selected = index === pairIndex ? ' selected' : '';
-        return `<option value="${index}"${selected}>${this.escapeHtml(revisions[index].label)} -&gt; ${this.escapeHtml(revisions[index + 1].label)}</option>`;
-      }).join('')}</select>`;
-    } else {
-      this.diffPairTarget.innerHTML = '';
-    }
+    this.diffPairTarget.innerHTML = diffPairOptions(revisions, pairIndex);
 
-    this.diffBodyTarget.innerHTML = this.renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
+    this.diffBodyTarget.innerHTML = renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
   }
 
   renderCodeRevision(revision) {
-    return `
-      <section class="border rounded bg-dark text-light">
-        <pre class="m-0 p-3 overflow-auto" style="max-height: 65vh;"><code>${this.escapeHtml(revision.body || '')}</code></pre>
-      </section>
-    `;
+    return renderCodeRevision(revision);
   }
 
   renderCodeDiff(previousRevision, currentRevision) {
-    var rows = this.lineDiff(previousRevision.body || '', currentRevision.body || '').map((line) => {
-      var rowClass = line.type === 'added' ? 'bg-success text-white' : line.type === 'removed' ? 'bg-danger text-white' : 'text-light';
-      return `<div class="d-flex ${rowClass}"><span class="text-right text-monospace px-2 text-muted" style="width: 4rem;">${line.number || ''}</span><code class="text-monospace flex-fill px-2" style="white-space: pre-wrap;">${this.escapeHtml(line.prefix + line.text)}</code></div>`;
-    }).join('');
-
-    return `
-      <section class="border rounded bg-dark overflow-hidden">
-        <div class="row no-gutters border-bottom border-secondary text-light small">
-          <div class="col-sm-6 border-right border-secondary p-2">
-            <strong>${this.escapeHtml(previousRevision.label || 'Before')}</strong>
-            <div class="text-muted">${this.escapeHtml(this.revisionDetail(previousRevision))}</div>
-          </div>
-          <div class="col-sm-6 p-2">
-            <strong>${this.escapeHtml(currentRevision.label || 'After')}</strong>
-            <div class="text-muted">${this.escapeHtml(this.revisionDetail(currentRevision))}</div>
-          </div>
-        </div>
-        <div class="overflow-auto" style="max-height: 65vh;">${rows}</div>
-      </section>
-    `;
+    return renderCodeDiff(previousRevision, currentRevision);
   }
 
   lineDiff(before, after) {
-    var beforeLines = before.split(/\r?\n/);
-    var afterLines = after.split(/\r?\n/);
-    var table = Array.from({length: beforeLines.length + 1}, () => Array(afterLines.length + 1).fill(0));
-
-    for (var i = beforeLines.length - 1; i >= 0; i--) {
-      for (var j = afterLines.length - 1; j >= 0; j--) {
-        table[i][j] = beforeLines[i] === afterLines[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
-      }
-    }
-
-    var diff = [];
-    i = 0;
-    j = 0;
-    while (i < beforeLines.length && j < afterLines.length) {
-      if (beforeLines[i] === afterLines[j]) {
-        diff.push({type: 'same', prefix: ' ', text: beforeLines[i], number: j + 1});
-        i++;
-        j++;
-      } else if (table[i + 1][j] >= table[i][j + 1]) {
-        diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
-        i++;
-      } else {
-        diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
-        j++;
-      }
-    }
-
-    while (i < beforeLines.length) {
-      diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
-      i++;
-    }
-
-    while (j < afterLines.length) {
-      diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
-      j++;
-    }
-
-    return diff;
+    return lineDiff(before, after);
   }
 
   revisionDetail(revision) {
-    var parts = [];
-    if (revision.published_at) parts.push(revision.published_at);
-    if (revision.block_num) parts.push(`block ${revision.block_num}`);
-    return parts.length > 0 ? parts.join(' · ') : 'No chain metadata';
+    return revisionDetail(revision);
   }
 
   escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, (character) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[character]);
+    return escapeHtml(value);
   }
   
   markRowAsRead(e) {
