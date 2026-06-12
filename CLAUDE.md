@@ -1,6 +1,7 @@
 # Hyperion — Full Project Review
 
-_Review date: 2026-06-02. Scope: backend (Rails 8.1 / Ruby 3.3.11), HafSQL indexing,
+_Original review: 2026-06-02. Revised: 2026-06-12 after the `refactor` branch
+decomposition pass. Scope: backend (Rails 8.1 / Ruby 3.3.11), HafSQL indexing,
 React/Vite SPA, legacy Stimulus + Haml stack, PostgreSQL schema, and tests._
 
 This document is a working checklist. Each item is actionable and grouped by
@@ -9,24 +10,80 @@ Check items off (`[x]`) as they are addressed.
 
 ---
 
+## 0. What the `refactor` branch changed (2026-06-12)
+
+The `refactor` branch carried out a large, behavior-preserving decomposition of
+the two biggest maintainability risks (the React SPA and several fat Rails
+classes) into small, individually unit-tested units. No public behavior changed;
+every step landed with the Rails + frontend suites green and a live HTTP smoke
+check.
+
+**Runtime/test environment notes (durable):**
+- Backend tests: `RBENV_VERSION=3.3.11 rbenv exec bundle exec rails test ...`
+  (or `bin/rails test`).
+- Frontend tests: Node 24, e.g. `source ~/.nvm/nvm.sh && nvm use 24 && yarn test:frontend`.
+- Asset builds: `yarn build` (legacy esbuild/sass) and `yarn vite:build` (SPA).
+- Live smoke check used during the refactor: `http://127.0.0.1:3000/sessions/new`
+  returns `200` and renders login HTML.
+
+**Frontend SPA decomposition (`app/frontend/src/`):**
+- `CurationInbox.jsx` reduced from **989 → 381 lines**; `App.jsx` from **324 → 228**.
+- `App.test.jsx` no longer 1843 lines but coverage moved into focused per-unit
+  test files; remaining `App.test.jsx` is still large (2723 lines) and hardened
+  for parallel-safe timer cleanup.
+- Pure helpers extracted: `curationInboxState`, `curationQuery`,
+  `curationReadState`, `curationViewState`, `curationPagination`,
+  `postPayloadUpdates`, `previewScroll`, `previewPaneLinks`, `timelineChart`.
+- Hooks extracted: `useCurationPosts`, `useCurationSelection`, `useCurationSearch`,
+  `useCurationPreferences`, `useCurationPreviewState`, `usePostPreview`,
+  `usePreviewChainStats`, `usePreviewVoteActions`, `usePreviewImageSources`,
+  `useRevisionDiffModal`, `useTimelineData`, `useDesktopPreviewResize`,
+  `useInfiniteLoadMore`, `useSelectedPostListScroll`, `useVotingPower`,
+  `useThemePreference`, `useSessionBootstrap`, `useMediaQuery`.
+- Components extracted under `components/`: `CurationPostListPanel`,
+  `CurationPreviewPanels`, `MobilePreviewDrawer`, `PostListSkeleton`,
+  `SelectionBar`, `TagsModal`, `SettingsModal`, `HivesignerVoteModal`,
+  `PostActionsDrawer`, `PreviewSkeleton`, `RevisionDiffModal`.
+- Legacy Stimulus `posts_controller.js` (~700 → 380 lines) had pure logic pulled
+  into testable helpers in `app/javascript/controllers/`: `posts_diff`,
+  `posts_navigation`, `posts_keyboard`, `posts_preview`, `posts_details`
+  (covered by `legacyPosts*.test.js`).
+
+**Backend service extractions (`app/services/`):**
+- `Api::V1::PostSerializer` — post JSON serialization out of the API controller.
+- `PostChainPayload` — Hive chain-stat / payout payload assembly.
+- `PostKeywordSearch` — keyword normalization, `ILIKE` filtering, fuzzy suggestions.
+- `PostCurationParams` / `PostCurationSort` / `PostCurationAssociations` — split
+  out of `PostCurationQuery` (param parsing, ordering, association enrichment).
+- `PostMedia`, `PostDisplayBody`, `PostPayout` — extracted from the `Post` model
+  (model keeps thin compatibility delegators).
+- `PostBlacklist` — blacklist refresh/parsing/cache pulled out of `PostIndexJob`.
+- `HyperionAgentPostPresenter` — agent post payload formatting out of `HyperionAgent`.
+- `AgentOpenapiDocument` — OpenAPI document shape out of `AgentDiscoveryController`.
+
+---
+
 ## 1. Architecture & Tech Debt
 
 - [ ] **[H] Two parallel frontends.** A modern React/Vite SPA lives in
   `app/frontend/` while a legacy Stimulus/jQuery/Turbolinks stack lives in
-  `app/javascript/` + Haml views in `app/views/`. Decide which is canonical and
-  schedule removal of the dead stack. Carrying both inflates `package.json`
-  (`jquery`, `jquery-ui`, `select2`, `bootstrap@4`, `popper.js`, `turbolinks`,
-  `@rails/ujs`, `@hotwired/stimulus`) and the asset build matrix
-  (esbuild + sass + vite all configured).
-- [ ] **[H] Duplicated query logic.** `PostsController#index` (~100 lines,
-  `app/controllers/posts_controller.rb`) re-implements almost exactly the logic
-  already extracted into `PostCurationQuery`
-  (`app/services/post_curation_query.rb`), which the API (`Api::V1::PostsController#index`)
-  uses. Collapse the legacy controller onto `PostCurationQuery` or delete it if
-  the SPA has fully replaced the server-rendered views.
+  `app/javascript/` + Haml views in `app/views/`. The refactor made the legacy
+  Stimulus controller easier to maintain (extracted `posts_*` helpers) but did
+  **not** remove it. Decide which is canonical and schedule removal of the dead
+  stack. Carrying both inflates `package.json` (`jquery`, `jquery-ui`, `select2`,
+  `bootstrap@4`, `popper.js`, `turbolinks`, `@rails/ujs`, `@hotwired/stimulus`)
+  and the asset build matrix (esbuild + sass + vite all configured).
+- [ ] **[H] Duplicated query logic.** `PostsController#index`
+  (`app/controllers/posts_controller.rb`) still re-implements logic that lives in
+  `PostCurationQuery` (now slimmed to ~230 lines and split across
+  `PostCurationParams`/`Sort`/`Associations`), which the API
+  (`Api::V1::PostsController#index`) uses. Collapse the legacy controller onto
+  `PostCurationQuery` or delete it if the SPA has fully replaced the
+  server-rendered views.
 - [ ] **[M] `read_params` duplicated.** The identical param-parsing block exists
-  in both `PostsController#read_params` and `PostCurationQuery#read_params`.
-  Extract to a single shared parser object.
+  in both `PostsController#read_params` and the curation param parser. With
+  `PostCurationParams` now extracted, route the legacy controller through it
+  instead of keeping a second copy.
 - [ ] **[M] Mixed bundlers.** `jsbundling-rails` + `esbuild` (`yarn build`),
   `cssbundling-rails` + `sass` (`yarn build:css`), `sprockets-rails`, AND
   `vite_rails` are all present. Consolidate on Vite for the SPA and drop the
@@ -34,30 +91,21 @@ Check items off (`[x]`) as they are addressed.
 
 ## 2. Correctness / Bugs
 
-- [x] **[H] `Post.tagged_all` does not filter by ALL tags.** In
-  `app/models/post.rb` the loop body uses the whole array `tag` instead of the
-  iteration variable `t`:
-  ```ruby
-  tag.each do |t|
-    r = r.where(id: Tag.where(tag: tag).select(:post_id))   # uses `tag`, not `t`
-  end
-  ```
-  Every iteration applies the same ANY-of-tags predicate, so "all tags" behaves
-  like "any tag". Fix to `Tag.where(tag: t)`. Add a regression test.
+- [x] **[H] `Post.tagged_all` does not filter by ALL tags.** Fixed: the loop now
+  uses the iteration variable `t` (`Tag.where(tag: t)`); regression test added.
 - [ ] **[H] Broken / mis-targeted counter caches.**
-  - `Post has_many :read_posts, counter_cache: :tags_count`
-    (`app/models/post.rb:20`) points reads at `tags_count` (the tag counter) and,
-    because `counter_cache` belongs on the `belongs_to` side, is ineffective
-    anyway. `ReadPost belongs_to :post` has no `counter_cache: true`.
+  - `Post has_many :read_posts, counter_cache: :tags_count` points reads at
+    `tags_count` (the tag counter) and, because `counter_cache` belongs on the
+    `belongs_to` side, is ineffective anyway. `ReadPost belongs_to :post` has no
+    `counter_cache: true`.
   - `accounts.read_posts_count` column is never incremented (no
     `counter_cache: true` on `ReadPost belongs_to :account`).
   - Decide whether these counters are needed; if so wire `counter_cache: true`
     on the `belongs_to` associations and backfill. If not, drop the columns.
-- [ ] **[M] `body ILIKE "%...%"` is unsanitized for LIKE metacharacters.** In both
-  `PostsController#index` and `PostCurationQuery#base_filter_relation`, user
-  `query` is interpolated into a bind value but `%` / `_` are not escaped, so
-  user-supplied wildcards alter matching semantics. Use
-  `ActiveRecord::Base.sanitize_sql_like` before wrapping in `%...%`.
+- [ ] **[M] `body ILIKE "%...%"` is unsanitized for LIKE metacharacters.** Keyword
+  filtering now lives in `PostKeywordSearch` and the legacy `PostsController#index`.
+  Confirm both escape `%` / `_` with `ActiveRecord::Base.sanitize_sql_like` before
+  wrapping in `%...%`.
 - [ ] **[L] `to_param` + `Post.find(params[:id])`.** `to_param` emits
   `id/author/permlink` but the API/controllers look up by `params[:id]` (leading
   integer is parsed by Rails). Confirm the routes/constraints handle the slug
@@ -65,82 +113,88 @@ Check items off (`[x]`) as they are addressed.
 
 ## 3. Performance — Low-Hanging Fruit (do these first)
 
-- [ ] **[H] N+1 `Community.find_by` per post.** In
-  `Api::V1::PostsController#post_json`, `Community.find_by(name: display_post.category)`
-  runs once per post in the list. Preload communities for all `display_post`
-  categories in `PostCurationQuery#load_associations` (it already builds
-  `post_communities`) and look them up from the in-memory map.
-- [ ] **[H] N+1 `muted_authors.include?` per post.** Also in `post_json`,
-  `current_account.muted_authors.include?(...)` is evaluated per post. Hoist
-  `current_account.muted_authors` into a memoized `Set` once per request.
-- [ ] **[H] Five separate COUNT queries per request.**
-  `PostCurationQuery#build_mode_counts` issues 5 independent `COUNT(*)` queries
-  (unread/read/ignored/deleted/blacklisted) plus `build_muted_posts_count` and
-  `total_count`. Combine where possible (e.g. a single grouped query or
-  `FILTER (WHERE ...)` aggregate) and/or compute lazily only for the active mode.
+- [ ] **[H] N+1 `Community.find_by` per post.** Serialization moved into
+  `Api::V1::PostSerializer` / `PostChainPayload`; verify community lookup is now
+  resolved from a preloaded map (`PostCurationAssociations` builds community
+  payloads) rather than `Community.find_by(name: display_post.category)` per post.
+- [ ] **[H] N+1 `muted_authors.include?` per post.** Hoist
+  `current_account.muted_authors` into a memoized `Set` once per request inside
+  the serializer.
+- [ ] **[H] Five separate COUNT queries per request.** `PostCurationQuery`
+  mode-count assembly still issues independent `COUNT(*)` queries plus muted/total
+  counts. Combine where possible (single grouped query / `FILTER (WHERE ...)`)
+  and/or compute lazily only for the active mode.
 - [ ] **[H] Repeated `account.reload`.** `account.reload.muted_authors` is called
-  in `Post.unread` scope, `PostCurationQuery#build_muted_posts_count`,
-  `#base_filter_relation`, and `PostsController#index`. Each reload is a full row
-  refetch; memoize the muted-author list per request instead.
+  in multiple paths; memoize the muted-author list per request instead of
+  refetching the row.
 - [ ] **[H] Synchronous Hive RPC inside request path.**
-  `Account#blacklist_sources` → `followed_blacklist_accounts` →
-  `fetch_bridge_follow_list_accounts` performs a live `bridge.get_follow_list`
-  RPC on every curation request (memoist only de-dupes within one instance).
-  Cache the follow/blacklist lists (DB column or Rails.cache with TTL) and
-  refresh out-of-band, like `muted_authors` already is.
+  `Account#blacklist_sources` → `followed_blacklist_accounts` performs a live
+  `bridge.get_follow_list` RPC on every curation request. Cache the
+  follow/blacklist lists (DB column or Rails.cache with TTL) and refresh
+  out-of-band, like `muted_authors` already is.
 - [ ] **[M] Missing trigram index for body search.** `body ILIKE '%q%'` cannot use
-  any index (`db/schema.rb` has none on `body`). If search is used in practice,
-  add `pg_trgm` + a GIN index, or restrict search to title. Otherwise it is a
-  full sequential scan over `posts`.
+  any index. If search is used in practice, add `pg_trgm` + a GIN index, or
+  restrict search to title. Otherwise it is a full sequential scan over `posts`.
 - [ ] **[M] No index for `metadata->>'app'` filter.** `Post.app` scope filters on
   `metadata->>'app' ILIKE ?`; add an expression index if app filtering is common.
-- [ ] **[M] `related_authors` pulls up to 1000 rows.**
-  `all_posts.distinct.limit(1000).order(:author).pluck(:author)` runs on the full
-  filtered relation every request. Confirm the index support and consider a
-  smaller cap or caching.
-- [ ] **[L] `TagCount.count` on every list render.** Called in both index actions
-  and the API `counts` payload. Cheap but unnecessary per request — cache it.
+- [ ] **[M] `related_authors` pulls up to 1000 rows.** Now in
+  `PostCurationAssociations`; confirm index support and consider a smaller cap or
+  caching.
+- [ ] **[L] `TagCount.count` on every list render.** Cheap but unnecessary per
+  request — cache it.
 - [ ] **[M] `order_by_prolific` correlated subquery.** The per-author
-  `(SELECT count(*) ... )` correlated subquery in the `ORDER BY`
-  (`app/models/post.rb`) is O(n·m). Consider a materialized author-post-count or
-  a join+group.
+  `(SELECT count(*) ...)` correlated subquery in the `ORDER BY` is O(n·m).
+  Consider a materialized author-post-count or a join+group. (Sort selection now
+  lives in `PostCurationSort`.)
 
-## 4. Indexing Pipeline (`HafsqlPostIndexer`)
+## 4. Indexing Pipeline (`HafsqlPostIndexer` / `PostIndexJob`)
 
 - [ ] **[M] Long transaction over a 1000-row batch.** `perform` wraps the entire
-  batch (and the sweep batch) in one `Post.transaction`, doing per-row
-  `find_or_initialize` + `save!` + tag replacement. This holds locks for the
-  whole batch. Consider chunked transactions / `insert_all`/`upsert_all`.
-- [ ] **[M] Per-row blacklist lookup.** `upsert_post` calls
-  `PostIndexJob.new.blacklist_reasons_for(row.author)` for every row (new object
-  each time). Batch blacklist resolution per author set, like reputations already
-  are (`author_reputations_for`).
+  batch in one `Post.transaction` with per-row `find_or_initialize` + `save!` +
+  tag replacement, holding locks for the whole batch. Consider chunked
+  transactions / `insert_all`/`upsert_all`.
+- [x] **[M] Per-row blacklist lookup.** Blacklist refresh/parsing/caching is now
+  extracted into `PostBlacklist` with focused tests; `PostIndexJob` keeps
+  compatibility wrappers. Confirm per-author batching when wiring into the indexer.
 - [ ] **[M] `replace_tags` is N queries per post.** `destroy_all` + per-tag
   `find_or_initialize_by` + `save!`. Use bulk `delete`/`upsert_all` for tags.
-- [ ] **[L] `ensure_configured!` is an empty method.** Either implement the intended
-  guard (it is called in `perform`/`fetch_body`) or remove it to avoid confusion.
+- [ ] **[L] `ensure_configured!` is an empty method.** Either implement the
+  intended guard or remove it to avoid confusion.
 
 ## 5. Tests
 
-- [ ] **[M] No direct unit tests for `PostCurationQuery`.** It is the core query
-  engine used by the API but only exercised indirectly via controller tests. Add
-  focused tests (sorting, tag include/exclude, modes, blacklist, muted authors).
+- [x] **[M] No direct unit tests for the query engine.** The split produced focused
+  tests: `post_curation_params_test`, `post_curation_sort_test`,
+  `post_curation_associations_test`, plus `post_keyword_search_test`,
+  `post_blacklist_test`, `post_media_test`, `post_display_body_test`,
+  `post_payout_test`. `PostCurationQuery` itself is still only exercised
+  indirectly — consider a thin integration test over the composed query.
 - [ ] **[M] Legacy `PostsController` query branches under-tested.** If kept, mirror
-  the `PostCurationQuery` coverage; if removed (see §1), delete its test.
-- [ ] **[L] Large monolithic test files.** `app/frontend/src/App.test.jsx` is 1843
-  lines. Split by feature alongside the component split in §6.
-- [x] **[L] Add a regression test for the `tagged_all` fix** (§2) before changing
-  the scope.
+  the curation coverage; if removed (see §1), delete its test.
+- [ ] **[L] `App.test.jsx` still large (2723 lines).** Most logic now has focused
+  per-hook/component tests (`use*.test.js`, `components/*.test.jsx`,
+  `legacyPosts*.test.js`); finish trimming `App.test.jsx` to integration-level
+  cases only.
+- [x] **[L] Regression test for the `tagged_all` fix** (§2) — added.
 
 ## 6. Frontend (React SPA)
 
-- [ ] **[M] `CurationInbox.jsx` is 989 lines.** Decompose into smaller components
-  /hooks (data fetching, mode state, keyboard shortcuts, list rendering). It is
-  the single largest source file and the main maintainability risk in the SPA.
-- [ ] **[L] `App.jsx` (324 lines)** — review for extractable state/hooks once
-  `CurationInbox` is split.
+- [x] **[M] `CurationInbox.jsx` was 989 lines.** Decomposed into hooks
+  (`useCurationPosts`, `useCurationSelection`, `useCurationSearch`,
+  `useCurationPreferences`, `useCurationPreviewState`, `useInfiniteLoadMore`,
+  `useSelectedPostListScroll`, …), pure helpers (`curationInboxState`,
+  `curationQuery`, `curationReadState`, `curationViewState`, `curationPagination`),
+  and components (`CurationPostListPanel`, `CurationPreviewPanels`). Now ~381 lines
+  of composition/orchestration.
+- [x] **[L] `App.jsx` (324 lines).** State extracted into `useVotingPower`,
+  `useThemePreference`, `useSessionBootstrap`, and the `SettingsModal` component;
+  now ~228 lines.
+- [ ] **[M] `PreviewPane.jsx` / `TimelineModal.jsx` follow-up.** `PreviewPane`
+  shrank substantially (chain stats, vote actions, image sources, revision diff,
+  and leaf modals extracted) and `TimelineModal` now delegates to `useTimelineData`
+  + `timelineChart`. Re-review both for any remaining mixed concerns.
 - [ ] **[L] Vite `hmr: false`.** HMR is disabled in `vite.config.js`; confirm this
-  is intentional (it slows the dev loop) or re-enable for local development.
+  is intentional or re-enable for local development.
 
 ## 7. Configuration & Ops
 
@@ -148,60 +202,55 @@ Check items off (`[x]`) as they are addressed.
   instructions mention `rake db:create`/`db:seed` only — add Node/Yarn, Vite, and
   HafSQL env var setup for a from-scratch run.
 - [ ] **[L] Public HafSQL credentials in `README`.** Default public read-only
-  creds are documented; fine for the public endpoint but make sure no real
-  secrets ever land here and that `HAFSQL_DATABASE_URL` is the documented prod
-  override.
-- [ ] **[L] `stackprof`/profiling gems in default group.** `stackprof` is in the
-  top-level Gemfile group (loaded in production); confirm intended, or move
-  dev/profiling-only gems into the `:development` group.
+  creds are documented; ensure no real secrets land here and that
+  `HAFSQL_DATABASE_URL` is the documented prod override.
+- [ ] **[L] `stackprof`/profiling gems in default group.** Confirm intended, or
+  move dev/profiling-only gems into the `:development` group.
 - [ ] **[L] Pin Ruby/Node consistency.** `Gemfile` pins `ruby '3.3.11'`,
   `package.json` pins `node 24.x`. Ensure CI and Heroku buildpacks match.
 
 ## 8. Security
 
-- [ ] **[M] LIKE-injection via search wildcards** — see §2 (`sanitize_sql_like`).
+- [ ] **[M] LIKE-injection via search wildcards** — see §2 (`sanitize_sql_like`),
+  now centralized in `PostKeywordSearch`.
 - [ ] **[L] Confirm strong params / authorization** on all `Api::V1` mutating
   actions (`mark_read`, `mark_many_read`, `mark_all_as_read`) scope strictly to
-  `current_account` (they appear to, but add tests asserting cross-account
-  isolation).
-- [ ] **[L] `condenser_rpc` error handling** in `chain_stats` swallows all
-  `StandardError`; ensure failures are logged with enough context and not masking
-  systemic node outages.
+  `current_account`; add tests asserting cross-account isolation.
+- [ ] **[L] `condenser_rpc` error handling.** Chain-stat fetching (now in
+  `PostChainPayload`) swallows `StandardError`; ensure failures are logged with
+  enough context and not masking systemic node outages.
 
 ---
 
 ## Next Pass — Proposed Plan
 
-A suggested ordering that front-loads cheap, high-impact wins and de-risks later
-refactors. Each phase should land with tests green.
+The `refactor` branch effectively completed the **Pass 2D frontend
+decomposition** and seeded the **Pass 2B query-engine split** and **Pass 2C
+blacklist extraction**. Remaining priorities front-load the still-open
+high-impact correctness/perf items.
 
-### Pass 2A — Quick wins (low effort, high value)
-1. Fix `Post.tagged_all` bug + regression test (§2).
-2. Eliminate the two per-post N+1s in `post_json` (community + muted authors) (§3).
-3. Memoize `muted_authors` / remove redundant `account.reload` (§3).
-4. `sanitize_sql_like` for body search (§2/§8).
-5. Cache `TagCount.count` per request (§3).
+### Pass 3A — Backend perf & correctness (mostly still open)
+1. Eliminate the per-post N+1s in `Api::V1::PostSerializer` (community + muted
+   authors) using preloaded maps from `PostCurationAssociations` (§3).
+2. Memoize `muted_authors` / remove redundant `account.reload` (§3).
+3. Collapse `build_mode_counts` into fewer queries (§3).
+4. Cache/refresh follow & blacklist lists out-of-band (§3).
+5. `sanitize_sql_like` for body search in `PostKeywordSearch` + legacy controller (§2/§8).
 
-### Pass 2B — Query engine consolidation
-1. Add `PostCurationQuery` unit tests (§5) to lock in behavior.
-2. Collapse `PostsController#index` onto `PostCurationQuery` (or delete legacy
-   controller/views if the SPA is canonical) (§1).
-3. Extract the shared `read_params` parser (§1).
-4. Optimize `build_mode_counts` into fewer queries (§3).
+### Pass 3B — Stack consolidation
+1. Decide the canonical frontend; remove the legacy Stimulus/jQuery/Haml stack
+   (now helper-extracted but still live) and its build pipeline + unused deps (§1).
+2. Collapse `PostsController#index` onto `PostCurationQuery`/`PostCurationParams`
+   or delete the legacy controller/views (§1).
+3. Drop the redundant esbuild/sprockets pipeline once legacy views are gone (§1).
 
-### Pass 2C — Indexing & data layer
-1. Batch blacklist lookups and tag upserts in `HafsqlPostIndexer` (§4).
+### Pass 3C — Indexing & data layer
+1. Wire `PostBlacklist` batching into the indexer; batch tag upserts (§4).
 2. Chunk the indexer transaction (§4).
 3. Add/justify DB indexes for body/app search; decide on `pg_trgm` (§3).
 4. Resolve counter-cache correctness (§2).
 
-### Pass 2D — Frontend & stack cleanup
-1. Decompose `CurationInbox.jsx` and split `App.test.jsx` (§6/§5).
-2. Decide the canonical frontend; remove the legacy Stimulus/jQuery/Haml stack
-   and its build pipeline + unused dependencies (§1).
-3. Refresh `README` and Gemfile group hygiene (§7).
-
-### Pass 3 — Hardening
+### Pass 3D — Hardening
 1. Cross-account authorization tests for all mutating API endpoints (§8).
-2. Cache/refresh follow & blacklist lists out-of-band (§3).
+2. Finish trimming `App.test.jsx` to integration cases (§5).
 3. Re-profile hot endpoints (`stackprof`/`rack-mini-profiler`) to confirm gains.
