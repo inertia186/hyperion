@@ -4,6 +4,7 @@ import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
+import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import MobilePreviewDrawer from './components/MobilePreviewDrawer'
 import PostList from './components/PostList'
@@ -14,17 +15,12 @@ import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
 import {
   COMPACT_MODE_SELECTOR_PREVIEW_PERCENT,
-  MAX_DESKTOP_PREVIEW_PERCENT,
-  MIN_DESKTOP_PREVIEW_PERCENT,
   adjustReadCounts,
-  clamp,
   emptyContextSuggestions,
   keywordSuggestionFromFilterQuery,
   parseQueryInput,
   postsResultCountLabel,
-  queryInputValue,
-  readDesktopPreviewPercent,
-  writeDesktopPreviewPercent
+  queryInputValue
 } from './curationInboxState'
 
 const emptyPreviewState = {postId: null, status: 'idle', html: '', detail: null, error: null}
@@ -47,7 +43,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const [previewActive, setPreviewActive] = useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
-  const [desktopPreviewPercent, setDesktopPreviewPercent] = useState(readDesktopPreviewPercent)
   const desktopLayoutRef = useRef(null)
   const listScrollRef = useRef(null)
   const desktopPreviewScrollRef = useRef(null)
@@ -56,6 +51,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const previewRequestRef = useRef(0)
   const resetKeyRef = useRef(resetKey)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
+  const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
 
   const posts = postsPayload?.posts || []
   const selectedIndex = posts.findIndex((post) => post.id === selectedId)
@@ -78,9 +74,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const allLoadedSelected = posts.length > 0 && posts.every((post) => selectedPostIds.has(post.id))
   const canSelectAllMatching = allLoadedSelected && !allMatchingSelected && totalPosts > loadedPostsCount
   const params = useMemo(() => queryParams(query), [query])
-  const desktopLayoutStyle = useMemo(() => ({
-    '--desktop-preview-width': `${desktopPreviewPercent}%`
-  }), [desktopPreviewPercent])
   const compactModeSelector = isMobilePreviewLayout || desktopPreviewPercent >= COMPACT_MODE_SELECTOR_PREVIEW_PERCENT
   const handleError = useCallback((err) => {
     if (err.status === 401 && err.payload?.login_url) {
@@ -202,43 +195,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const updateQuery = (updates) => {
     setQuery((current) => ({...current, ...updates, page: updates.page || '1'}))
   }
-
-  const updateDesktopPreviewPercent = useCallback((clientX) => {
-    if (!Number.isFinite(clientX)) return
-
-    const rect = desktopLayoutRef.current?.getBoundingClientRect()
-    if (!rect || rect.width <= 0) return
-
-    const nextPercent = clamp(((rect.right - clientX) / rect.width) * 100, MIN_DESKTOP_PREVIEW_PERCENT, MAX_DESKTOP_PREVIEW_PERCENT)
-    const roundedPercent = Math.round(nextPercent)
-    setDesktopPreviewPercent(roundedPercent)
-    writeDesktopPreviewPercent(roundedPercent)
-  }, [])
-
-  const startDesktopResize = useCallback((event) => {
-    if (event.button != null && event.button !== 0) return
-
-    event.preventDefault()
-    updateDesktopPreviewPercent(event.clientX)
-
-    const previousCursor = document.body.style.cursor
-    const previousUserSelect = document.body.style.userSelect
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    const handlePointerMove = (moveEvent) => updateDesktopPreviewPercent(moveEvent.clientX)
-    const stopResize = () => {
-      document.body.style.cursor = previousCursor
-      document.body.style.userSelect = previousUserSelect
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', stopResize)
-      window.removeEventListener('pointercancel', stopResize)
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', stopResize)
-    window.addEventListener('pointercancel', stopResize)
-  }, [updateDesktopPreviewPercent])
 
   const submitQuery = (event) => {
     event.preventDefault()
