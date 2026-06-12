@@ -3,34 +3,26 @@ import { api } from './api'
 import { useCurationKeyboard } from './useCurationKeyboard'
 import { useCurationPosts } from './useCurationPosts'
 import { useCurationPreferences } from './useCurationPreferences'
+import { useCurationPreviewState } from './useCurationPreviewState'
 import { useCurationSearch } from './useCurationSearch'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import { postReadTransition, selectedIdsAfterPostRead, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
+import { curationViewState } from './curationViewState'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
-import {
-  COMPACT_MODE_SELECTOR_PREVIEW_PERCENT,
-  emptyContextSuggestions,
-  keywordSuggestionFromFilterQuery,
-  postsResultCountLabel,
-  selectionAfterAllMatching,
-  selectionAfterLoadedToggle,
-  selectionAfterPostToggle
-} from './curationInboxState'
+import { selectionAfterAllMatching, selectionAfterLoadedToggle, selectionAfterPostToggle } from './curationInboxState'
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
   const [selectedId, setSelectedId] = useState(null)
   const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [previewActive, setPreviewActive] = useState(false)
-  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
   const desktopLayoutRef = useRef(null)
   const listScrollRef = useRef(null)
@@ -40,10 +32,15 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
   const previewState = usePostPreview(selectedId, {desktopPreviewScrollRef, mobilePreviewScrollRef})
-  const closePreview = useCallback(() => {
-    setPreviewActive(false)
-    if (isMobilePreviewLayout) setMobilePreviewOpen(false)
-  }, [isMobilePreviewLayout])
+  const {
+    previewActive,
+    setPreviewActive,
+    mobilePreviewOpen,
+    setMobilePreviewOpen,
+    closePreview,
+    togglePreview,
+    selectPost
+  } = useCurationPreviewState({isMobilePreviewLayout, setSelectedId})
   const closeTags = useCallback(() => setTagsOpen(false), [])
 
   const {
@@ -88,26 +85,36 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     handleLoadError
   } = useCurationPosts({query, refreshKey, onPostsLoaded: applyLoadedPosts})
 
-  const posts = postsPayload?.posts || []
-  const selectedIndex = posts.findIndex((post) => post.id === selectedId)
-  const selectedPost = posts[selectedIndex] || null
-  const ignoredTags = postsPayload?.ignored_tags || session.ignored_tags || []
-  const poisonedPillTags = postsPayload?.poisoned_pill_tags || session.poisoned_pill_tags || []
-  const favoriteTags = postsPayload?.favorite_tags || session.favorite_tags || []
-  const pastTags = postsPayload?.past_tags || session.past_tags || []
-  const activeTag = postsPayload?.query?.tag || ''
-  const activeTagIgnored = activeTag && ignoredTags.includes(activeTag)
-  const pagination = postsPayload?.pagination
-  const totalPosts = pagination?.total_count || 0
-  const loadedPostsCount = posts.length
-  const resultCountLabel = postsPayload ? postsResultCountLabel(postsPayload.query, totalPosts, loadedPostsCount, hasMorePosts) : ''
-  const keywordSearchSuggestion = postsPayload && !postsPayload.query?.only_keyword ? keywordSuggestionFromFilterQuery(postsPayload.query) : ''
-  const keywordDidYouMean = postsPayload?.query?.only_keyword ? postsPayload.keyword_suggestion : ''
-  const contextSuggestions = postsPayload && !postsPayload.query?.only_keyword ? emptyContextSuggestions(postsPayload.query, postsPayload.mode_counts) : []
-  const visibleSelectionCount = allMatchingSelected ? totalPosts : selectedPostIds.size
-  const allLoadedSelected = posts.length > 0 && posts.every((post) => selectedPostIds.has(post.id))
-  const canSelectAllMatching = allLoadedSelected && !allMatchingSelected && totalPosts > loadedPostsCount
-  const compactModeSelector = isMobilePreviewLayout || desktopPreviewPercent >= COMPACT_MODE_SELECTOR_PREVIEW_PERCENT
+  const {
+    posts,
+    selectedIndex,
+    selectedPost,
+    ignoredTags,
+    poisonedPillTags,
+    favoriteTags,
+    pastTags,
+    activeTag,
+    activeTagIgnored,
+    totalPosts,
+    loadedPostsCount,
+    resultCountLabel,
+    keywordSearchSuggestion,
+    keywordDidYouMean,
+    contextSuggestions,
+    visibleSelectionCount,
+    allLoadedSelected,
+    canSelectAllMatching,
+    compactModeSelector
+  } = curationViewState({
+    postsPayload,
+    session,
+    selectedId,
+    selectedPostIds,
+    allMatchingSelected,
+    hasMorePosts,
+    isMobilePreviewLayout,
+    desktopPreviewPercent
+  })
   const {
     toggleMute,
     toggleOnlyFavorites,
@@ -142,18 +149,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     observer.observe(target)
     return () => observer.disconnect()
   }, [hasMorePosts, loading, loadingMore, loadMorePosts])
-
-  useEffect(() => {
-    if (!isMobilePreviewLayout) {
-      setMobilePreviewOpen(false)
-    }
-  }, [isMobilePreviewLayout])
-
-  useEffect(() => {
-    document.body.classList.toggle('mobile-preview-open', mobilePreviewOpen && isMobilePreviewLayout)
-
-    return () => document.body.classList.remove('mobile-preview-open')
-  }, [isMobilePreviewLayout, mobilePreviewOpen])
 
   const selectedPostRef = useRef(null)
   selectedPostRef.current = selectedPost
@@ -257,24 +252,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     const nextIndex = Math.min(Math.max(selectedIndex + direction, 0), posts.length - 1)
     setSelectedId(posts[nextIndex].id)
   }, [posts, selectedIndex])
-
-  const openPreview = useCallback(() => {
-    setPreviewActive(true)
-    if (isMobilePreviewLayout) setMobilePreviewOpen(true)
-  }, [isMobilePreviewLayout])
-
-  const togglePreview = useCallback(() => {
-    if (previewActive) {
-      closePreview()
-    } else {
-      openPreview()
-    }
-  }, [closePreview, openPreview, previewActive])
-
-  const selectPost = (postId) => {
-    setSelectedId(postId)
-    if (isMobilePreviewLayout) openPreview()
-  }
 
   useImperativeHandle(ref, () => ({
     openTags: () => setTagsOpen(true),
