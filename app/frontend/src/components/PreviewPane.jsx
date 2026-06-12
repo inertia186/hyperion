@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, MessageSquare, MoreVertical, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { api } from '../api'
 import { imageProxy } from '../format'
 import { blacklistReasonText, previewExternalLinks, replyCommentsUrl } from '../previewPaneLinks'
 import { renderPostBody } from '../renderPostBody'
+import { usePreviewChainStats } from '../usePreviewChainStats'
 import { useModalDismiss } from '../useModalDismiss'
 import { usePreviewImageSources } from '../usePreviewImageSources'
 import CategoryTagsControl from './CategoryTagsControl'
@@ -11,10 +12,6 @@ import HivesignerVoteModal from './HivesignerVoteModal'
 import PostActionsDrawer from './PostActionsDrawer'
 import PreviewSkeleton from './PreviewSkeleton'
 import RevisionDiffModal from './RevisionDiffModal'
-
-const emptyStats = {status: 'idle', votes: null, replies: null, payout: null, currentVote: null}
-const loadingStats = {status: 'loading', votes: null, replies: null, payout: null, currentVote: null}
-const voteRefreshDelays = [2500, 7000, 15000]
 
 export default function PreviewPane({
   post,
@@ -56,7 +53,6 @@ export default function PreviewPane({
     }
   }, [detail?.body_markdown, displayPost, previewState.html])
   const previewHtmlMarkup = useMemo(() => ({__html: previewHtml}), [previewHtml])
-  const [stats, setStats] = useState(emptyStats)
   const [votePanel, setVotePanel] = useState(null)
   const [voteWeight, setVoteWeight] = useState(100)
   const [voteBusy, setVoteBusy] = useState(false)
@@ -64,7 +60,7 @@ export default function PreviewPane({
   const [diffModal, setDiffModal] = useState(null)
   const [postActionsOpen, setPostActionsOpen] = useState(false)
   const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
-  const voteRefreshRef = useRef({id: 0, timeoutId: null})
+  const {stats, refreshStatsAfterVote} = usePreviewChainStats({post, displayPost, previewReady, onChainStatsRefresh})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)
@@ -72,88 +68,6 @@ export default function PreviewPane({
   }, [post?.id])
 
   usePreviewImageSources({previewReady, previewScrollRef, previewHtml, theme})
-
-  useEffect(() => {
-    setStats(post ? loadingStats : emptyStats)
-    voteRefreshRef.current.id += 1
-    window.clearTimeout(voteRefreshRef.current.timeoutId)
-
-    return () => {
-      voteRefreshRef.current.id += 1
-      window.clearTimeout(voteRefreshRef.current.timeoutId)
-    }
-  }, [post?.id])
-
-  useEffect(() => {
-    if (!displayPost) return undefined
-    if (!previewReady) return undefined
-
-    let active = true
-
-    api.postChainStats(displayPost.id, {author: displayPost.author, permlink: displayPost.permlink})
-      .then((payload) => {
-        if (!active) return
-        setStats({
-          status: payload.status || 'ready',
-          votes: payload.votes ?? null,
-          replies: payload.replies ?? null,
-          payout: payload.payout ?? null,
-          currentVote: payload.current_vote ?? null
-        })
-        if (payload.status === 'ready') onChainStatsRefresh?.(post.id, payload)
-      })
-      .catch(() => {
-        if (active) setStats({status: 'unavailable', votes: null, replies: null, payout: null, currentVote: null})
-      })
-
-    return () => {
-      active = false
-    }
-  }, [accountName, displayPost?.id, displayPost?.author, displayPost?.permlink, onChainStatsRefresh, post?.id, previewReady])
-
-  const refreshStatsAfterVote = ({expectedVote = null} = {}) => {
-    if (!displayPost) return
-
-    const targetPost = displayPost
-    const refreshId = voteRefreshRef.current.id + 1
-    voteRefreshRef.current.id = refreshId
-    window.clearTimeout(voteRefreshRef.current.timeoutId)
-    setStats((current) => ({...current, status: 'loading'}))
-
-    const scheduleRefresh = (attempt) => {
-      voteRefreshRef.current.timeoutId = window.setTimeout(() => {
-        if (voteRefreshRef.current.id !== refreshId) return
-
-        api.postChainStats(targetPost.id, {author: targetPost.author, permlink: targetPost.permlink, refresh: true})
-          .then((payload) => {
-            if (voteRefreshRef.current.id !== refreshId) return
-            if (payload.status !== 'ready') return
-            setStats((current) => ({
-              ...current,
-              status: 'ready',
-              votes: payload.votes ?? current.votes,
-              replies: payload.replies ?? current.replies,
-              payout: payload.payout ?? current.payout,
-              currentVote: payload.current_vote ?? current.currentVote
-            }))
-
-            const observedVote = payload.current_vote == null ? null : Number(payload.current_vote)
-            if (expectedVote != null && observedVote !== expectedVote && attempt + 1 < voteRefreshDelays.length) {
-              scheduleRefresh(attempt + 1)
-            } else {
-              onChainStatsRefresh?.(post.id, payload, {refreshVotingPower: true})
-            }
-          })
-          .catch(() => {
-            if (voteRefreshRef.current.id === refreshId && attempt + 1 < voteRefreshDelays.length) {
-              scheduleRefresh(attempt + 1)
-            }
-          })
-      }, voteRefreshDelays[attempt])
-    }
-
-    scheduleRefresh(0)
-  }
 
   const closeHivesignerModal = ({refresh = true} = {}) => {
     setHivesignerModal(null)
