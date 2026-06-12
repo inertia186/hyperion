@@ -5,23 +5,20 @@ import { useCurationPosts } from './useCurationPosts'
 import { useCurationPreferences } from './useCurationPreferences'
 import { useCurationPreviewState } from './useCurationPreviewState'
 import { useCurationSearch } from './useCurationSearch'
+import { useCurationSelection } from './useCurationSelection'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
-import { postReadTransition, selectedIdsAfterPostRead, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
+import { postReadTransition, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
 import { curationViewState } from './curationViewState'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
-import { selectionAfterAllMatching, selectionAfterLoadedToggle, selectionAfterPostToggle } from './curationInboxState'
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
-  const [selectedId, setSelectedId] = useState(null)
-  const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
-  const [allMatchingSelected, setAllMatchingSelected] = useState(false)
   const [busy, setBusy] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
   const desktopLayoutRef = useRef(null)
@@ -31,6 +28,20 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const loadMoreRef = useRef(null)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
+  const {
+    selectedId,
+    setSelectedId,
+    selectedPostIds,
+    allMatchingSelected,
+    applyLoadedSelection,
+    applyReadTransition: applySelectionReadTransition,
+    removeSelectedPostId,
+    clearAllMatchingSelection,
+    togglePostSelection,
+    toggleLoadedSelection,
+    selectAllMatching,
+    clearSelection
+  } = useCurationSelection()
   const previewState = usePostPreview(selectedId, {desktopPreviewScrollRef, mobilePreviewScrollRef})
   const {
     previewActive,
@@ -68,11 +79,9 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   })
 
   const applyLoadedPosts = useCallback((payload) => {
-    setSelectedPostIds(new Set())
-    setAllMatchingSelected(false)
-    setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
+    applyLoadedSelection(payload)
     applyLoadedQuery(payload.query)
-  }, [applyLoadedQuery])
+  }, [applyLoadedQuery, applyLoadedSelection])
   const {
     postsPayload,
     setPostsPayload,
@@ -154,15 +163,11 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   selectedPostRef.current = selectedPost
 
   const applyReadTransition = useCallback((transition) => {
-    if (transition.clearPreview) {
-      setSelectedId(null)
+    if (applySelectionReadTransition(transition)) {
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      return
     }
-
-    if (transition.selectedId !== null && transition.selectedId !== selectedId) setSelectedId(transition.selectedId)
-  }, [selectedId])
+  }, [applySelectionReadTransition, setMobilePreviewOpen, setPreviewActive])
 
   const markPostReadAndMove = useCallback(async (post, direction = 1) => {
     if (!post) return
@@ -170,8 +175,8 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setBusy(true)
     try {
       const result = await api.markRead(post.id)
-      setAllMatchingSelected(false)
-      setSelectedPostIds((current) => selectedIdsAfterPostRead(current, post.id))
+      clearAllMatchingSelection()
+      removeSelectedPostId(post.id)
       setPostsPayload((payload) => {
         const transition = postReadTransition(payload, {post, result, query, direction})
         applyReadTransition(transition)
@@ -182,30 +187,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     } finally {
       setBusy(false)
     }
-  }, [applyReadTransition, handleLoadError, query])
-
-  const togglePostSelection = (postId) => {
-    const selection = selectionAfterPostToggle(postId, posts, selectedPostIds, allMatchingSelected)
-    setAllMatchingSelected(selection.allMatchingSelected)
-    setSelectedPostIds(selection.selectedPostIds)
-  }
-
-  const toggleLoadedSelection = () => {
-    const selection = selectionAfterLoadedToggle(posts, allLoadedSelected, allMatchingSelected)
-    setAllMatchingSelected(selection.allMatchingSelected)
-    setSelectedPostIds(selection.selectedPostIds)
-  }
-
-  const selectAllMatching = () => {
-    const selection = selectionAfterAllMatching(posts)
-    setSelectedPostIds(selection.selectedPostIds)
-    setAllMatchingSelected(selection.allMatchingSelected)
-  }
-
-  const clearSelection = () => {
-    setSelectedPostIds(new Set())
-    setAllMatchingSelected(false)
-  }
+  }, [applyReadTransition, clearAllMatchingSelection, handleLoadError, query, removeSelectedPostId])
 
   const markSelectedRead = async () => {
     const postIds = selectedLoadedPostIds(posts, selectedPostIds)
@@ -350,8 +332,8 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
             loadedPostsCount={loadedPostsCount}
             selectedCount={visibleSelectionCount}
             totalPosts={totalPosts}
-            onToggleLoaded={toggleLoadedSelection}
-            onSelectAllMatching={selectAllMatching}
+            onToggleLoaded={() => toggleLoadedSelection(posts, allLoadedSelected)}
+            onSelectAllMatching={() => selectAllMatching(posts)}
             onClearSelection={clearSelection}
             contextSuggestions={contextSuggestions}
             keywordSearchSuggestion={keywordSearchSuggestion}
@@ -363,7 +345,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
             selectedPostIds={selectedPostIds}
             ignoredTags={ignoredTags}
             onSelect={selectPost}
-            onToggleSelected={togglePostSelection}
+            onToggleSelected={(postId) => togglePostSelection(postId, posts)}
             onSelectTag={focusTag}
             onSelectAuthor={focusAuthor}
             onPayoutRefresh={updatePostPayout}
