@@ -1,14 +1,13 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { api } from './api'
 import { initialQuery } from './constants'
-import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
+import { useCurationPosts } from './useCurationPosts'
 import { useCurationPreferences } from './useCurationPreferences'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
-import { appendCurationPage, curationHasMorePosts } from './curationPagination'
 import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery } from './curationQuery'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
@@ -34,15 +33,10 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const [draftTag, setDraftTag] = useState('')
   const [draftQuery, setDraftQuery] = useState('')
   const [searchMode, setSearchMode] = useState('filters')
-  const [postsPayload, setPostsPayload] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const [loadMoreError, setLoadMoreError] = useState(null)
   const [previewActive, setPreviewActive] = useState(false)
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -55,6 +49,24 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
   const previewState = usePostPreview(selectedId, {desktopPreviewScrollRef, mobilePreviewScrollRef})
+  const applyLoadedPosts = useCallback((payload) => {
+    setSelectedPostIds(new Set())
+    setAllMatchingSelected(false)
+    setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
+    setDraftTag(queryInputValue(payload.query))
+    setDraftQuery(payload.query.query || '')
+  }, [])
+  const {
+    postsPayload,
+    setPostsPayload,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    hasMorePosts,
+    loadMorePosts,
+    handleLoadError
+  } = useCurationPosts({query, refreshKey, onPostsLoaded: applyLoadedPosts})
 
   const posts = postsPayload?.posts || []
   const selectedIndex = posts.findIndex((post) => post.id === selectedId)
@@ -68,7 +80,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const pagination = postsPayload?.pagination
   const totalPosts = pagination?.total_count || 0
   const loadedPostsCount = posts.length
-  const hasMorePosts = curationHasMorePosts(pagination)
   const resultCountLabel = postsPayload ? postsResultCountLabel(postsPayload.query, totalPosts, loadedPostsCount, hasMorePosts) : ''
   const keywordSearchSuggestion = postsPayload && !postsPayload.query?.only_keyword ? keywordSuggestionFromFilterQuery(postsPayload.query) : ''
   const keywordDidYouMean = postsPayload?.query?.only_keyword ? postsPayload.keyword_suggestion : ''
@@ -76,17 +87,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const visibleSelectionCount = allMatchingSelected ? totalPosts : selectedPostIds.size
   const allLoadedSelected = posts.length > 0 && posts.every((post) => selectedPostIds.has(post.id))
   const canSelectAllMatching = allLoadedSelected && !allMatchingSelected && totalPosts > loadedPostsCount
-  const params = useMemo(() => queryParams(query), [query])
   const compactModeSelector = isMobilePreviewLayout || desktopPreviewPercent >= COMPACT_MODE_SELECTOR_PREVIEW_PERCENT
-  const handleError = useCallback((err) => {
-    if (err.status === 401 && err.payload?.login_url) {
-      window.location.assign(err.payload.login_url)
-      return
-    }
-
-    setError(err.message || 'Request failed')
-    setLoading(false)
-  }, [])
   const {
     toggleMute,
     toggleOnlyFavorites,
@@ -105,53 +106,8 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setPostsPayload,
     setQuery,
     setBusy,
-    handleError
+    handleError: handleLoadError
   })
-
-  const loadPosts = useCallback((nextQuery) => {
-    setLoading(true)
-    setError(null)
-    setLoadMoreError(null)
-
-    api.posts(queryParams(nextQuery))
-      .then((payload) => {
-        setPostsPayload(payload)
-        setSelectedPostIds(new Set())
-        setAllMatchingSelected(false)
-        setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
-        setDraftTag(queryInputValue(payload.query))
-        setDraftQuery(payload.query.query || '')
-      })
-      .catch(handleError)
-      .finally(() => setLoading(false))
-  }, [handleError])
-
-  useEffect(() => {
-    loadPosts(query)
-  }, [loadPosts, query, refreshKey])
-
-  const loadMorePosts = useCallback(() => {
-    if (!postsPayload || loading || loadingMore || !hasMorePosts) return
-
-    const nextPage = String(postsPayload.pagination.page + 1)
-    const nextQuery = {...query, page: nextPage}
-    setLoadingMore(true)
-    setLoadMoreError(null)
-
-    api.posts(queryParams(nextQuery))
-      .then((payload) => {
-        setPostsPayload((current) => appendCurationPage(current, payload))
-      })
-      .catch((err) => {
-        if (err.status === 401 && err.payload?.login_url) {
-          window.location.assign(err.payload.login_url)
-          return
-        }
-
-        setLoadMoreError(err.message || 'Request failed')
-      })
-      .finally(() => setLoadingMore(false))
-  }, [hasMorePosts, loading, loadingMore, postsPayload, query])
 
   useEffect(() => {
     if (!hasMorePosts || loading || loadingMore || typeof IntersectionObserver === 'undefined') return undefined
@@ -283,11 +239,11 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
         return {...nextPayload, posts: selectAfterRemoval(post.id, direction, markedPosts)}
       })
     } catch (err) {
-      handleError(err)
+      handleLoadError(err)
     } finally {
       setBusy(false)
     }
-  }, [handleError, query.only_keyword, query.only_read, selectAfterRemoval])
+  }, [handleLoadError, query.only_keyword, query.only_read, selectAfterRemoval])
 
   const togglePostSelection = (postId) => {
     const selection = selectionAfterPostToggle(postId, posts, selectedPostIds, allMatchingSelected)
@@ -333,7 +289,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
         return {...nextPayload, posts: selectAfterRemovingIds(markedPostIds, markedPosts)}
       })
     } catch (err) {
-      handleError(err)
+      handleLoadError(err)
     } finally {
       setBusy(false)
     }
