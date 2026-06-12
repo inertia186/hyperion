@@ -8,8 +8,7 @@ import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import CurationPostListPanel from './components/CurationPostListPanel'
-import MobilePreviewDrawer from './components/MobilePreviewDrawer'
-import PreviewPane from './components/PreviewPane'
+import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
 import {
@@ -637,50 +636,28 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
           </div>
         )}
 
-        <aside className="hidden min-w-0 xl:sticky xl:top-4 xl:flex xl:h-[calc(100vh-2rem)] xl:h-[calc(100dvh-2rem)] xl:flex-col xl:gap-3">
-          <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-slate-200 bg-white">
-            <PreviewPane
-              post={selectedPost}
-              previewState={previewState}
-              previewActive={previewActive}
-              previewScrollRef={desktopPreviewScrollRef}
-              accountName={session.account.name}
-              hivesignerAvailable={session.preferences.hivesigner_available}
-              theme={theme}
-              onPrevious={() => moveSelection(-1)}
-              onNext={() => moveSelection(1)}
-              onMarkReadNext={markSelectedReadAndMoveNext}
-              onSelectTag={focusTag}
-              onSelectAuthor={focusAuthor}
-              onChainStatsRefresh={updatePostChainStats}
-              readBusy={busy}
-              hasPrevious={selectedIndex > 0}
-              hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
-            />
-          </div>
-        </aside>
+        <CurationPreviewPanels
+          mobilePreviewOpen={mobilePreviewOpen}
+          selectedPost={selectedPost}
+          previewState={previewState}
+          previewActive={previewActive}
+          desktopPreviewScrollRef={desktopPreviewScrollRef}
+          mobilePreviewScrollRef={mobilePreviewScrollRef}
+          accountName={session.account.name}
+          hivesignerAvailable={session.preferences.hivesigner_available}
+          theme={theme}
+          onClosePreview={closePreview}
+          onPrevious={() => moveSelection(-1)}
+          onNext={() => moveSelection(1)}
+          onMarkReadNext={markSelectedReadAndMoveNext}
+          onSelectTag={focusTag}
+          onSelectAuthor={focusAuthor}
+          onChainStatsRefresh={updatePostChainStats}
+          readBusy={busy}
+          hasPrevious={selectedIndex > 0}
+          hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
+        />
       </main>
-
-      <MobilePreviewDrawer
-        open={mobilePreviewOpen}
-        post={selectedPost}
-        previewState={previewState}
-        previewActive={previewActive}
-        previewScrollRef={mobilePreviewScrollRef}
-        accountName={session.account.name}
-        hivesignerAvailable={session.preferences.hivesigner_available}
-        theme={theme}
-        onClose={closePreview}
-        onPrevious={() => moveSelection(-1)}
-        onNext={() => moveSelection(1)}
-        onMarkReadNext={markSelectedReadAndMoveNext}
-        onSelectTag={focusTag}
-        onSelectAuthor={focusAuthor}
-        onChainStatsRefresh={updatePostChainStats}
-        readBusy={busy}
-        hasPrevious={selectedIndex > 0}
-        hasNext={selectedIndex >= 0 && selectedIndex < posts.length - 1}
-      />
 
       <TagsModal
         open={tagsOpen}
