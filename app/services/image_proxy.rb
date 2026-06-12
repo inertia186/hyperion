@@ -31,6 +31,7 @@ class ImageProxy
     dweb.link
     gateway.pinata.cloud
   ].freeze
+  IPFS_FETCH_GATEWAY_HOST = 'dweb.link'
 
   Result = Struct.new(:body, :content_type, :cache_key, keyword_init: true)
 
@@ -260,8 +261,10 @@ private
   end
 
   def fetch_uri
-    @fetch_uri ||= if @size
-      if already_resized_hive_image? || hive_avatar_image? || ipfs_gateway_image?
+    @fetch_uri ||= if ipfs_gateway_image?
+      ipfs_fetch_uri
+    elsif @size
+      if already_resized_hive_image? || hive_avatar_image?
         source_uri
       else
         URI.parse("https://#{HIVE_IMAGE_HOST}/#{@size}/#{@url}")
@@ -282,5 +285,9 @@ private
   def ipfs_gateway_image?
     IPFS_GATEWAY_HOSTS.include?(source_uri.host.to_s.downcase) &&
       source_uri.path.match?(%r{\A/ipfs/[A-Za-z0-9]+(?:/.*)?\z})
+  end
+
+  def ipfs_fetch_uri
+    URI::HTTPS.build(host: IPFS_FETCH_GATEWAY_HOST, path: source_uri.path)
   end
 end
