@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Info, X } from 'lucide-react'
-import { api } from '../api'
 import {
   bucketFromChartClick,
   chartData,
@@ -16,6 +15,7 @@ import {
   timelineRange
 } from '../timelineChart'
 import { closeOnBackdropClick, useModalDismiss } from '../useModalDismiss'
+import { useTimelineData } from '../useTimelineData'
 
 const cardHelp = {
   'All posts': 'Every post Hyperion has indexed in this rolling 7-day window, including deleted and blacklisted posts.',
@@ -26,35 +26,10 @@ const cardHelp = {
 
 export default function TimelineModal({visible, onClose, onSelectAuthor}) {
   const [metric, setMetric] = useState('payout')
-  const [state, setState] = useState({status: 'idle', payload: null, error: null})
   const [manualSignpostKeys, setManualSignpostKeys] = useState(() => new Set())
+  const resetManualSignposts = useCallback(() => setManualSignpostKeys(new Set()), [])
+  const state = useTimelineData({visible, onResetSignposts: resetManualSignposts})
   useModalDismiss(visible, onClose)
-
-  useEffect(() => {
-    if (!visible) {
-      setManualSignpostKeys(new Set())
-      return undefined
-    }
-
-    let active = true
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    setState((current) => ({status: current.payload ? 'ready' : 'loading', payload: current.payload, error: null}))
-
-    api.postTimeline({time_zone: timeZone})
-      .then((payload) => {
-        if (active) {
-          setManualSignpostKeys(new Set())
-          setState({status: 'ready', payload, error: null})
-        }
-      })
-      .catch((error) => {
-        if (active) setState({status: 'error', payload: null, error: error.message || 'Timeline failed to load.'})
-      })
-
-    return () => {
-      active = false
-    }
-  }, [visible])
 
   if (!visible) return null
 
