@@ -9,6 +9,7 @@ import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import { appendCurationPage, curationHasMorePosts } from './curationPagination'
+import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery } from './curationQuery'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
@@ -19,7 +20,6 @@ import {
   adjustReadCounts,
   emptyContextSuggestions,
   keywordSuggestionFromFilterQuery,
-  parseQueryInput,
   postsResultCountLabel,
   queryInputValue,
   selectionAfterPostRemoval,
@@ -177,37 +177,24 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   }, [isMobilePreviewLayout, mobilePreviewOpen])
 
   const updateQuery = (updates) => {
-    setQuery((current) => ({...current, ...updates, page: updates.page || '1'}))
+    setQuery((current) => queryWithUpdates(current, updates))
   }
 
   const submitQuery = (event) => {
     event.preventDefault()
     if (searchMode === 'keyword') {
-      updateQuery({
-        tag: '',
-        author: '',
-        query: draftQuery.trim(),
-        only_keyword: true,
-        only_read: false,
-        only_ignored: false,
-        only_deleted: false,
-        only_blacklisted: false
-      })
+      updateQuery(keywordOnlyQuery(draftQuery))
       return
     }
 
-    updateQuery({
-      ...parseQueryInput(draftTag),
-      query: '',
-      only_keyword: false
-    })
+    updateQuery(filterInputQuery(draftTag))
   }
 
   const resetQueryInput = () => {
     setDraftTag('')
     setDraftQuery('')
     setSearchMode('filters')
-    updateQuery({tag: '', query: '', author: '', only_keyword: false})
+    updateQuery(resetFilterQuery())
   }
 
   useEffect(() => {
@@ -222,16 +209,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
     setSearchMode('keyword')
     setDraftQuery(keywordSearchSuggestion)
-    updateQuery({
-      tag: '',
-      author: '',
-      query: keywordSearchSuggestion,
-      only_keyword: true,
-      only_read: false,
-      only_ignored: false,
-      only_deleted: false,
-      only_blacklisted: false
-    })
+    updateQuery(keywordOnlyQuery(keywordSearchSuggestion))
   }
 
   const searchKeywordSuggestion = () => {
@@ -239,16 +217,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
     setSearchMode('keyword')
     setDraftQuery(keywordDidYouMean)
-    updateQuery({
-      tag: '',
-      author: '',
-      query: keywordDidYouMean,
-      only_keyword: true,
-      only_read: false,
-      only_ignored: false,
-      only_deleted: false,
-      only_blacklisted: false
-    })
+    updateQuery(keywordOnlyQuery(keywordDidYouMean))
   }
 
   const selectedPostRef = useRef(null)
