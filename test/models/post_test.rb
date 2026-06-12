@@ -250,6 +250,25 @@ class PostTest < ActiveSupport::TestCase
     assert_equal 'Existing body', post.reload.body
   end
 
+  test 'refresh latest revision fetches latest when local body is a newer patch placeholder' do
+    post = create_post(author: 'alice', permlink: 'revision-patch-placeholder')
+    post.update!(body: "@@ -1,8 +1,12 @@\n Old\n+ body\n", block_num: 30)
+    service = RevisionService.new([
+      {
+        body: 'Older body',
+        title: 'Older title',
+        json_metadata_present: false,
+        block_num: 20
+      }
+    ])
+
+    post.stub(:fetch_latest, -> { post.body = 'Fetched latest body' }) do
+      post.refresh_latest_revision!(revisions_service: service)
+    end
+
+    assert_equal 'Fetched latest body', post.reload.body
+  end
+
 private
   class RevisionService
     def initialize(revisions)

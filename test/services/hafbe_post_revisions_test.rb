@@ -45,6 +45,53 @@ class HafbePostRevisionsTest < ActiveSupport::TestCase
     end
   end
 
+  test 'does not expose diff match patch bodies that cannot be reconstructed' do
+    post = Post.new(author: 'seattlea', permlink: 'introducing-hivelytics-2-0-or', title: 'Current title')
+    patch_body = "@@ -0,0 +1,12 @@\n+Hello world\n"
+    response = hafbe_response(
+      'operations_result' => [
+        comment_op(post, body: patch_body, block: 30, timestamp: '2026-01-03T00:00:00')
+      ]
+    )
+
+    Net::HTTP.stub(:get_response, response) do
+      revisions = HafbePostRevisions.new(base_url: 'https://hafbe.example').revisions_for(post)
+
+      assert_empty revisions
+    end
+  end
+
+  test 'does not append a local diff match patch body as a rendered revision' do
+    post = Post.new(author: 'seattlea', permlink: 'introducing-hivelytics-2-0-or', title: 'Current title')
+    response = hafbe_response('operations_result' => [])
+
+    Net::HTTP.stub(:get_response, response) do
+      revisions = HafbePostRevisions.new(base_url: 'https://hafbe.example').call(
+        post: post,
+        local_body: "@@ -0,0 +1,12 @@\n+Hello world\n",
+        render_body: ->(body) { body }
+      )
+
+      assert_empty revisions
+    end
+  end
+
+  test 'recognizes diff match patch headers with omitted lengths' do
+    post = Post.new(author: 'alice', permlink: 'edited-post', title: 'Current title')
+    response = hafbe_response(
+      'operations_result' => [
+        comment_op(post, body: "Hello\n", block: 20, timestamp: '2026-01-02T00:00:00'),
+        comment_op(post, body: "@@ -6 +6,6 @@\n %0A\n+Again\n", block: 21, timestamp: '2026-01-03T00:00:00')
+      ]
+    )
+
+    Net::HTTP.stub(:get_response, response) do
+      revisions = HafbePostRevisions.new(base_url: 'https://hafbe.example').revisions_for(post)
+
+      assert_equal ["Hello\n", "Hello\nAgain"], revisions.map { |revision| revision.fetch(:body) }
+    end
+  end
+
 private
   def hafbe_response(payload)
     Struct.new(:code, :body).new('200', payload.to_json)

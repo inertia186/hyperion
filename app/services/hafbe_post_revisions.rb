@@ -16,7 +16,7 @@ class HafbePostRevisions
 
     revisions = revisions_for(post)
     local_body = local_body.to_s
-    if local_body.present? && revisions.none? { |revision| revision[:body].to_s.strip == local_body.strip }
+    if local_body.present? && !diff_match_patch_body?(local_body) && revisions.none? { |revision| revision[:body].to_s.strip == local_body.strip }
       revisions << {
         body: local_body,
         title: post.title,
@@ -75,8 +75,11 @@ private
     end.sort_by { |revision| [revision[:block_num] || Float::INFINITY, revision[:published_at].to_s, revision[:sequence]] }
       .each_with_object([]) do |revision, unique_revisions|
         next if revision[:body].to_s.blank?
-        if revision[:body].match?(Post::DIFF_MATCH_PATCH_PATTERN) && unique_revisions.last
-          revision[:body] = apply_patch(unique_revisions.last[:body].to_s, revision[:body].to_s) || revision[:body]
+        if diff_match_patch_body?(revision[:body])
+          next unless unique_revisions.last
+
+          revision[:body] = apply_patch(unique_revisions.last[:body].to_s, revision[:body].to_s)
+          next if revision[:body].blank? || diff_match_patch_body?(revision[:body])
         end
         next if unique_revisions.last && unique_revisions.last[:body].to_s.strip == revision[:body].to_s.strip
 
@@ -164,6 +167,10 @@ private
     end
 
     patched_body
+  end
+
+  def diff_match_patch_body?(body)
+    body.to_s.match?(Post::DIFF_MATCH_PATCH_PATTERN)
   end
 
   def parse_patches(patch_body)

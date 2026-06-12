@@ -1,7 +1,7 @@
 class Post < ApplicationRecord
   extend Immutable
   
-  DIFF_MATCH_PATCH_PATTERN = /@@ -[0-9]+,[0-9]+ \+[0-9]+,[0-9]+ @@/
+  DIFF_MATCH_PATCH_PATTERN = /@@ -[0-9]+(?:,[0-9]+)? \+[0-9]+(?:,[0-9]+)? @@/
   IMAGE_URL_PATTERN = /(http(s?):\/\/.*\.(jpeg|jpg|gif|png))/
   YOUTUBE_SHORT_URL_PATTERN = /http(s?):\/\/youtu.be\/(.*)/
   YOUTUBE_LONG_URL_PATTERN = /http(s?):\/\/.*youtube.com\/.*?.*v=(.*)(&?).*/
@@ -360,6 +360,12 @@ class Post < ApplicationRecord
     revision = revisions_service.revisions_for(self).last
     unless revision
       fetch_latest_revision_fallback if body.blank? || body.to_s.match?(DIFF_MATCH_PATCH_PATTERN)
+      save! if changed?
+      return body
+    end
+
+    if body.to_s.match?(DIFF_MATCH_PATCH_PATTERN) && revision[:block_num].present? && block_num.to_i > revision[:block_num].to_i
+      fetch_latest_revision_fallback
       save! if changed?
       return body
     end
