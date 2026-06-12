@@ -467,7 +467,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   }, [markPostReadAndMove])
 
   const scrollPreview = useCallback((direction) => {
-    const pane = previewScrollTarget(mobilePreviewOpen ? mobilePreviewScrollRef.current : desktopPreviewScrollRef.current)
+    const pane = mobilePreviewOpen ? mobilePreviewScrollRef.current : desktopPreviewScrollRef.current
     const result = scrollPreviewPane(pane, direction)
     if (result.advanceSelection) moveSelection(direction)
   }, [mobilePreviewOpen, moveSelection])
@@ -616,7 +616,3 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 })
 
 export default CurationInbox
-
-function previewScrollTarget(container) {
-  return container
-}
