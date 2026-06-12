@@ -17,7 +17,7 @@ class Api::V1::PostsController < Api::V1::BaseController
       },
       mode_counts: result.mode_counts,
       keyword_suggestion: result.keyword_suggestion,
-      posts: result.posts.map { |post| post_json(post, result) },
+      posts: result.posts.map { |post| post_serializer.list(post, result) },
       related_tags: result.related_tags,
       related_authors: result.related_authors,
       ignored_tags: result.ignored_tags,
@@ -38,7 +38,7 @@ class Api::V1::PostsController < Api::V1::BaseController
     post = Post.find(params[:id])
     display_post = refresh_post_for_display(post)
 
-    render json: post_detail_json(post, display_post)
+    render json: post_serializer.detail(post, display_post)
   end
 
   def revisions
@@ -281,110 +281,11 @@ private
     end
   end
 
-  def post_json(post, result)
-    display_post = post.display_post(result.post_bodies[post.id])
-    display_community = display_post == post ? nil : Community.find_by(name: display_post.category)
-    display_category_name = display_community&.title || (result.post_communities[display_post.category] || {})[:name] || display_post.category
-    display_category_image_url = display_community&.profile_image_url || (result.post_communities[display_post.category] || {})[:image_url]
-    thumbnail_url = display_post == post ? post.post_image_url(result.post_bodies[post.id]) : display_post.post_image_url
-
-    tags = (result.post_tags[post.id] || []).map do |(_post_id, tag, category)|
-      community = result.post_communities[tag] || {}
-      {tag: tag, name: community[:name] || tag, image_url: community[:image_url], category: category}
-    end
-
-    {
-      id: post.id,
-      param: post.to_param,
-      author: display_post.author,
-      permlink: display_post.permlink,
-      title: display_post.title,
-      category: display_post.category,
-      category_name: display_category_name,
-      category_image_url: display_category_image_url,
-      tags: tags,
-      tags_count: post.tags_count,
-      thumbnail_url: thumbnail_url,
-      author_avatar_url: display_post.author_avatar_url,
-      placeholder_image_url: post.placeholder_image_url,
-      canonical_url: display_post.canonical_url,
-      app: display_post.app,
-      created_at: display_post.created_at.iso8601,
-      updated_at: display_post.updated_at&.iso8601 || post.updated_at.iso8601,
-      deleted: post.deleted?,
-      blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
-      blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
-      author_reputation: display_post.author_reputation,
-      payout: post.payout,
-      payout_amount: post.payout_amount&.to_s,
-      payout_currency: post.payout_currency,
-      payout_fetched_at: post.payout_fetched_at&.iso8601,
-      payout_unavailable_at: post.payout_unavailable_at&.iso8601,
-      payout_source: post.payout_source,
-      read: result.read_post_ids.include?(post.id),
-      muted_author: current_account.muted_authors.include?(display_post.author)
-    }
-  end
-
-  def post_detail_json(post, display_post = post)
-    display_community = Community.find_by(name: display_post.category)
-    display_category_name = display_community&.title || display_post.category
-    display_category_image_url = display_community&.profile_image_url
-
-    {
-      id: post.id,
-      param: post.to_param,
-      author: display_post.author,
-      permlink: display_post.permlink,
-      title: display_post.title,
-      category: display_post.category,
-      category_name: display_category_name,
-      category_image_url: display_category_image_url,
-      app: display_post.app,
-      created_at: display_post.created_at.iso8601,
-      deleted: post.deleted?,
-      blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
-      blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
-      author_reputation: display_post.author_reputation,
-      read: current_account.post_read?(post.id),
-      body_markdown: display_post.display_body,
-      body_html: post_body(post).to_s,
-      content_sandbox_url: content_sandbox_post_path(post, pp: :skip),
-      canonical_url: display_post.canonical_url,
-      display_post: {
-        id: display_post.id,
-        author: display_post.author,
-        permlink: display_post.permlink,
-        title: display_post.title,
-        category: display_post.category,
-        category_name: display_category_name,
-        category_image_url: display_category_image_url,
-        app: display_post.app,
-        canonical_url: display_post.canonical_url
-      },
-      urls: {
-        canonical: display_post.canonical_url,
-        hive_blog: "https://hive.blog/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        peakd: "https://peakd.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        hiveblocks: display_post.deleted? ? "https://hiveblocks.com/tx/#{display_post.trx_id}" : "https://hiveblocks.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        hive_db: "https://hivehub.dev/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}"
-      }
-    }
-  end
-
-  def blacklist_reasons_json(reasons)
-    Array(reasons).map do |reason|
-      account = reason['account'] || reason[:account]
-      reason.merge('name' => account)
-    end
-  end
-
-  def effective_blacklist_reasons(reasons)
-    blacklist_sources = current_account.blacklist_sources
-    return [] if blacklist_sources.empty?
-
-    Array(reasons).select do |reason|
-      blacklist_sources.include?(reason['account'] || reason[:account])
-    end
+  def post_serializer
+    @post_serializer ||= Api::V1::PostSerializer.new(
+      current_account: current_account,
+      url_helpers: self,
+      body_renderer: ->(post) { post_body(post) }
+    )
   end
 end
