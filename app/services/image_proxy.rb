@@ -25,6 +25,12 @@ class ImageProxy
     'image/webp' => 'webp'
   }.freeze
   HIVE_IMAGE_HOST = 'images.hive.blog'
+  IPFS_GATEWAY_HOSTS = %w[
+    ipfs.io
+    cloudflare-ipfs.com
+    dweb.link
+    gateway.pinata.cloud
+  ].freeze
 
   Result = Struct.new(:body, :content_type, :cache_key, keyword_init: true)
 
@@ -138,11 +144,10 @@ private
 
   def fetch_image
     response = @fetcher ? @fetcher.call(fetch_uri) : fetch_with_net_http(fetch_uri)
-    content_type = normalize_content_type(response.fetch(:content_type))
-    raise Error, 'Unsupported image content type.' unless ALLOWED_CONTENT_TYPES.key?(content_type)
-
     body = response.fetch(:body).to_s.b
     raise Error, 'Image is too large.' if body.bytesize > MAX_BYTES
+    content_type = image_content_type(response.fetch(:content_type), body)
+    raise Error, 'Unsupported image content type.' unless ALLOWED_CONTENT_TYPES.key?(content_type)
 
     {body: body, content_type: content_type}
   end
@@ -222,6 +227,22 @@ private
     content_type.to_s.split(';', 2).first.to_s.downcase.strip
   end
 
+  def image_content_type(content_type, body)
+    normalized_content_type = normalize_content_type(content_type)
+    return normalized_content_type if ALLOWED_CONTENT_TYPES.key?(normalized_content_type)
+
+    sniff_image_content_type(body)
+  end
+
+  def sniff_image_content_type(body)
+    return 'image/png' if body.start_with?("\x89PNG\r\n\x1A\n".b)
+    return 'image/jpeg' if body.start_with?("\xFF\xD8\xFF".b)
+    return 'image/gif' if body.start_with?('GIF87a'.b) || body.start_with?('GIF89a'.b)
+    return 'image/webp' if body.bytesize >= 12 && body[0, 4] == 'RIFF'.b && body[8, 4] == 'WEBP'.b
+
+    ''
+  end
+
   def cache_key
     @cache_key ||= Digest::SHA256.hexdigest(JSON.generate({url: @url, size: @size}))
   end
@@ -240,7 +261,7 @@ private
 
   def fetch_uri
     @fetch_uri ||= if @size
-      if already_resized_hive_image? || hive_avatar_image?
+      if already_resized_hive_image? || hive_avatar_image? || ipfs_gateway_image?
         source_uri
       else
         URI.parse("https://#{HIVE_IMAGE_HOST}/#{@size}/#{@url}")
@@ -256,5 +277,10 @@ private
 
   def hive_avatar_image?
     source_uri.host == HIVE_IMAGE_HOST && source_uri.path.match?(%r{\A/u/[^/]+/avatar\z}i)
+  end
+
+  def ipfs_gateway_image?
+    IPFS_GATEWAY_HOSTS.include?(source_uri.host.to_s.downcase) &&
+      source_uri.path.match?(%r{\A/ipfs/[A-Za-z0-9]+(?:/.*)?\z})
   end
 end

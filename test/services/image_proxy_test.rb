@@ -206,6 +206,35 @@ class ImageProxyTest < ActiveSupport::TestCase
     assert_equal source_url, requested_uri.to_s
   end
 
+  test 'sized requests for IPFS gateway URLs fetch the source directly' do
+    requested_uri = nil
+    source_url = 'https://ipfs.io/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9'
+
+    with_public_dns do
+      proxy(url: source_url, size: '1280x0', fetcher: ->(uri) {
+        requested_uri = uri
+        {body: 'ipfs-image', content_type: 'image/png'}
+      }).call
+    end
+
+    assert_equal source_url, requested_uri.to_s
+  end
+
+  test 'gateway images with generic content types are accepted when bytes identify an image' do
+    png_body = "\x89PNG\r\n\x1A\nimage-bytes".b
+    source_url = 'https://ipfs.io/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9'
+
+    with_public_dns do
+      result = proxy(
+        url: source_url,
+        fetcher: image_fetcher(url: source_url, body: png_body, content_type: 'application/octet-stream')
+      ).call
+
+      assert_equal png_body, result.body
+      assert_equal 'image/png', result.content_type
+    end
+  end
+
 private
   def proxy(url: 'https://example.com/image.png', size: nil, fetcher:)
     ImageProxy.new(url: url, size: size, cache_root: @cache_root, fetcher: fetcher)
