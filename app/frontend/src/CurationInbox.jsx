@@ -1,15 +1,14 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { api } from './api'
-import { initialQuery } from './constants'
 import { useCurationKeyboard } from './useCurationKeyboard'
 import { useCurationPosts } from './useCurationPosts'
 import { useCurationPreferences } from './useCurationPreferences'
+import { useCurationSearch } from './useCurationSearch'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import { postReadTransition, selectedIdsAfterPostRead, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
-import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery } from './curationQuery'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
@@ -20,17 +19,12 @@ import {
   emptyContextSuggestions,
   keywordSuggestionFromFilterQuery,
   postsResultCountLabel,
-  queryInputValue,
   selectionAfterAllMatching,
   selectionAfterLoadedToggle,
   selectionAfterPostToggle
 } from './curationInboxState'
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
-  const [query, setQuery] = useState(initialQuery)
-  const [draftTag, setDraftTag] = useState('')
-  const [draftQuery, setDraftQuery] = useState('')
-  const [searchMode, setSearchMode] = useState('filters')
   const [selectedId, setSelectedId] = useState(null)
   const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
@@ -43,17 +37,45 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const desktopPreviewScrollRef = useRef(null)
   const mobilePreviewScrollRef = useRef(null)
   const loadMoreRef = useRef(null)
-  const resetKeyRef = useRef(resetKey)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
   const previewState = usePostPreview(selectedId, {desktopPreviewScrollRef, mobilePreviewScrollRef})
+  const closePreview = useCallback(() => {
+    setPreviewActive(false)
+    if (isMobilePreviewLayout) setMobilePreviewOpen(false)
+  }, [isMobilePreviewLayout])
+  const closeTags = useCallback(() => setTagsOpen(false), [])
+
+  const {
+    query,
+    setQuery,
+    draftTag,
+    setDraftTag,
+    draftQuery,
+    setDraftQuery,
+    searchMode,
+    setSearchMode,
+    applyLoadedQuery,
+    updateQuery,
+    submitQuery,
+    resetQueryInput,
+    searchKeywordsFromFilters,
+    searchKeywordSuggestion,
+    focusTag,
+    focusAuthor
+  } = useCurationSearch({
+    resetKey,
+    closePreviewOnFocus: isMobilePreviewLayout,
+    onClosePreview: closePreview,
+    onCloseTags: closeTags
+  })
+
   const applyLoadedPosts = useCallback((payload) => {
     setSelectedPostIds(new Set())
     setAllMatchingSelected(false)
     setSelectedId((current) => current && payload.posts.some((post) => post.id === current) ? current : payload.posts[0]?.id || null)
-    setDraftTag(queryInputValue(payload.query))
-    setDraftQuery(payload.query.query || '')
-  }, [])
+    applyLoadedQuery(payload.query)
+  }, [applyLoadedQuery])
   const {
     postsPayload,
     setPostsPayload,
@@ -132,50 +154,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
     return () => document.body.classList.remove('mobile-preview-open')
   }, [isMobilePreviewLayout, mobilePreviewOpen])
-
-  const updateQuery = (updates) => {
-    setQuery((current) => queryWithUpdates(current, updates))
-  }
-
-  const submitQuery = (event) => {
-    event.preventDefault()
-    if (searchMode === 'keyword') {
-      updateQuery(keywordOnlyQuery(draftQuery))
-      return
-    }
-
-    updateQuery(filterInputQuery(draftTag))
-  }
-
-  const resetQueryInput = () => {
-    setDraftTag('')
-    setDraftQuery('')
-    setSearchMode('filters')
-    updateQuery(resetFilterQuery())
-  }
-
-  useEffect(() => {
-    if (resetKeyRef.current === resetKey) return
-
-    resetKeyRef.current = resetKey
-    resetQueryInput()
-  }, [resetKey])
-
-  const searchKeywordsFromFilters = () => {
-    if (!keywordSearchSuggestion) return
-
-    setSearchMode('keyword')
-    setDraftQuery(keywordSearchSuggestion)
-    updateQuery(keywordOnlyQuery(keywordSearchSuggestion))
-  }
-
-  const searchKeywordSuggestion = () => {
-    if (!keywordDidYouMean) return
-
-    setSearchMode('keyword')
-    setDraftQuery(keywordDidYouMean)
-    updateQuery(keywordOnlyQuery(keywordDidYouMean))
-  }
 
   const selectedPostRef = useRef(null)
   selectedPostRef.current = selectedPost
@@ -285,11 +263,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     if (isMobilePreviewLayout) setMobilePreviewOpen(true)
   }, [isMobilePreviewLayout])
 
-  const closePreview = useCallback(() => {
-    setPreviewActive(false)
-    if (isMobilePreviewLayout) setMobilePreviewOpen(false)
-  }, [isMobilePreviewLayout])
-
   const togglePreview = useCallback(() => {
     if (previewActive) {
       closePreview()
@@ -301,25 +274,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const selectPost = (postId) => {
     setSelectedId(postId)
     if (isMobilePreviewLayout) openPreview()
-  }
-
-  const switchToFilters = () => {
-    setSearchMode('filters')
-    setDraftQuery('')
-  }
-
-  const focusTag = (tag) => {
-    switchToFilters()
-    updateQuery({tag, query: '', only_keyword: false})
-    if (isMobilePreviewLayout) closePreview()
-    setTagsOpen(false)
-  }
-
-  const focusAuthor = (author) => {
-    switchToFilters()
-    updateQuery({author, query: '', only_keyword: false})
-    if (isMobilePreviewLayout) closePreview()
-    setTagsOpen(false)
   }
 
   useImperativeHandle(ref, () => ({
@@ -426,8 +380,8 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
             keywordSearchSuggestion={keywordSearchSuggestion}
             keywordDidYouMean={keywordDidYouMean}
             onApplySuggestion={(updates) => updateQuery(updates)}
-            onSearchKeywordsFromFilters={searchKeywordsFromFilters}
-            onSearchKeywordSuggestion={searchKeywordSuggestion}
+            onSearchKeywordsFromFilters={() => searchKeywordsFromFilters(keywordSearchSuggestion)}
+            onSearchKeywordSuggestion={() => searchKeywordSuggestion(keywordDidYouMean)}
             selectedId={selectedId}
             selectedPostIds={selectedPostIds}
             ignoredTags={ignoredTags}
@@ -476,7 +430,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
       <TagsModal
         open={tagsOpen}
-        onClose={() => setTagsOpen(false)}
+        onClose={closeTags}
         tagPanelProps={tagPanelProps}
       />
 
