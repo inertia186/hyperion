@@ -1,13 +1,16 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { CheckSquare, Loader2, Square, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
-import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
+import { useMediaQuery } from './useMediaQuery'
+import MobilePreviewDrawer from './components/MobilePreviewDrawer'
 import PostList from './components/PostList'
+import PostListSkeleton from './components/PostListSkeleton'
 import PreviewPane from './components/PreviewPane'
-import TagPanels from './components/TagPanels'
+import SelectionBar from './components/SelectionBar'
+import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
 import {
   COMPACT_MODE_SELECTOR_PREVIEW_PERCENT,
@@ -904,170 +907,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
 export default CurationInbox
 
-function TagsModal({open, onClose, tagPanelProps}) {
-  useModalDismiss(open, onClose)
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/30 p-3 pt-8 sm:p-4 sm:pt-10" role="dialog" aria-modal="true" aria-label="Tags" onClick={closeOnBackdropClick(onClose)}>
-      <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col rounded-md border border-slate-200 bg-white shadow-xl sm:max-h-[calc(100vh-3.5rem)]">
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="text-sm font-semibold text-slate-900">Tags</div>
-          <button className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Close tags">
-            <X size={15} />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
-          <TagPanels {...tagPanelProps} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SelectionBar({
-  allLoadedSelected,
-  allMatchingSelected,
-  canSelectAllMatching,
-  loadedPostsCount,
-  selectedCount,
-  totalPosts,
-  onToggleLoaded,
-  onSelectAllMatching,
-  onClearSelection
-}) {
-  const hasSelection = selectedCount > 0
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-      <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-slate-700 hover:bg-slate-50" type="button" onClick={onToggleLoaded} aria-label={allLoadedSelected || allMatchingSelected ? 'Clear loaded selection' : 'Select loaded posts'} aria-pressed={allLoadedSelected || allMatchingSelected}>
-        {allLoadedSelected || allMatchingSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-        <span className="text-xs font-medium">{allLoadedSelected || allMatchingSelected ? 'Selected' : 'Select loaded'}</span>
-      </button>
-
-      <div className="min-w-0 flex-1 text-xs text-slate-600">
-        {allMatchingSelected ? (
-          <span>All {totalPosts} posts in this filter selected.</span>
-        ) : hasSelection ? (
-          <span>{selectedCount} selected.</span>
-        ) : (
-          <span>Select loaded posts for bulk actions.</span>
-        )}
-        {canSelectAllMatching && (
-          <>
-            <span> All {loadedPostsCount} loaded posts selected. </span>
-            <button className="font-medium text-blue-700 hover:underline" type="button" onClick={onSelectAllMatching}>
-              Select all {totalPosts} posts in this filter.
-            </button>
-          </>
-        )}
-      </div>
-
-      {hasSelection && (
-        <button className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700 hover:bg-slate-50" type="button" onClick={onClearSelection}>
-          Clear selection
-        </button>
-      )}
-    </div>
-  )
-}
-
-function MobilePreviewDrawer({
-  open,
-  post,
-  previewState,
-  previewActive,
-  previewScrollRef,
-  accountName,
-  hivesignerAvailable,
-  theme,
-  onClose,
-  onPrevious,
-  onNext,
-  onMarkReadNext,
-  onSelectTag,
-  onSelectAuthor,
-  onChainStatsRefresh,
-  readBusy,
-  hasPrevious,
-  hasNext
-}) {
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden" role="dialog" aria-modal="true" aria-label="Post preview" onClick={closeOnBackdropClick(onClose)}>
-      <div className="safe-area-shell safe-area-top mobile-preview-sheet flex flex-col bg-white">
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <PreviewPane
-            post={post}
-            previewState={previewState}
-            previewActive={previewActive}
-            previewScrollRef={previewScrollRef}
-            accountName={accountName}
-            hivesignerAvailable={hivesignerAvailable}
-            theme={theme}
-            onClose={onClose}
-            onPrevious={onPrevious}
-            onNext={onNext}
-            onMarkReadNext={onMarkReadNext}
-            onSelectTag={onSelectTag}
-            onSelectAuthor={onSelectAuthor}
-            onChainStatsRefresh={onChainStatsRefresh}
-            readBusy={readBusy}
-            hasPrevious={hasPrevious}
-            hasNext={hasNext}
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function useMediaQuery(query) {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false
-    return window.matchMedia(query).matches
-  })
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return undefined
-
-    const media = window.matchMedia(query)
-    const handleChange = () => setMatches(media.matches)
-    handleChange()
-
-    if (media.addEventListener) {
-      media.addEventListener('change', handleChange)
-      return () => media.removeEventListener('change', handleChange)
-    }
-
-    media.addListener(handleChange)
-    return () => media.removeListener(handleChange)
-  }, [query])
-
-  return matches
-}
-
 function previewScrollTarget(container) {
   return container
-}
-
-function PostListSkeleton() {
-  return (
-    <div className="divide-y divide-slate-100" aria-label="Loading posts" aria-busy="true">
-      {[0, 1, 2, 3, 4].map((index) => (
-        <div key={index} className="grid grid-cols-[40px_minmax(0,1fr)_96px] items-center gap-3 px-3 py-3 md:grid-cols-[40px_56px_minmax(220px,1fr)_minmax(120px,180px)_minmax(120px,160px)_90px]">
-          <div className="h-5 w-5 rounded bg-slate-200" />
-          <div className="hidden h-12 w-12 rounded-md bg-slate-200 md:block" />
-          <div className="space-y-2">
-            <div className="h-4 w-3/4 rounded bg-slate-200" />
-            <div className="h-3 w-1/3 rounded bg-slate-100" />
-          </div>
-          <div className="hidden h-4 rounded bg-slate-100 md:block" />
-          <div className="hidden h-4 rounded bg-slate-100 md:block" />
-          <div className="h-4 rounded bg-slate-100" />
-        </div>
-      ))}
-    </div>
-  )
 }
