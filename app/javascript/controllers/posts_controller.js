@@ -14,6 +14,7 @@ import {
 } from './posts_keyboard'
 import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
 import { bindPreviewListeners, clearPreviewIframe, isPreviewBackdropClick, loadPreviewIframe, unbindPreviewListeners } from './posts_preview'
+import { refreshPendingPayout, refreshReplyCount, refreshVoteCount } from './posts_details'
 
 import $ from 'jquery';
 
@@ -285,65 +286,30 @@ export default class extends Controller {
   }
   
   refrestVoteCount() {
-    var voteCount = this.previewVoteCountTarget;
-    
-    hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        var upvotes = 0;
-        
-        for ( var i = 0 ; i < response.length; i++ ) {
-          var voteCast = false;
-          if ( response[i].voter == $('#current-account').data('name') ) {
-            voteCount.classList.remove('badge-secondary');
-            voteCast = true;
-          }
-          
-          if ( response[i].percent > 0 ) {
-            upvotes++;
-            
-            if ( voteCast ) {
-              voteCount.classList.add('badge-success');
-            }
-          }
-          
-          if ( response[i].percent < 0 && voteCast ) {
-            voteCount.classList.add('badge-danger');
-          }
-        }
-  
-        voteCount.textContent = 'Votes: ' + upvotes;
-      }
+    refreshVoteCount({
+      hiveApi: hive.api,
+      voteCount: this.previewVoteCountTarget,
+      author: this.authorValue,
+      permlink: this.permlinkValue,
+      currentAccountName: $('#current-account').data('name')
     });
   }
   
   refrestReplyCount() {
-    var replyCount = this.previewReplyCountTarget;
-    
-    replyCount.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Replies: 0</span>';
-    
-    hive.api.getContentReplies(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        replyCount.textContent = 'Replies: ' + response.length;
-      }
+    refreshReplyCount({
+      hiveApi: hive.api,
+      replyCount: this.previewReplyCountTarget,
+      author: this.authorValue,
+      permlink: this.permlinkValue
     });
   }
   
   refreshPendingPayout(pendingPayout) {
-    hive.api.getContent(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(pendingPayout, err);
-      
-      if ( !!response ) {
-        if ( response.cashout_time == '1969-12-31T23:59:59' ) {
-          // Just in case we're showing a post that has already paid.
-          pendingPayout.textContent = response.total_payout_value;
-        } else {
-          pendingPayout.textContent = response.pending_payout_value;
-        }
-      }
+    refreshPendingPayout({
+      hiveApi: hive.api,
+      pendingPayout,
+      author: this.authorValue,
+      permlink: this.permlinkValue
     });
   }
   
