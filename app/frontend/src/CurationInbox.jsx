@@ -4,6 +4,7 @@ import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
+import { useCurationPreferences } from './useCurationPreferences'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
@@ -84,6 +85,26 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setError(err.message || 'Request failed')
     setLoading(false)
   }, [])
+  const {
+    toggleMute,
+    toggleOnlyFavorites,
+    toggleIgnoredTag,
+    toggleFavorite,
+    togglePoisonedPill,
+    removePastTag,
+    clearPastTags,
+    clearIgnoredTags
+  } = useCurationPreferences({
+    postsPayload,
+    activeTag,
+    activeTagIgnored,
+    favoriteTags,
+    poisonedPillTags,
+    setPostsPayload,
+    setQuery,
+    setBusy,
+    handleError
+  })
 
   const loadPosts = useCallback((nextQuery) => {
     setLoading(true)
@@ -368,111 +389,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
         return {...nextPayload, posts: selectAfterRemovingIds(markedPostIds, markedPosts)}
       })
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleMute = async () => {
-    const enabled = !postsPayload.query.muted_authors_enabled
-    setBusy(true)
-    try {
-      const payload = await api.setMute(enabled)
-      setPostsPayload((current) => ({...current, query: {...current.query, muted_authors_enabled: payload.muted_authors_enabled}}))
-      setQuery((current) => ({...current}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleOnlyFavorites = async () => {
-    const enabled = !postsPayload.query.only_favorite_tags
-    setBusy(true)
-    try {
-      const payload = await api.setOnlyFavoriteTags(enabled)
-      setPostsPayload((current) => ({...current, query: {...current.query, only_favorite_tags: payload.only_favorite_tags}}))
-      setQuery((current) => ({...current}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleIgnoredTag = async () => {
-    if (!activeTag) return
-    setBusy(true)
-    try {
-      const payload = activeTagIgnored ? await api.unignoreTag(activeTag) : await api.ignoreTag(activeTag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const toggleFavorite = async (tag) => {
-    setBusy(true)
-    try {
-      const payload = favoriteTags.includes(tag) ? await api.unfavoriteTag(tag) : await api.favoriteTag(tag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const togglePoisonedPill = async (tag) => {
-    setBusy(true)
-    try {
-      const payload = poisonedPillTags.includes(tag) ? await api.unpoisonTag(tag) : await api.poisonTag(tag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const removePastTag = async (tag) => {
-    setBusy(true)
-    try {
-      const payload = await api.removePastTag(tag)
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const clearPastTags = async (onlyIgnored = false) => {
-    if (!window.confirm('Clear these past tags?')) return
-
-    setBusy(true)
-    try {
-      const payload = onlyIgnored ? await api.clearIgnoredPastTags() : await api.clearPastTags()
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
-    } catch (err) {
-      handleError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const clearIgnoredTags = async () => {
-    if (!window.confirm('Clear all ignored tags?')) return
-
-    setBusy(true)
-    try {
-      const payload = await api.clearIgnoredTags()
-      setPostsPayload((current) => ({...current, ignored_tags: payload.ignored_tags, poisoned_pill_tags: payload.poisoned_pill_tags, favorite_tags: payload.favorite_tags, past_tags: payload.past_tags}))
     } catch (err) {
       handleError(err)
     } finally {
