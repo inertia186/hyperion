@@ -7,6 +7,7 @@ import { useCurationPreferences } from './useCurationPreferences'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
+import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
@@ -395,44 +396,14 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const updatePostChainStats = useCallback((postId, statsPayload, options = {}) => {
     if (!statsPayload || statsPayload.status !== 'ready') return
 
-    setPostsPayload((payload) => {
-      if (!payload) return payload
-      const payoutFetchedAt = statsPayload.payout_fetched_at ?? (statsPayload.payout ? new Date().toISOString() : null)
-
-      return {
-        ...payload,
-        posts: payload.posts.map((post) => post.id === postId ? {
-          ...post,
-          payout: statsPayload.payout ?? post.payout,
-          payout_amount: statsPayload.payout_amount ?? post.payout_amount,
-          payout_currency: statsPayload.payout_currency ?? post.payout_currency,
-          payout_fetched_at: payoutFetchedAt ?? post.payout_fetched_at,
-          payout_source: statsPayload.payout_source ?? post.payout_source,
-          current_vote: statsPayload.current_vote ?? post.current_vote
-        } : post)
-      }
-    })
+    setPostsPayload((payload) => postsPayloadWithChainStats(payload, postId, statsPayload))
     if (options.refreshVotingPower) onRefreshVotingPower?.()
   }, [onRefreshVotingPower])
 
   const updatePostPayout = useCallback((postId, payoutPayload) => {
     if (!payoutPayload || payoutPayload.status !== 'ready') return
 
-    setPostsPayload((payload) => {
-      if (!payload) return payload
-
-      return {
-        ...payload,
-        posts: payload.posts.map((post) => post.id === postId ? {
-          ...post,
-          payout: payoutPayload.payout ?? post.payout,
-          payout_amount: payoutPayload.payout_amount ?? post.payout_amount,
-          payout_currency: payoutPayload.payout_currency ?? post.payout_currency,
-          payout_fetched_at: payoutPayload.payout_fetched_at ?? post.payout_fetched_at,
-          payout_source: payoutPayload.payout_source ?? post.payout_source
-        } : post)
-      }
-    })
+    setPostsPayload((payload) => postsPayloadWithPayout(payload, postId, payoutPayload))
   }, [])
 
   useEffect(() => {
