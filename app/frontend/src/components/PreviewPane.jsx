@@ -7,6 +7,7 @@ import { renderPostBody } from '../renderPostBody'
 import { usePreviewChainStats } from '../usePreviewChainStats'
 import { useModalDismiss } from '../useModalDismiss'
 import { usePreviewImageSources } from '../usePreviewImageSources'
+import { usePreviewVoteActions } from '../usePreviewVoteActions'
 import CategoryTagsControl from './CategoryTagsControl'
 import HivesignerVoteModal from './HivesignerVoteModal'
 import PostActionsDrawer from './PostActionsDrawer'
@@ -53,14 +54,20 @@ export default function PreviewPane({
     }
   }, [detail?.body_markdown, displayPost, previewState.html])
   const previewHtmlMarkup = useMemo(() => ({__html: previewHtml}), [previewHtml])
-  const [votePanel, setVotePanel] = useState(null)
-  const [voteWeight, setVoteWeight] = useState(100)
-  const [voteBusy, setVoteBusy] = useState(false)
-  const [hivesignerModal, setHivesignerModal] = useState(null)
   const [diffModal, setDiffModal] = useState(null)
   const [postActionsOpen, setPostActionsOpen] = useState(false)
   const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
   const {stats, refreshStatsAfterVote} = usePreviewChainStats({post, displayPost, previewReady, onChainStatsRefresh})
+  const {
+    votePanel,
+    setVotePanel,
+    voteWeight,
+    setVoteWeight,
+    voteBusy,
+    hivesignerModal,
+    closeHivesignerModal,
+    castVote
+  } = usePreviewVoteActions({displayPost, accountName, hivesignerAvailable, refreshStatsAfterVote})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)
@@ -69,41 +76,8 @@ export default function PreviewPane({
 
   usePreviewImageSources({previewReady, previewScrollRef, previewHtml, theme})
 
-  const closeHivesignerModal = ({refresh = true} = {}) => {
-    setHivesignerModal(null)
-    setVoteBusy(false)
-    if (refresh) refreshStatsAfterVote()
-  }
-
   useModalDismiss(!!hivesignerModal, () => closeHivesignerModal())
   useModalDismiss(postActionsOpen, () => setPostActionsOpen(false))
-
-  const castVote = (direction) => {
-    if (!displayPost || !accountName) return
-
-    const weight = voteWeight * 100 * direction
-    setVoteBusy(true)
-
-    if (hivesignerAvailable) {
-      setHivesignerModal({
-        url: `https://hivesigner.com/sign/vote?authority=post&voter=${encodeURIComponent(accountName)}&author=${encodeURIComponent(displayPost.author)}&permlink=${encodeURIComponent(displayPost.permlink)}&weight=${weight}`
-      })
-      setVotePanel(null)
-      return
-    }
-
-    if (window.hive_keychain?.requestVote) {
-      window.hive_keychain.requestVote(accountName, displayPost.permlink, displayPost.author, weight, (response) => {
-        setVotePanel(null)
-        setVoteBusy(false)
-        if (response?.success !== false) refreshStatsAfterVote({expectedVote: weight})
-      })
-      return
-    }
-
-    setVoteBusy(false)
-    window.alert('Hive Keychain is not available.')
-  }
 
   const openDiffModal = () => {
     if (!post) return
