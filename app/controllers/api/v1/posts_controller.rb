@@ -1,9 +1,6 @@
 require 'timeout'
 
 class Api::V1::PostsController < Api::V1::BaseController
-  CHAIN_STATS_CACHE_TTL = 2.minutes
-  CHAIN_STATS_TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
-
   def index
     result = PostCurationQuery.new(account: current_account, params: params, session: session).call
 
@@ -68,7 +65,7 @@ class Api::V1::PostsController < Api::V1::BaseController
     post = Post.find(params[:id])
     author, permlink = chain_identity(post)
 
-    render json: chain_stats_json(post, author, permlink)
+    render json: post_chain_payload.chain_stats(post, author, permlink, refresh: truthy?(params[:refresh]))
   rescue StandardError => e
     log_chain_fetch_error(:chain_stats, e)
     render json: {
@@ -84,7 +81,7 @@ class Api::V1::PostsController < Api::V1::BaseController
     post = Post.find(params[:id])
     author, permlink = chain_identity(post, allow_override: false)
 
-    render json: payout_json(post, author, permlink)
+    render json: post_chain_payload.payout(post, author, permlink)
   rescue StandardError => e
     log_chain_fetch_error(:payout, e)
     render json: {
@@ -182,110 +179,15 @@ private
       (defined?(Hive::ArgumentError) && error.is_a?(Hive::ArgumentError))
   end
 
-  def chain_stats_json(post, author, permlink)
-    payload = cached_chain_stats_payload(author, permlink)
-    votes = payload.fetch(:votes)
-    replies = payload.fetch(:replies)
-    content = payload.fetch(:content)
-    current_vote = Array(votes).find { |vote| chain_value(vote, :voter) == current_account.name }
-    payout = payout_value(content)
-    persist_payout(post, payout)
-
-    {
-      status: 'ready',
-      votes: Array(votes).count { |vote| chain_value(vote, :percent).to_i > 0 },
-      replies: Array(replies).size,
-      payout: payout,
-      payout_amount: post.payout_amount&.to_s,
-      payout_currency: post.payout_currency,
-      payout_fetched_at: post.payout_fetched_at&.iso8601,
-      payout_source: post.payout_source,
-      current_vote: chain_value(current_vote, :percent)
-    }
-  end
-
-  def cached_chain_stats_payload(author, permlink)
-    cache_key = ['chain-stats', author, permlink]
-    if truthy?(params[:refresh])
-      payload = fetch_chain_stats_payload(author, permlink)
-      Rails.cache.write(cache_key, payload, expires_in: CHAIN_STATS_CACHE_TTL)
-      return payload
-    end
-
-    Rails.cache.fetch(cache_key, expires_in: CHAIN_STATS_CACHE_TTL, race_condition_ttl: 10.seconds) do
-      fetch_chain_stats_payload(author, permlink)
-    end
-  end
-
-  def fetch_chain_stats_payload(author, permlink)
-    Timeout.timeout(CHAIN_STATS_TIMEOUT) do
-      {
-        votes: condenser_rpc(:get_active_votes, [author, permlink]),
-        replies: condenser_rpc(:get_content_replies, [author, permlink]),
-        content: condenser_rpc(:get_content, [author, permlink])
-      }
-    end
-  end
-
-  def payout_json(post, author, permlink)
-    content = cached_payout_content(author, permlink)
-    payout = payout_value(content)
-    persist_payout(post, payout)
-
-    {
-      status: content.present? ? 'ready' : 'unavailable',
-      payout: payout,
-      payout_amount: post.payout_amount&.to_s,
-      payout_currency: post.payout_currency,
-      payout_fetched_at: post.payout_fetched_at&.iso8601,
-      payout_source: post.payout_source
-    }
-  end
-
-  def persist_payout(post, payout)
-    post.capture_payout!(payout) if payout.present?
-  end
-
-  def cached_payout_content(author, permlink)
-    Rails.cache.fetch(['post-payout', author, permlink], expires_in: CHAIN_STATS_CACHE_TTL, race_condition_ttl: 10.seconds) do
-      Timeout.timeout(CHAIN_STATS_TIMEOUT) do
-        condenser_rpc(:get_content, [author, permlink])
-      end
-    end
-  end
-
-  def condenser_rpc(method, args)
-    response = Account.api.rpc_client.rpc_execute(:condenser_api, method, args)
-    raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
-
-    response.result
-  end
-
-  def payout_value(content)
-    return nil unless content
-
-    if chain_value(content, :cashout_time).to_s == '1969-12-31T23:59:59'
-      chain_value(content, :total_payout_value)
-    else
-      chain_value(content, :pending_payout_value)
-    end
-  end
-
-  def chain_value(object, key)
-    return nil unless object
-
-    if object.respond_to?(key)
-      object.public_send(key)
-    elsif object.respond_to?(:[])
-      object[key.to_s] || object[key.to_sym]
-    end
-  end
-
   def post_serializer
     @post_serializer ||= Api::V1::PostSerializer.new(
       current_account: current_account,
       url_helpers: self,
       body_renderer: ->(post) { post_body(post) }
     )
+  end
+
+  def post_chain_payload
+    @post_chain_payload ||= PostChainPayload.new(account: current_account)
   end
 end
