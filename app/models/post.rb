@@ -153,27 +153,15 @@ class Post < ApplicationRecord
   end
 
   def capture_payout!(payout_value, fetched_at: Time.current, source: 'exact')
-    amount, currency = self.class.parse_payout(payout_value)
-
-    update!(
-      payout: payout_value.presence,
-      payout_amount: amount,
-      payout_currency: currency,
-      payout_fetched_at: fetched_at,
-      payout_unavailable_at: nil,
-      payout_source: source
-    )
+    payout_record.capture!(payout_value, fetched_at: fetched_at, source: source)
   end
 
   def mark_payout_unavailable!(unavailable_at: Time.current)
-    update!(payout_unavailable_at: unavailable_at, payout_source: nil)
+    payout_record.mark_unavailable!(unavailable_at: unavailable_at)
   end
 
   def self.parse_payout(payout_value)
-    match = payout_value.to_s.strip.match(/\A(?<amount>-?\d+(?:\.\d+)?)\s+(?<currency>[A-Z]{2,10})\z/)
-    return [nil, nil] unless match
-
-    [BigDecimal(match[:amount]), match[:currency]]
+    PostPayout.parse(payout_value)
   end
 
   def display_body(body_override = DISPLAY_BODY_UNSET)
@@ -229,6 +217,10 @@ class Post < ApplicationRecord
 
   def media_service
     PostMedia.new(self)
+  end
+
+  def payout_record
+    PostPayout.new(self)
   end
   
   def fetch_latest
