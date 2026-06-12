@@ -10,8 +10,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      fs: fileURLToPath(new URL('./app/frontend/shims/empty.js', import.meta.url)),
+      'node:fs': fileURLToPath(new URL('./app/frontend/shims/empty.js', import.meta.url)),
       os: fileURLToPath(new URL('./app/frontend/shims/os.js', import.meta.url)),
-      'node:os': fileURLToPath(new URL('./app/frontend/shims/os.js', import.meta.url))
+      'node:os': fileURLToPath(new URL('./app/frontend/shims/os.js', import.meta.url)),
+      postcss: fileURLToPath(new URL('./app/frontend/shims/postcss.js', import.meta.url)),
+      url: fileURLToPath(new URL('./app/frontend/shims/url.js', import.meta.url)),
+      'node:url': fileURLToPath(new URL('./app/frontend/shims/url.js', import.meta.url))
     }
   },
   server: {
