@@ -2,10 +2,10 @@ class Post < ApplicationRecord
   extend Immutable
   
   DIFF_MATCH_PATCH_PATTERN = /@@ -[0-9]+(?:,[0-9]+)? \+[0-9]+(?:,[0-9]+)? @@/
-  IMAGE_URL_PATTERN = /(http(s?):\/\/.*\.(jpeg|jpg|gif|png))/
-  YOUTUBE_SHORT_URL_PATTERN = /http(s?):\/\/youtu.be\/(.*)/
-  YOUTUBE_LONG_URL_PATTERN = /http(s?):\/\/.*youtube.com\/.*?.*v=(.*)(&?).*/
-  PLACEHOLDER_IMAGE_URL = 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs='
+  IMAGE_URL_PATTERN = PostMedia::IMAGE_URL_PATTERN
+  YOUTUBE_SHORT_URL_PATTERN = PostMedia::YOUTUBE_SHORT_URL_PATTERN
+  YOUTUBE_LONG_URL_PATTERN = PostMedia::YOUTUBE_LONG_URL_PATTERN
+  PLACEHOLDER_IMAGE_URL = PostMedia::PLACEHOLDER_IMAGE_URL
   DISPLAY_BODY_UNSET = PostDisplayBody::DISPLAY_BODY_UNSET
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
@@ -193,37 +193,19 @@ class Post < ApplicationRecord
   end
   
   def post_image_url(body_override = DISPLAY_BODY_UNSET)
-    thumbnail_url = [metadata.fetch('image')].flatten[0] rescue nil
-    post_body = display_body(body_override)
-    
-    thumbnail_url ||= if matches = post_body.match(IMAGE_URL_PATTERN)
-      matches[1]
-    end
-    
-    thumbnail_url ||= if matches = post_body.match(YOUTUBE_SHORT_URL_PATTERN)
-      "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
-    end
-    
-    thumbnail_url ||= if matches = post_body.match(YOUTUBE_LONG_URL_PATTERN)
-      "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
-    end
-    
-    thumbnail_url = URI.parse(thumbnail_url).to_s rescue nil
-    thumbnail_url = nil unless thumbnail_url.present?
-    
-    thumbnail_url
+    media_service.post_image_url(body_override)
   end
 
   def thumbnail_url(body_override = DISPLAY_BODY_UNSET)
-    post_image_url(body_override) || PLACEHOLDER_IMAGE_URL
+    media_service.thumbnail_url(body_override)
   end
 
   def placeholder_image_url
-    PLACEHOLDER_IMAGE_URL
+    media_service.placeholder_image_url
   end
 
   def author_avatar_url
-    "https://images.hive.blog/u/#{author}/avatar"
+    media_service.author_avatar_url
   end
   
   def canonical_url
@@ -243,6 +225,10 @@ class Post < ApplicationRecord
 
   def display_body_service
     PostDisplayBody.new(self)
+  end
+
+  def media_service
+    PostMedia.new(self)
   end
   
   def fetch_latest
