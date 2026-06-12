@@ -13,19 +13,13 @@ import {
   isScrollUpKey
 } from './posts_keyboard'
 import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
+import { bindPreviewListeners, clearPreviewIframe, isPreviewBackdropClick, loadPreviewIframe, unbindPreviewListeners } from './posts_preview'
 
 import $ from 'jquery';
 
 var firstLink;
-var bindingPreviewDismissKey;
-var bindingPreviewDismissOutsideModal;
-var bindingPreviewPreviousKey;
-var bindingPreviewNextKey;
-var bindingMarkAsReadAndPreviewPreviousKey;
-var bindingMarkAsReadAndPreviewNextKey;
 var bindingFocusPreviousKey;
 var bindingFocusNextKey;
-var bindingScrollKey;
 
 export default class extends Controller {
   static values = {
@@ -87,9 +81,7 @@ export default class extends Controller {
   
   previewShowModal() {
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${this.idValue} iframe`);
-    
-    iframe.attr('src', iframe.data('src'));
+    loadPreviewIframe($, this.idValue);
     
     $(preview).modal('show');
     
@@ -97,26 +89,7 @@ export default class extends Controller {
     this.refrestReplyCount();
     this.refreshPendingPayout(this.previewPendingPayoutTarget);
     
-    bindingScrollKey = this.scrollKey.bind(this);
-    document.addEventListener('keydown', bindingScrollKey);
-    
-    bindingPreviewDismissKey = this.previewDismissKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewDismissKey);
-    
-    bindingPreviewPreviousKey = this.previewPreviousKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewPreviousKey);
-    
-    bindingPreviewNextKey = this.previewNextKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewNextKey);
-    
-    bindingMarkAsReadAndPreviewPreviousKey = this.markAsReadAndPreviewPreviousKey.bind(this);
-    document.addEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
-    
-    bindingMarkAsReadAndPreviewNextKey = this.markAsReadAndPreviewNextKey.bind(this);
-    document.addEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
-    
-    bindingPreviewDismissOutsideModal = this.previewDismissOutsideModal.bind(this);
-    document.addEventListener('click', bindingPreviewDismissOutsideModal);
+    this.previewBindings = bindPreviewListeners(document, this);
   }
   
   previewPrevious(e) {
@@ -229,7 +202,7 @@ export default class extends Controller {
     // }
     
     // Clicked directly on the related div.modal (thanks, bs).
-    if (e.target.id == `preview-${this.idValue}`) {
+    if (isPreviewBackdropClick(e, this.idValue)) {
       e.preventDefault();
       this.previewDismiss(e);
     }
@@ -237,19 +210,11 @@ export default class extends Controller {
     
   previewDismiss(e) {
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${this.idValue} iframe`);
-    
-    iframe.attr('src', 'about:blank');
+    clearPreviewIframe($, this.idValue);
     
     $(preview).modal('hide');
-    
-    document.removeEventListener('keydown', bindingScrollKey);
-    document.removeEventListener('keydown', bindingPreviewDismissKey);
-    document.removeEventListener('keydown', bindingPreviewPreviousKey);
-    document.removeEventListener('keydown', bindingPreviewNextKey);
-    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
-    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
-    document.removeEventListener('click', bindingPreviewDismissOutsideModal);
+    unbindPreviewListeners(document, this.previewBindings);
+    this.previewBindings = null;
   }
 
   diffShow(e) {
