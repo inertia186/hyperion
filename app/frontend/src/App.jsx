@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { CalendarDays, CircleHelp, Code2, Laptop, LogOut, Menu, Monitor, Moon, PanelsTopLeft, Settings, Sun, Tags, Terminal } from 'lucide-react'
-import { api } from './api'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
 import SettingsModal from './components/SettingsModal'
@@ -9,6 +8,7 @@ import TimelineModal from './components/TimelineModal'
 import { imageProxy } from './format'
 import { THEME_OPTIONS, themeOption } from './theme'
 import { useModalDismiss } from './useModalDismiss'
+import { useSessionBootstrap } from './useSessionBootstrap'
 import { useThemePreference } from './useThemePreference'
 import { useVotingPower } from './useVotingPower'
 import hyperionLogo from '../../assets/images/favicon.svg'
@@ -24,26 +24,7 @@ export default function App() {
   const inboxRef = useRef(null)
   const {votingPower, refreshVotingPower} = useVotingPower({authenticated: !!session?.authenticated})
   const {theme, effectiveTheme, themeSaving, applySessionTheme, updateTheme} = useThemePreference({setSession, onError: setError})
-
-  useEffect(() => {
-    api.session()
-      .then((payload) => {
-        if (!payload.authenticated) {
-          window.location.assign(payload.login_url)
-          return
-        }
-
-        setSession(applySessionTheme(payload))
-      })
-      .catch((err) => {
-        if (err.status === 401 && err.payload?.login_url) {
-          window.location.assign(err.payload.login_url)
-          return
-        }
-
-        setError(err.message || 'Request failed')
-      })
-  }, [applySessionTheme])
+  useSessionBootstrap({applySessionTheme, setSession, setError})
 
   if (error) {
     return <FullPageState label={error} />
