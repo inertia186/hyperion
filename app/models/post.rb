@@ -2,13 +2,11 @@ class Post < ApplicationRecord
   extend Immutable
   
   DIFF_MATCH_PATCH_PATTERN = /@@ -[0-9]+(?:,[0-9]+)? \+[0-9]+(?:,[0-9]+)? @@/
-  IMAGE_URL_PATTERN = /(http(s?):\/\/.*\.(jpeg|jpg|gif|png))/
-  YOUTUBE_SHORT_URL_PATTERN = /http(s?):\/\/youtu.be\/(.*)/
-  YOUTUBE_LONG_URL_PATTERN = /http(s?):\/\/.*youtube.com\/.*?.*v=(.*)(&?).*/
-  PLACEHOLDER_IMAGE_URL = 'data:image/gif;base64,R0lGODdhAQABAPAAAMPDwwAAACwAAAAAAQABAAACAkQBADs='
-  CROSS_POST_PREAMBLE_PATTERN = /\AThis is a cross post of \[[^\]]+\]\([^)]+\) by @[^.]+\.?(?:<br\s*\/?>\s*){2}/i
-  CROSS_POST_REFERENCE_PATTERN = /\AThis is a cross post of \[[^\]]+\]\((?:https?:\/\/[^\/]+)?\/(?:[^\/\s)]+\/)?@(?<author>[^\/\s)]+)\/(?<permlink>[^)\s]+)\) by @[^.]+\.?(?:<br\s*\/?>\s*){2}/i
-  DISPLAY_BODY_UNSET = Object.new.freeze
+  IMAGE_URL_PATTERN = PostMedia::IMAGE_URL_PATTERN
+  YOUTUBE_SHORT_URL_PATTERN = PostMedia::YOUTUBE_SHORT_URL_PATTERN
+  YOUTUBE_LONG_URL_PATTERN = PostMedia::YOUTUBE_LONG_URL_PATTERN
+  PLACEHOLDER_IMAGE_URL = PostMedia::PLACEHOLDER_IMAGE_URL
+  DISPLAY_BODY_UNSET = PostDisplayBody::DISPLAY_BODY_UNSET
   LIST_COLUMNS = %i(
     id author permlink title category metadata block_num trx_id deleted_at
     blacklisted blacklist_reasons author_reputation tags_count payout payout_amount
@@ -155,120 +153,47 @@ class Post < ApplicationRecord
   end
 
   def capture_payout!(payout_value, fetched_at: Time.current, source: 'exact')
-    amount, currency = self.class.parse_payout(payout_value)
-
-    update!(
-      payout: payout_value.presence,
-      payout_amount: amount,
-      payout_currency: currency,
-      payout_fetched_at: fetched_at,
-      payout_unavailable_at: nil,
-      payout_source: source
-    )
+    payout_record.capture!(payout_value, fetched_at: fetched_at, source: source)
   end
 
   def mark_payout_unavailable!(unavailable_at: Time.current)
-    update!(payout_unavailable_at: unavailable_at, payout_source: nil)
+    payout_record.mark_unavailable!(unavailable_at: unavailable_at)
   end
 
   def self.parse_payout(payout_value)
-    match = payout_value.to_s.strip.match(/\A(?<amount>-?\d+(?:\.\d+)?)\s+(?<currency>[A-Z]{2,10})\z/)
-    return [nil, nil] unless match
-
-    [BigDecimal(match[:amount]), match[:currency]]
+    PostPayout.parse(payout_value)
   end
 
   def display_body(body_override = DISPLAY_BODY_UNSET)
-    post_body = body_override.equal?(DISPLAY_BODY_UNSET) ? (has_attribute?(:body) ? body.to_s : '') : body_override.to_s
-    return post_body unless post_body.present?
-    return post_body unless cross_post?
-
-    copied_body = cross_post_copied_body(post_body)
-    referenced_post = display_post(post_body)
-    if referenced_post != self && referenced_post.body.present?
-      original_body = referenced_post.body.to_s
-      return original_body if copied_body.blank? || copied_body.strip == original_body.strip
-
-      return [original_body, copied_body].join("\n\n---\n\n")
-    end
-
-    copied_body
+    display_body_service.display_body(body_override)
   end
 
   def display_post(body_override = DISPLAY_BODY_UNSET)
-    reference = cross_post_reference(body_override)
-    return self unless reference
-
-    referenced_post = self.class.find_by(author: reference[:author], permlink: reference[:permlink])
-    referenced_post ||= self.class.new(
-      author: reference[:author],
-      permlink: reference[:permlink],
-      title: "#{reference[:author]}/#{reference[:permlink]}",
-      category: category,
-      metadata: {},
-      block_num: block_num,
-      trx_id: '',
-      created_at: created_at || Time.current
-    )
-
-    referenced_post.persisted? ? referenced_post.load_body! : referenced_post.fetch_latest
-    referenced_post.body.present? ? referenced_post : self
-  rescue => e
-    Rails.logger.warn "Unable to resolve cross-post display source for #{author}/#{permlink}: #{e.class}: #{e.message}"
-    self
+    display_body_service.display_post(body_override)
   end
 
   def cross_post_reference(body_override = DISPLAY_BODY_UNSET)
-    post_body = body_override.equal?(DISPLAY_BODY_UNSET) ? (has_attribute?(:body) ? body.to_s : '') : body_override.to_s
-    return nil unless post_body.match?(/\AThis is a cross post of /i)
-    return nil unless cross_post?
-
-    match = post_body.match(CROSS_POST_REFERENCE_PATTERN)
-    return nil unless match
-
-    {author: match[:author].delete_prefix('@'), permlink: match[:permlink]}
+    display_body_service.cross_post_reference(body_override)
   end
 
   def cross_post_copied_body(body_override = DISPLAY_BODY_UNSET)
-    post_body = body_override.equal?(DISPLAY_BODY_UNSET) ? (has_attribute?(:body) ? body.to_s : '') : body_override.to_s
-    return post_body unless post_body.present? && cross_post?
-
-    stripped_body = post_body.sub(CROSS_POST_PREAMBLE_PATTERN, '')
-    stripped_body.present? && stripped_body != post_body ? stripped_body : post_body
+    display_body_service.cross_post_copied_body(body_override)
   end
   
   def post_image_url(body_override = DISPLAY_BODY_UNSET)
-    thumbnail_url = [metadata.fetch('image')].flatten[0] rescue nil
-    post_body = display_body(body_override)
-    
-    thumbnail_url ||= if matches = post_body.match(IMAGE_URL_PATTERN)
-      matches[1]
-    end
-    
-    thumbnail_url ||= if matches = post_body.match(YOUTUBE_SHORT_URL_PATTERN)
-      "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
-    end
-    
-    thumbnail_url ||= if matches = post_body.match(YOUTUBE_LONG_URL_PATTERN)
-      "https://img.youtube.com/vi/#{matches[2]}/0.jpg"
-    end
-    
-    thumbnail_url = URI.parse(thumbnail_url).to_s rescue nil
-    thumbnail_url = nil unless thumbnail_url.present?
-    
-    thumbnail_url
+    media_service.post_image_url(body_override)
   end
 
   def thumbnail_url(body_override = DISPLAY_BODY_UNSET)
-    post_image_url(body_override) || PLACEHOLDER_IMAGE_URL
+    media_service.thumbnail_url(body_override)
   end
 
   def placeholder_image_url
-    PLACEHOLDER_IMAGE_URL
+    media_service.placeholder_image_url
   end
 
   def author_avatar_url
-    "https://images.hive.blog/u/#{author}/avatar"
+    media_service.author_avatar_url
   end
   
   def canonical_url
@@ -284,6 +209,18 @@ class Post < ApplicationRecord
     return true if metadata_tags.include?('cross-post')
 
     tags.loaded? ? tags.any? { |tag| tag.tag == 'cross-post' } : tags.where(tag: 'cross-post').exists?
+  end
+
+  def display_body_service
+    PostDisplayBody.new(self)
+  end
+
+  def media_service
+    PostMedia.new(self)
+  end
+
+  def payout_record
+    PostPayout.new(self)
   end
   
   def fetch_latest

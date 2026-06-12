@@ -1,8 +1,7 @@
 class HyperionAgent
   DEFAULT_DIGEST_LIMIT = 10
-  DEFAULT_VOTE_WEIGHT = 10_000
+  DEFAULT_VOTE_WEIGHT = HyperionAgentPostPresenter::DEFAULT_VOTE_WEIGHT
   MAX_VOTE_WEIGHT = 10_000
-  EXCERPT_LENGTH = 280
 
   attr_reader :account, :session, :url_helpers
 
@@ -39,7 +38,7 @@ class HyperionAgent
       },
       mode_counts: result.mode_counts,
       context_matches: context_matches(result),
-      posts: result.posts.map { |post| digest_post_payload(post, result) },
+      posts: result.posts.map { |post| post_presenter.digest(post, result) },
       ignored_tags: result.ignored_tags,
       favorite_tags: result.favorite_tag_set.to_a
     }
@@ -47,38 +46,15 @@ class HyperionAgent
 
   def post_payload(post_id)
     post = Post.find(post_id)
-    post.load_body!
-    display_post = post.display_post
 
-    {
-      id: post.id,
-      author: display_post.author,
-      permlink: display_post.permlink,
-      title: display_post.title,
-      excerpt: excerpt(display_post.display_body, fallback: display_post.title),
-      category: display_post.category,
-      tags: post.tags.order(:id).map { |tag| {tag: tag.tag, category: tag.category} },
-      created_at: display_post.created_at.iso8601,
-      canonical_url: display_post.canonical_url,
-      body_markdown: display_post.display_body,
-      read: account.post_read?(post.id),
-      vote_links: vote_links(display_post)
-    }
+    post_presenter.detail(post)
   end
 
   def vote_link(post_id, weight = DEFAULT_VOTE_WEIGHT)
     post = Post.find(post_id)
-    display_post = post.display_post
     normalized_weight = normalize_vote_weight(weight)
 
-    {
-      id: post.id,
-      voter: account.name,
-      author: display_post.author,
-      permlink: display_post.permlink,
-      weight: normalized_weight,
-      hivesigner_url: hivesigner_vote_url(display_post, normalized_weight)
-    }
+    post_presenter.vote_link(post, normalized_weight)
   end
 
   def mark_read(params = {})
@@ -162,87 +138,6 @@ private
       minimum_reputation: account.minimum_reputation,
       hivesigner_available: session[:hivesigner_access_token].present?
     }
-  end
-
-  def digest_post_payload(post, result)
-    display_post = post.display_post(result.post_bodies[post.id])
-    body = digest_body(post, display_post, result.post_bodies[post.id])
-
-    {
-      id: post.id,
-      author: display_post.author,
-      permlink: display_post.permlink,
-      title: display_post.title,
-      excerpt: excerpt(body, fallback: display_post.title),
-      category: display_post.category,
-      tags: tags_payload(post, result),
-      created_at: display_post.created_at.iso8601,
-      canonical_url: display_post.canonical_url,
-      payout: post.payout,
-      payout_amount: post.payout_amount&.to_s,
-      payout_currency: post.payout_currency,
-      author_reputation: display_post.author_reputation,
-      read: result.read_post_ids.include?(post.id),
-      muted_author: account.muted_authors.include?(display_post.author),
-      current_vote: nil,
-      vote_links: vote_links(display_post),
-      interest_reasons: interest_reasons(post, display_post)
-    }
-  end
-
-  def tags_payload(post, result)
-    (result.post_tags[post.id] || []).map do |(_post_id, tag, category)|
-      community = result.post_communities[tag] || {}
-      {tag: tag, name: community[:name] || tag, category: category}
-    end
-  end
-
-  def digest_body(post, display_post, indexed_body)
-    body = display_post.display_body(display_post == post ? indexed_body : Post::DISPLAY_BODY_UNSET)
-    return body if body.present?
-    return body unless display_post.persisted?
-
-    full_post = Post.find(display_post.id)
-    full_post.load_body!
-    full_post.display_body
-  rescue => e
-    Rails.logger.warn "Unable to load digest body for post #{post.id}: #{e.class}: #{e.message}"
-    body.to_s
-  end
-
-  def interest_reasons(post, display_post)
-    reasons = []
-    reasons << 'unread'
-    reasons << 'known_payout' if post.payout_amount.present?
-    reasons << 'high_reputation_author' if display_post.author_reputation.to_i >= 60
-    reasons << 'recent' if display_post.created_at > 2.days.ago
-    reasons
-  end
-
-  def vote_links(post)
-    {
-      upvote: hivesigner_vote_url(post, DEFAULT_VOTE_WEIGHT),
-      downvote: hivesigner_vote_url(post, -DEFAULT_VOTE_WEIGHT)
-    }
-  end
-
-  def hivesigner_vote_url(post, weight)
-    query = URI.encode_www_form(
-      authority: 'post',
-      voter: account.name,
-      author: post.author,
-      permlink: post.permlink,
-      weight: weight
-    )
-
-    "https://hivesigner.com/sign/vote?#{query}"
-  end
-
-  def excerpt(body, fallback: '')
-    text = ActionController::Base.helpers.strip_tags(body.to_s)
-    text = text.gsub(/\s+/, ' ').strip
-    text = fallback.to_s if text.blank?
-    ActionController::Base.helpers.truncate(text, length: EXCERPT_LENGTH, separator: ' ')
   end
 
   def tag_state_payload(tags: [], changed_count: nil, warnings: [])
@@ -372,5 +267,9 @@ private
 
   def truthy?(value)
     value == true || value.to_s == 'true' || value.to_s == '1'
+  end
+
+  def post_presenter
+    @post_presenter ||= HyperionAgentPostPresenter.new(account: account)
   end
 end

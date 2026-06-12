@@ -4,6 +4,9 @@ import App from './App'
 import { imageProxy } from './format'
 import { PROFESSIONAL_THEMES, THEME_OPTIONS, THEMES } from './theme'
 
+const nativeSetInterval = window.setInterval?.bind(window)
+const nativeClearInterval = window.clearInterval?.bind(window)
+
 const posts = [
   {
     id: 1,
@@ -567,6 +570,7 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     document.documentElement.classList.remove('dark')
     document.documentElement.classList.remove('theme-pro')
     THEME_OPTIONS.forEach((theme) => {
@@ -578,6 +582,8 @@ describe('App', () => {
     delete window.IntersectionObserver
     delete globalThis.IntersectionObserver
     vi.restoreAllMocks()
+    if (!window.setInterval && nativeSetInterval) window.setInterval = nativeSetInterval
+    if (!window.clearInterval && nativeClearInterval) window.clearInterval = nativeClearInterval
   })
 
   test('bootstraps session and renders posts from the API', async () => {
@@ -598,14 +604,14 @@ describe('App', () => {
 
   test('polls current voting power periodically', async () => {
     let poll
-    const originalSetInterval = window.setInterval
+    const originalSetInterval = window.setInterval || nativeSetInterval
     const setIntervalSpy = vi.spyOn(window, 'setInterval').mockImplementation((callback, delay, ...args) => {
       if (delay === 60000) {
         poll = callback
         return 123
       }
 
-      return originalSetInterval(callback, delay, ...args)
+      return originalSetInterval?.(callback, delay, ...args) ?? 0
     })
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval').mockImplementation(() => {})
 

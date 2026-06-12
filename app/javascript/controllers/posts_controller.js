@@ -1,17 +1,26 @@
 import { Controller } from '@hotwired/stimulus'
+import { diffPairOptions, escapeHtml, normalizePairIndex, renderCodeDiff, renderCodeRevision } from './posts_diff'
+import {
+  isFocusNextKey,
+  isFocusPreviousKey,
+  isMarkReadAndPreviewNextKey,
+  isMarkReadAndPreviewPreviousKey,
+  isPreviewDismissKey,
+  isPreviewNextKey,
+  isPreviewPreviousKey,
+  isPreviewScrollKey,
+  isScrollDownKey,
+  isScrollUpKey
+} from './posts_keyboard'
+import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
+import { bindPreviewListeners, clearPreviewIframe, isPreviewBackdropClick, loadPreviewIframe, unbindPreviewListeners } from './posts_preview'
+import { refreshPendingPayout, refreshReplyCount, refreshVoteCount } from './posts_details'
 
 import $ from 'jquery';
 
 var firstLink;
-var bindingPreviewDismissKey;
-var bindingPreviewDismissOutsideModal;
-var bindingPreviewPreviousKey;
-var bindingPreviewNextKey;
-var bindingMarkAsReadAndPreviewPreviousKey;
-var bindingMarkAsReadAndPreviewNextKey;
 var bindingFocusPreviousKey;
 var bindingFocusNextKey;
-var bindingScrollKey;
 
 export default class extends Controller {
   static values = {
@@ -73,9 +82,7 @@ export default class extends Controller {
   
   previewShowModal() {
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${this.idValue} iframe`);
-    
-    iframe.attr('src', iframe.data('src'));
+    loadPreviewIframe($, this.idValue);
     
     $(preview).modal('show');
     
@@ -83,108 +90,45 @@ export default class extends Controller {
     this.refrestReplyCount();
     this.refreshPendingPayout(this.previewPendingPayoutTarget);
     
-    bindingScrollKey = this.scrollKey.bind(this);
-    document.addEventListener('keydown', bindingScrollKey);
-    
-    bindingPreviewDismissKey = this.previewDismissKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewDismissKey);
-    
-    bindingPreviewPreviousKey = this.previewPreviousKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewPreviousKey);
-    
-    bindingPreviewNextKey = this.previewNextKey.bind(this);
-    document.addEventListener('keydown', bindingPreviewNextKey);
-    
-    bindingMarkAsReadAndPreviewPreviousKey = this.markAsReadAndPreviewPreviousKey.bind(this);
-    document.addEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
-    
-    bindingMarkAsReadAndPreviewNextKey = this.markAsReadAndPreviewNextKey.bind(this);
-    document.addEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
-    
-    bindingPreviewDismissOutsideModal = this.previewDismissOutsideModal.bind(this);
-    document.addEventListener('click', bindingPreviewDismissOutsideModal);
+    this.previewBindings = bindPreviewListeners(document, this);
   }
   
   previewPrevious(e) {
-    var element = $(this.element);
-    var previous_element = element.prev();
-    var previous_post_id = previous_element.data('posts-id-value');
-    var previous_link = document.getElementById(`#show-${previous_post_id}`);
-    
-    if ( !!previous_link ) {
-      previous_link.focus();
-      previous_link.click();
-    }
+    focusAndClickLink(adjacentPostActionLink(this.element, -1, 'show'));
   }
   
   previewNext(e) {
-    var element = $(this.element);
-    var next_element = element.next();
-    var next_post_id = next_element.data('posts-id-value');
-    var next_link = document.getElementById(`#show-${next_post_id}`);
-    
-    if ( !!next_link ) {
-      next_link.focus();
-      next_link.click();
-    }
+    focusAndClickLink(adjacentPostActionLink(this.element, 1, 'show'));
   }
   
   focusPrevious(e) {
-    var element = $(this.element);
-    var previous_element = element.prev();
-    var previous_post_id = previous_element.data('posts-id-value');
-    var previous_link = document.getElementById(`#show-${previous_post_id}`);
-    
-    if ( !!previous_link ) {
-      previous_link.focus();
-    }
+    focusLink(adjacentPostActionLink(this.element, -1, 'show'));
   }
   
   focusCurrent(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#show-${post_id}`);
-    
-    if ( !!link ) {
-      link.focus();
-    }
+    focusLink(postActionLink(this.element, 'show'));
   }
   
   focusNext(e) {
-    var element = $(this.element);
-    var next_element = element.next();
-    var next_post_id = next_element.data('posts-id-value');
-    var next_link = document.getElementById(`#show-${next_post_id}`);
-    
-    if ( !!next_link ) {
-      next_link.focus();
-    }
+    focusLink(adjacentPostActionLink(this.element, 1, 'show'));
   }
   
   previewPreviousKey(e) {
-    if ( e.keyCode == 37 // left
-      || e.keyCode == 72 // h
-      || e.keyCode == 74 // j
-      || e.keyCode == 38 // up
-    ) {
+    if (isPreviewPreviousKey(e)) {
       this.previewDismiss(e);
       this.previewPrevious(e);
     }
   }
   
   previewNextKey(e) {
-    if ( e.keyCode == 76 // l
-      || e.keyCode == 39 // right
-      || e.keyCode == 40 // down
-      || e.keyCode == 74 // j
-    ) {
+    if (isPreviewNextKey(e)) {
       this.previewDismiss(e);
       this.previewNext(e);
     }
   }
   
   markAsReadAndPreviewPreviousKey(e) {
-    if ( e.shiftKey && e.keyCode == 188 ) { // < (shift + ,)
+    if (isMarkReadAndPreviewPreviousKey(e)) {
       this.previewDismiss(e);
       this.markRowAsRead(e);
       this.previewPrevious(e);
@@ -192,7 +136,7 @@ export default class extends Controller {
   }
   
   markAsReadAndPreviewNextKey(e) {
-    if ( e.shiftKey && e.keyCode == 190 ) { // > (shift + .)
+    if (isMarkReadAndPreviewNextKey(e)) {
       this.previewDismiss(e);
       this.markRowAsRead(e);
       this.previewNext(e);
@@ -200,40 +144,31 @@ export default class extends Controller {
   }
   
   focusPreviousKey(e) {
-    if ( e.keyCode == 38 // up
-      || e.keyCode == 75 // k
-    ) {
+    if (isFocusPreviousKey(e)) {
       this.focusPrevious(e);
     }
   }
   
   focusNextKey(e) {
-    if ( e.keyCode == 74 // j
-      || e.keyCode == 40 // down
-    ) {
+    if (isFocusNextKey(e)) {
       this.focusNext(e);
     }
   }
   
   // https://discourse.stimulusjs.org/t/add-and-remove-eventlisteners/710/2
   previewDismissKey(e) {
-    if ( e.keyCode == 27 // esc
-      || e.keyCode == 13 // enter
-    ) {
+    if (isPreviewDismissKey(e)) {
       e.preventDefault();
       this.previewDismiss(e);
     }
   }
   
   scrollKey(e) {
-    if ( e.keyCode == 32 // space
-      || e.keyCode == 33 // page-up
-      || e.keyCode == 34 // page-down
-    ) {
+    if (isPreviewScrollKey(e)) {
       var iframe = $(`#preview-${this.idValue} iframe`);
       
       // Paging down.
-      if ( ( e.keyCode == 32 && !e.shiftKey ) || e.keyCode == 34 ) {
+      if (isScrollDownKey(e)) {
         var top = iframe.contents().scrollTop();
         iframe.contents().scrollTop(top + 150);
         
@@ -245,7 +180,7 @@ export default class extends Controller {
       }
       
       // Paging up.
-      if ( ( e.keyCode == 32 && e.shiftKey ) || e.keyCode == 33 ) {
+      if (isScrollUpKey(e)) {
         var top = iframe.contents().scrollTop();
         iframe.contents().scrollTop(top - 150);
         
@@ -268,7 +203,7 @@ export default class extends Controller {
     // }
     
     // Clicked directly on the related div.modal (thanks, bs).
-    if (e.target.id == `preview-${this.idValue}`) {
+    if (isPreviewBackdropClick(e, this.idValue)) {
       e.preventDefault();
       this.previewDismiss(e);
     }
@@ -276,19 +211,11 @@ export default class extends Controller {
     
   previewDismiss(e) {
     var preview = this.previewTarget;
-    var iframe = $(`#preview-${this.idValue} iframe`);
-    
-    iframe.attr('src', 'about:blank');
+    clearPreviewIframe($, this.idValue);
     
     $(preview).modal('hide');
-    
-    document.removeEventListener('keydown', bindingScrollKey);
-    document.removeEventListener('keydown', bindingPreviewDismissKey);
-    document.removeEventListener('keydown', bindingPreviewPreviousKey);
-    document.removeEventListener('keydown', bindingPreviewNextKey);
-    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewPreviousKey);
-    document.removeEventListener('keydown', bindingMarkAsReadAndPreviewNextKey);
-    document.removeEventListener('click', bindingPreviewDismissOutsideModal);
+    unbindPreviewListeners(document, this.previewBindings);
+    this.previewBindings = null;
   }
 
   diffShow(e) {
@@ -305,7 +232,7 @@ export default class extends Controller {
       if (!response.ok) throw new Error(payload.error || response.statusText);
       this.renderDiff(payload.revisions || []);
     })).catch((error) => {
-      this.diffBodyTarget.innerHTML = `<div class="alert alert-danger">${this.escapeHtml(error.message || 'Diff failed to load.')}</div>`;
+      this.diffBodyTarget.innerHTML = `<div class="alert alert-danger">${escapeHtml(error.message || 'Diff failed to load.')}</div>`;
     });
   }
 
@@ -324,133 +251,26 @@ export default class extends Controller {
 
     if (revisions.length === 1) {
       this.diffPairTarget.innerHTML = '';
-      this.diffBodyTarget.innerHTML = this.renderCodeRevision(revisions[0]);
+      this.diffBodyTarget.innerHTML = renderCodeRevision(revisions[0]);
       return;
     }
 
     var pairCount = revisions.length - 1;
-    var pairIndex = selectedIndex === null || isNaN(selectedIndex) ? pairCount - 1 : selectedIndex;
-    pairIndex = Math.min(Math.max(pairIndex, 0), pairCount - 1);
+    var pairIndex = normalizePairIndex(revisions, selectedIndex);
 
-    if (pairCount > 1) {
-      this.diffPairTarget.innerHTML = `<select class="custom-select custom-select-sm w-auto" data-action="posts#diffPairChanged">${Array.from({length: pairCount}, (_item, index) => {
-        var selected = index === pairIndex ? ' selected' : '';
-        return `<option value="${index}"${selected}>${this.escapeHtml(revisions[index].label)} -&gt; ${this.escapeHtml(revisions[index + 1].label)}</option>`;
-      }).join('')}</select>`;
-    } else {
-      this.diffPairTarget.innerHTML = '';
-    }
+    this.diffPairTarget.innerHTML = diffPairOptions(revisions, pairIndex);
 
-    this.diffBodyTarget.innerHTML = this.renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
-  }
-
-  renderCodeRevision(revision) {
-    return `
-      <section class="border rounded bg-dark text-light">
-        <pre class="m-0 p-3 overflow-auto" style="max-height: 65vh;"><code>${this.escapeHtml(revision.body || '')}</code></pre>
-      </section>
-    `;
-  }
-
-  renderCodeDiff(previousRevision, currentRevision) {
-    var rows = this.lineDiff(previousRevision.body || '', currentRevision.body || '').map((line) => {
-      var rowClass = line.type === 'added' ? 'bg-success text-white' : line.type === 'removed' ? 'bg-danger text-white' : 'text-light';
-      return `<div class="d-flex ${rowClass}"><span class="text-right text-monospace px-2 text-muted" style="width: 4rem;">${line.number || ''}</span><code class="text-monospace flex-fill px-2" style="white-space: pre-wrap;">${this.escapeHtml(line.prefix + line.text)}</code></div>`;
-    }).join('');
-
-    return `
-      <section class="border rounded bg-dark overflow-hidden">
-        <div class="row no-gutters border-bottom border-secondary text-light small">
-          <div class="col-sm-6 border-right border-secondary p-2">
-            <strong>${this.escapeHtml(previousRevision.label || 'Before')}</strong>
-            <div class="text-muted">${this.escapeHtml(this.revisionDetail(previousRevision))}</div>
-          </div>
-          <div class="col-sm-6 p-2">
-            <strong>${this.escapeHtml(currentRevision.label || 'After')}</strong>
-            <div class="text-muted">${this.escapeHtml(this.revisionDetail(currentRevision))}</div>
-          </div>
-        </div>
-        <div class="overflow-auto" style="max-height: 65vh;">${rows}</div>
-      </section>
-    `;
-  }
-
-  lineDiff(before, after) {
-    var beforeLines = before.split(/\r?\n/);
-    var afterLines = after.split(/\r?\n/);
-    var table = Array.from({length: beforeLines.length + 1}, () => Array(afterLines.length + 1).fill(0));
-
-    for (var i = beforeLines.length - 1; i >= 0; i--) {
-      for (var j = afterLines.length - 1; j >= 0; j--) {
-        table[i][j] = beforeLines[i] === afterLines[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
-      }
-    }
-
-    var diff = [];
-    i = 0;
-    j = 0;
-    while (i < beforeLines.length && j < afterLines.length) {
-      if (beforeLines[i] === afterLines[j]) {
-        diff.push({type: 'same', prefix: ' ', text: beforeLines[i], number: j + 1});
-        i++;
-        j++;
-      } else if (table[i + 1][j] >= table[i][j + 1]) {
-        diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
-        i++;
-      } else {
-        diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
-        j++;
-      }
-    }
-
-    while (i < beforeLines.length) {
-      diff.push({type: 'removed', prefix: '-', text: beforeLines[i], number: i + 1});
-      i++;
-    }
-
-    while (j < afterLines.length) {
-      diff.push({type: 'added', prefix: '+', text: afterLines[j], number: j + 1});
-      j++;
-    }
-
-    return diff;
-  }
-
-  revisionDetail(revision) {
-    var parts = [];
-    if (revision.published_at) parts.push(revision.published_at);
-    if (revision.block_num) parts.push(`block ${revision.block_num}`);
-    return parts.length > 0 ? parts.join(' · ') : 'No chain metadata';
-  }
-
-  escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, (character) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    })[character]);
+    this.diffBodyTarget.innerHTML = renderCodeDiff(revisions[pairIndex], revisions[pairIndex + 1]);
   }
   
   markRowAsRead(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#mark-as-read-${post_id}`);
-    
-    if ( !!link ) {
-      link.click();
-    }
+    const link = postActionLink(this.element, 'mark-as-read');
+    if (link) link.click();
   }
   
   markRowAsUnread(e) {
-    var element = $(this.element);
-    var post_id = element.data('posts-id-value');
-    var link = document.getElementById(`#mark-as-unread-${post_id}`);
-    
-    if ( !!link ) {
-      link.click();
-    }
+    const link = postActionLink(this.element, 'mark-as-unread');
+    if (link) link.click();
   }
   
   // Also see posts#mark_as_read.js.erb
@@ -466,65 +286,30 @@ export default class extends Controller {
   }
   
   refrestVoteCount() {
-    var voteCount = this.previewVoteCountTarget;
-    
-    hive.api.getActiveVotes(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        var upvotes = 0;
-        
-        for ( var i = 0 ; i < response.length; i++ ) {
-          var voteCast = false;
-          if ( response[i].voter == $('#current-account').data('name') ) {
-            voteCount.classList.remove('badge-secondary');
-            voteCast = true;
-          }
-          
-          if ( response[i].percent > 0 ) {
-            upvotes++;
-            
-            if ( voteCast ) {
-              voteCount.classList.add('badge-success');
-            }
-          }
-          
-          if ( response[i].percent < 0 && voteCast ) {
-            voteCount.classList.add('badge-danger');
-          }
-        }
-  
-        voteCount.textContent = 'Votes: ' + upvotes;
-      }
+    refreshVoteCount({
+      hiveApi: hive.api,
+      voteCount: this.previewVoteCountTarget,
+      author: this.authorValue,
+      permlink: this.permlinkValue,
+      currentAccountName: $('#current-account').data('name')
     });
   }
   
   refrestReplyCount() {
-    var replyCount = this.previewReplyCountTarget;
-    
-    replyCount.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Replies: 0</span>';
-    
-    hive.api.getContentReplies(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(preview, err);
-  
-      if ( !!response ) {
-        replyCount.textContent = 'Replies: ' + response.length;
-      }
+    refreshReplyCount({
+      hiveApi: hive.api,
+      replyCount: this.previewReplyCountTarget,
+      author: this.authorValue,
+      permlink: this.permlinkValue
     });
   }
   
   refreshPendingPayout(pendingPayout) {
-    hive.api.getContent(this.authorValue, this.permlinkValue, function(err, response) {
-      if ( !!err ) console.log(pendingPayout, err);
-      
-      if ( !!response ) {
-        if ( response.cashout_time == '1969-12-31T23:59:59' ) {
-          // Just in case we're showing a post that has already paid.
-          pendingPayout.textContent = response.total_payout_value;
-        } else {
-          pendingPayout.textContent = response.pending_payout_value;
-        }
-      }
+    refreshPendingPayout({
+      hiveApi: hive.api,
+      pendingPayout,
+      author: this.authorValue,
+      permlink: this.permlinkValue
     });
   }
   
