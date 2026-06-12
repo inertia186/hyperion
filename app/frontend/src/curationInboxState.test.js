@@ -8,6 +8,8 @@ import {
   postsResultCountLabel,
   queryInputValue,
   readDesktopPreviewPercent,
+  selectionAfterPostRemoval,
+  selectionAfterPostsRemoval,
   writeDesktopPreviewPercent
 } from './curationInboxState'
 
@@ -65,6 +67,46 @@ describe('curation inbox state helpers', () => {
     expect(postsResultCountLabel({}, 12, 12, false)).toBe('12 unread posts')
     expect(postsResultCountLabel({only_keyword: true}, 20, 10, true)).toBe('20 keyword matches · 10 loaded')
     expect(postsResultCountLabel({only_blacklisted: true}, 1, 1, false)).toBe('1 blacklisted posts')
+  })
+
+  test('chooses the next selected post after removing one post', () => {
+    const posts = [{id: 1}, {id: 2}, {id: 3}]
+
+    expect(selectionAfterPostRemoval(2, 1, posts)).toEqual({
+      posts: [{id: 1}, {id: 3}],
+      selectedId: 3,
+      cleared: false
+    })
+    expect(selectionAfterPostRemoval(2, -1, posts)).toEqual({
+      posts: [{id: 1}, {id: 3}],
+      selectedId: 1,
+      cleared: false
+    })
+    expect(selectionAfterPostRemoval(1, 1, [{id: 1}])).toEqual({
+      posts: [],
+      selectedId: null,
+      cleared: true
+    })
+  })
+
+  test('keeps or advances selection after removing several posts', () => {
+    const posts = [{id: 1}, {id: 2}, {id: 3}, {id: 4}]
+
+    expect(selectionAfterPostsRemoval([1, 4], 2, posts)).toEqual({
+      posts: [{id: 2}, {id: 3}],
+      selectedId: 2,
+      cleared: false
+    })
+    expect(selectionAfterPostsRemoval([2, 3], 3, posts)).toEqual({
+      posts: [{id: 1}, {id: 4}],
+      selectedId: 4,
+      cleared: false
+    })
+    expect(selectionAfterPostsRemoval([1, 2], 1, [{id: 1}, {id: 2}])).toEqual({
+      posts: [],
+      selectedId: null,
+      cleared: true
+    })
   })
 
   test('persists valid desktop preview widths and ignores invalid stored values', () => {

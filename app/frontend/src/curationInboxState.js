@@ -92,6 +92,37 @@ export function adjustReadCounts(payload, query, readDelta) {
   }
 }
 
+export function selectionAfterPostRemoval(removedId, direction, sourcePosts) {
+  const nextPosts = sourcePosts.filter((post) => post.id !== removedId)
+
+  if (nextPosts.length === 0) {
+    return {posts: nextPosts, selectedId: null, cleared: true}
+  }
+
+  const removedIndex = sourcePosts.findIndex((post) => post.id === removedId)
+  const nextIndex = direction > 0 ? Math.min(removedIndex, nextPosts.length - 1) : Math.max(removedIndex - 1, 0)
+
+  return {posts: nextPosts, selectedId: nextPosts[nextIndex]?.id || null, cleared: false}
+}
+
+export function selectionAfterPostsRemoval(removedIds, selectedId, sourcePosts) {
+  const removedSet = new Set(removedIds)
+  const nextPosts = sourcePosts.filter((post) => !removedSet.has(post.id))
+
+  if (nextPosts.length === 0) {
+    return {posts: nextPosts, selectedId: null, cleared: true}
+  }
+
+  if (!removedSet.has(selectedId)) {
+    return {posts: nextPosts, selectedId, cleared: false}
+  }
+
+  const removedIndex = sourcePosts.findIndex((post) => post.id === selectedId)
+  const nextIndex = Math.min(Math.max(removedIndex, 0), nextPosts.length - 1)
+
+  return {posts: nextPosts, selectedId: nextPosts[nextIndex]?.id || null, cleared: false}
+}
+
 export function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {
   const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
   const loadedSuffix = hasMorePosts ? ` · ${loadedPostsCount} loaded` : ''

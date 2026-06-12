@@ -21,7 +21,9 @@ import {
   keywordSuggestionFromFilterQuery,
   parseQueryInput,
   postsResultCountLabel,
-  queryInputValue
+  queryInputValue,
+  selectionAfterPostRemoval,
+  selectionAfterPostsRemoval
 } from './curationInboxState'
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
@@ -243,40 +245,33 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   selectedPostRef.current = selectedPost
 
   const selectAfterRemoval = useCallback((removedId, direction, sourcePosts) => {
-    const nextPosts = sourcePosts.filter((post) => post.id !== removedId)
+    const selection = selectionAfterPostRemoval(removedId, direction, sourcePosts)
 
-    if (nextPosts.length === 0) {
+    if (selection.cleared) {
       setSelectedId(null)
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      return nextPosts
+      return selection.posts
     }
 
-    const removedIndex = sourcePosts.findIndex((post) => post.id === removedId)
-    const nextIndex = direction > 0 ? Math.min(removedIndex, nextPosts.length - 1) : Math.max(removedIndex - 1, 0)
-    setSelectedId(nextPosts[nextIndex].id)
+    setSelectedId(selection.selectedId)
 
-    return nextPosts
+    return selection.posts
   }, [])
 
   const selectAfterRemovingIds = useCallback((removedIds, sourcePosts) => {
-    const removedSet = new Set(removedIds)
-    const nextPosts = sourcePosts.filter((post) => !removedSet.has(post.id))
+    const selection = selectionAfterPostsRemoval(removedIds, selectedId, sourcePosts)
 
-    if (nextPosts.length === 0) {
+    if (selection.cleared) {
       setSelectedId(null)
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      return nextPosts
+      return selection.posts
     }
 
-    if (removedSet.has(selectedId)) {
-      const removedIndex = sourcePosts.findIndex((post) => post.id === selectedId)
-      const nextIndex = Math.min(Math.max(removedIndex, 0), nextPosts.length - 1)
-      setSelectedId(nextPosts[nextIndex].id)
-    }
+    if (selection.selectedId !== selectedId) setSelectedId(selection.selectedId)
 
-    return nextPosts
+    return selection.posts
   }, [selectedId])
 
   const markPostReadAndMove = useCallback(async (post, direction = 1) => {
