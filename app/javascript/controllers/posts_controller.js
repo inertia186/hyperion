@@ -1,5 +1,17 @@
 import { Controller } from '@hotwired/stimulus'
 import { diffPairOptions, escapeHtml, lineDiff, normalizePairIndex, renderCodeDiff, renderCodeRevision, revisionDetail } from './posts_diff'
+import {
+  isFocusNextKey,
+  isFocusPreviousKey,
+  isMarkReadAndPreviewNextKey,
+  isMarkReadAndPreviewPreviousKey,
+  isPreviewDismissKey,
+  isPreviewNextKey,
+  isPreviewPreviousKey,
+  isPreviewScrollKey,
+  isScrollDownKey,
+  isScrollUpKey
+} from './posts_keyboard'
 import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
 
 import $ from 'jquery';
@@ -128,29 +140,21 @@ export default class extends Controller {
   }
   
   previewPreviousKey(e) {
-    if ( e.keyCode == 37 // left
-      || e.keyCode == 72 // h
-      || e.keyCode == 74 // j
-      || e.keyCode == 38 // up
-    ) {
+    if (isPreviewPreviousKey(e)) {
       this.previewDismiss(e);
       this.previewPrevious(e);
     }
   }
   
   previewNextKey(e) {
-    if ( e.keyCode == 76 // l
-      || e.keyCode == 39 // right
-      || e.keyCode == 40 // down
-      || e.keyCode == 74 // j
-    ) {
+    if (isPreviewNextKey(e)) {
       this.previewDismiss(e);
       this.previewNext(e);
     }
   }
   
   markAsReadAndPreviewPreviousKey(e) {
-    if ( e.shiftKey && e.keyCode == 188 ) { // < (shift + ,)
+    if (isMarkReadAndPreviewPreviousKey(e)) {
       this.previewDismiss(e);
       this.markRowAsRead(e);
       this.previewPrevious(e);
@@ -158,7 +162,7 @@ export default class extends Controller {
   }
   
   markAsReadAndPreviewNextKey(e) {
-    if ( e.shiftKey && e.keyCode == 190 ) { // > (shift + .)
+    if (isMarkReadAndPreviewNextKey(e)) {
       this.previewDismiss(e);
       this.markRowAsRead(e);
       this.previewNext(e);
@@ -166,40 +170,31 @@ export default class extends Controller {
   }
   
   focusPreviousKey(e) {
-    if ( e.keyCode == 38 // up
-      || e.keyCode == 75 // k
-    ) {
+    if (isFocusPreviousKey(e)) {
       this.focusPrevious(e);
     }
   }
   
   focusNextKey(e) {
-    if ( e.keyCode == 74 // j
-      || e.keyCode == 40 // down
-    ) {
+    if (isFocusNextKey(e)) {
       this.focusNext(e);
     }
   }
   
   // https://discourse.stimulusjs.org/t/add-and-remove-eventlisteners/710/2
   previewDismissKey(e) {
-    if ( e.keyCode == 27 // esc
-      || e.keyCode == 13 // enter
-    ) {
+    if (isPreviewDismissKey(e)) {
       e.preventDefault();
       this.previewDismiss(e);
     }
   }
   
   scrollKey(e) {
-    if ( e.keyCode == 32 // space
-      || e.keyCode == 33 // page-up
-      || e.keyCode == 34 // page-down
-    ) {
+    if (isPreviewScrollKey(e)) {
       var iframe = $(`#preview-${this.idValue} iframe`);
       
       // Paging down.
-      if ( ( e.keyCode == 32 && !e.shiftKey ) || e.keyCode == 34 ) {
+      if (isScrollDownKey(e)) {
         var top = iframe.contents().scrollTop();
         iframe.contents().scrollTop(top + 150);
         
@@ -211,7 +206,7 @@ export default class extends Controller {
       }
       
       // Paging up.
-      if ( ( e.keyCode == 32 && e.shiftKey ) || e.keyCode == 33 ) {
+      if (isScrollUpKey(e)) {
         var top = iframe.contents().scrollTop();
         iframe.contents().scrollTop(top - 150);
         
