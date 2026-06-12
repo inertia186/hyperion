@@ -7,6 +7,7 @@ import { useCurationPreviewState } from './useCurationPreviewState'
 import { useCurationSearch } from './useCurationSearch'
 import { useCurationSelection } from './useCurationSelection'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
+import { useInfiniteLoadMore } from './useInfiniteLoadMore'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
@@ -25,7 +26,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const listScrollRef = useRef(null)
   const desktopPreviewScrollRef = useRef(null)
   const mobilePreviewScrollRef = useRef(null)
-  const loadMoreRef = useRef(null)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
   const {
@@ -124,6 +124,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     isMobilePreviewLayout,
     desktopPreviewPercent
   })
+  const loadMoreRef = useInfiniteLoadMore({hasMorePosts, loading, loadingMore, onLoadMore: loadMorePosts})
   const {
     toggleMute,
     toggleOnlyFavorites,
@@ -144,20 +145,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setBusy,
     handleError: handleLoadError
   })
-
-  useEffect(() => {
-    if (!hasMorePosts || loading || loadingMore || typeof IntersectionObserver === 'undefined') return undefined
-
-    const target = loadMoreRef.current
-    if (!target) return undefined
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) loadMorePosts()
-    }, {rootMargin: '600px 0px'})
-
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [hasMorePosts, loading, loadingMore, loadMorePosts])
 
   const selectedPostRef = useRef(null)
   selectedPostRef.current = selectedPost
