@@ -9,6 +9,7 @@ import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import { appendCurationPage, curationHasMorePosts } from './curationPagination'
+import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
@@ -467,25 +468,8 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
   const scrollPreview = useCallback((direction) => {
     const pane = previewScrollTarget(mobilePreviewOpen ? mobilePreviewScrollRef.current : desktopPreviewScrollRef.current)
-
-    if (!pane) {
-      moveSelection(direction)
-      return
-    }
-
-    const maxScrollTop = Math.max(pane.scrollHeight - pane.clientHeight, 0)
-    const atTop = pane.scrollTop <= 0
-    const atBottom = pane.scrollTop >= maxScrollTop - 1
-
-    if ((direction > 0 && atBottom) || (direction < 0 && atTop)) {
-      moveSelection(direction)
-      return
-    }
-
-    const before = pane.scrollTop
-    pane.scrollTop = Math.min(Math.max(before + (direction * Math.max(pane.clientHeight * 0.75, 180)), 0), maxScrollTop)
-
-    if (pane.scrollTop === before) moveSelection(direction)
+    const result = scrollPreviewPane(pane, direction)
+    if (result.advanceSelection) moveSelection(direction)
   }, [mobilePreviewOpen, moveSelection])
 
   useCurationKeyboard({
