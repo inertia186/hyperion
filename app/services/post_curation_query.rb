@@ -2,9 +2,6 @@ require 'set'
 
 class PostCurationQuery
   TAG_CLOUD_LIMIT = 250
-  SORTS = PostCurationSort::SORTS
-  DEFAULT_SORT = PostCurationSort::DEFAULT_SORT
-  DEFAULT_LIMIT = 30
 
   attr_reader :account, :params, :session, :query_state, :relation, :all_posts,
     :posts, :post_ids, :read_post_ids, :post_tags, :post_communities,
@@ -54,69 +51,23 @@ class PostCurationQuery
 
 private
   def read_params
-    @sort = params[:sort].presence || DEFAULT_SORT
-    @sort = DEFAULT_SORT unless SORTS.include?(@sort)
-    @limit = [(params[:limit].presence || DEFAULT_LIMIT).to_i, 1].max
-    @page = [(params[:page].presence || 1).to_i, 1].max
-    @tag = [params[:tag].presence || ''].flatten.first.to_s
-    @other_tags = [params[:tag].presence || ''].flatten.map(&:to_s) - [@tag]
-    @query = params[:query].presence
-    @author = params[:author].presence
-    @app = params[:app].presence
-    @only_ignored = truthy?(params[:only_ignored])
-    @only_read = truthy?(params[:only_read])
-    @only_keyword = truthy?(params[:only_keyword])
-    @only_blacklisted = truthy?(params[:only_blacklisted])
-    @only_deleted = truthy?(params[:only_deleted])
-
-    if @tag.starts_with?('@')
-      @author = @tag.split('@').last
-      @tag = @tag.gsub("@#{@author}", '')
-    end
-
-    if @tag.starts_with?('app:')
-      @app = @tag.split('app:').last
-      @tag = @tag.gsub("app:#{@app}", '')
-    end
-
-    @tag = @tag.gsub('+', ' ')
-    @tag, *@other_tags = @tag.split(' ') + @other_tags if @tag.include?(' ')
-    @other_tags = @other_tags.uniq
-    @tag = '' if @tag == '-'
-
-    @without_tags = []
-    @other_tags.each do |tag|
-      @without_tags << tag.split('-')[1..].join('-') if tag.starts_with?('-')
-    end
-    @other_tags = @other_tags.reject { |tag| tag.starts_with?('-') }
-    @tag_pattern = [([@tag] + @other_tags).reject(&:empty?).join('+'), @without_tags].reject(&:empty?).join('+-')
-
-    if @track_past_tags
-      [@tag].flatten.reject(&:empty?).map(&:downcase).each do |tag|
-        account.past_tags.find_or_create_by(tag: tag)
-      end
-    end
-
-    @query_state = {
-      sort: @sort,
-      limit: @limit,
-      page: @page,
-      tag: @tag,
-      other_tags: @other_tags,
-      without_tags: @without_tags,
-      tag_pattern: @tag_pattern,
-      query: @query,
-      author: @author,
-      app: @app,
-      only_ignored: @only_ignored,
-      only_read: @only_read,
-      only_keyword: @only_keyword,
-      only_blacklisted: @only_blacklisted,
-      only_deleted: @only_deleted,
-      muted_authors_enabled: muted_authors_enabled?,
-      only_favorite_tags: only_favorite_tags?,
-      minimum_reputation: minimum_reputation
-    }
+    curation_params = PostCurationParams.new(params: params, account: account, session: session, track_past_tags: @track_past_tags).call
+    @sort = curation_params.sort
+    @limit = curation_params.limit
+    @page = curation_params.page
+    @tag = curation_params.tag
+    @other_tags = curation_params.other_tags
+    @query = curation_params.query
+    @author = curation_params.author
+    @app = curation_params.app
+    @only_ignored = curation_params.only_ignored
+    @only_read = curation_params.only_read
+    @only_keyword = curation_params.only_keyword
+    @only_blacklisted = curation_params.only_blacklisted
+    @only_deleted = curation_params.only_deleted
+    @without_tags = curation_params.without_tags
+    @tag_pattern = curation_params.tag_pattern
+    @query_state = curation_params.query_state
   end
 
   def build_relation
@@ -313,10 +264,6 @@ private
 
   def apply_sort(scope)
     PostCurationSort.apply(scope, sort: @sort, tag: @tag)
-  end
-
-  def truthy?(value)
-    value == true || value.to_s == 'true' || value.to_s == '1'
   end
 
   def keyword_search
