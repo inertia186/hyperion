@@ -1,5 +1,4 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
 import { api } from './api'
 import { initialQuery } from './constants'
 import { queryParams } from './format'
@@ -8,11 +7,9 @@ import { useCurationPreferences } from './useCurationPreferences'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
+import CurationPostListPanel from './components/CurationPostListPanel'
 import MobilePreviewDrawer from './components/MobilePreviewDrawer'
-import PostList from './components/PostList'
-import PostListSkeleton from './components/PostListSkeleton'
 import PreviewPane from './components/PreviewPane'
-import SelectionBar from './components/SelectionBar'
 import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
 import {
@@ -597,88 +594,41 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
           {error && <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-          <div ref={listScrollRef} className="post-list-shell overflow-hidden rounded-md border border-slate-200 bg-white">
-            <div className={`flex items-center gap-3 border-b px-3 py-2 text-xs ${loading ? 'border-blue-100 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-500'}`}>
-              {loading ? (
-                <span className="inline-flex items-center gap-2 font-semibold" role="status" aria-live="polite">
-                  <Loader2 className="animate-spin" size={14} aria-hidden="true" />
-                  Loading posts...
-                </span>
-              ) : (
-                <span>{resultCountLabel}</span>
-              )}
-            </div>
-            {!loading && posts.length > 0 && (
-              <SelectionBar
-                allLoadedSelected={allLoadedSelected}
-                allMatchingSelected={allMatchingSelected}
-                canSelectAllMatching={canSelectAllMatching}
-                loadedPostsCount={loadedPostsCount}
-                selectedCount={visibleSelectionCount}
-                totalPosts={totalPosts}
-                onToggleLoaded={toggleLoadedSelection}
-                onSelectAllMatching={selectAllMatching}
-                onClearSelection={clearSelection}
-              />
-            )}
-            {loading ? (
-              <PostListSkeleton />
-            ) : posts.length === 0 ? (
-              <div className="px-4 py-12 text-center text-sm text-slate-500">
-                <div>All caught up for this view.</div>
-                {contextSuggestions.length > 0 && (
-                  <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    {contextSuggestions.map((mode) => (
-                      <button key={mode.key} className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => updateQuery(mode.updates)}>
-                        View {mode.label} ({mode.count})
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {keywordSearchSuggestion && (
-                  <div className="mt-3">
-                    <button className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={searchKeywordsFromFilters}>
-                      Search keywords for "{keywordSearchSuggestion}"
-                    </button>
-                  </div>
-                )}
-                {keywordDidYouMean && (
-                  <div className="mt-3">
-                    <span className="mr-2">Did you mean:</span>
-                    <button className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={searchKeywordSuggestion}>
-                      {keywordDidYouMean}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <PostList
-                posts={posts}
-                selectedId={selectedId}
-                selectedPostIds={selectedPostIds}
-                allMatchingSelected={allMatchingSelected}
-                ignoredTags={ignoredTags}
-                onSelect={selectPost}
-                onToggleSelected={togglePostSelection}
-                onSelectTag={focusTag}
-                onSelectAuthor={focusAuthor}
-                onPayoutRefresh={updatePostPayout}
-              />
-            )}
-          </div>
-
-          {!loading && postsPayload && (
-            <div ref={loadMoreRef} className="mt-3 flex flex-col items-center gap-2 text-sm text-slate-500">
-              {loadMoreError && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">{loadMoreError}</div>}
-              {hasMorePosts ? (
-                <button className="inline-flex h-10 items-center rounded-md border border-slate-300 bg-white px-3 text-sm hover:bg-slate-50 disabled:opacity-50" type="button" onClick={loadMorePosts} disabled={loadingMore}>
-                  {loadingMore ? 'Loading more...' : 'Load more'}
-                </button>
-              ) : posts.length > 0 ? (
-                <span>All loaded</span>
-              ) : null}
-            </div>
-          )}
+          <CurationPostListPanel
+            listScrollRef={listScrollRef}
+            loading={loading}
+            resultCountLabel={resultCountLabel}
+            posts={posts}
+            allLoadedSelected={allLoadedSelected}
+            allMatchingSelected={allMatchingSelected}
+            canSelectAllMatching={canSelectAllMatching}
+            loadedPostsCount={loadedPostsCount}
+            selectedCount={visibleSelectionCount}
+            totalPosts={totalPosts}
+            onToggleLoaded={toggleLoadedSelection}
+            onSelectAllMatching={selectAllMatching}
+            onClearSelection={clearSelection}
+            contextSuggestions={contextSuggestions}
+            keywordSearchSuggestion={keywordSearchSuggestion}
+            keywordDidYouMean={keywordDidYouMean}
+            onApplySuggestion={(updates) => updateQuery(updates)}
+            onSearchKeywordsFromFilters={searchKeywordsFromFilters}
+            onSearchKeywordSuggestion={searchKeywordSuggestion}
+            selectedId={selectedId}
+            selectedPostIds={selectedPostIds}
+            ignoredTags={ignoredTags}
+            onSelect={selectPost}
+            onToggleSelected={togglePostSelection}
+            onSelectTag={focusTag}
+            onSelectAuthor={focusAuthor}
+            onPayoutRefresh={updatePostPayout}
+            loadMoreRef={loadMoreRef}
+            postsPayload={postsPayload}
+            loadMoreError={loadMoreError}
+            hasMorePosts={hasMorePosts}
+            loadingMore={loadingMore}
+            onLoadMore={loadMorePosts}
+          />
         </section>
 
         {!isMobilePreviewLayout && (
