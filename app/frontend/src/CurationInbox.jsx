@@ -8,6 +8,7 @@ import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
+import { appendCurationPage, curationHasMorePosts } from './curationPagination'
 import CurationPostListPanel from './components/CurationPostListPanel'
 import CurationPreviewPanels from './components/CurationPreviewPanels'
 import TagsModal from './components/TagsModal'
@@ -63,7 +64,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const pagination = postsPayload?.pagination
   const totalPosts = pagination?.total_count || 0
   const loadedPostsCount = posts.length
-  const hasMorePosts = !!pagination && pagination.page < pagination.total_pages
+  const hasMorePosts = curationHasMorePosts(pagination)
   const resultCountLabel = postsPayload ? postsResultCountLabel(postsPayload.query, totalPosts, loadedPostsCount, hasMorePosts) : ''
   const keywordSearchSuggestion = postsPayload && !postsPayload.query?.only_keyword ? keywordSuggestionFromFilterQuery(postsPayload.query) : ''
   const keywordDidYouMean = postsPayload?.query?.only_keyword ? postsPayload.keyword_suggestion : ''
@@ -135,17 +136,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
     api.posts(queryParams(nextQuery))
       .then((payload) => {
-        setPostsPayload((current) => {
-          if (!current) return payload
-
-          const seenIds = new Set(current.posts.map((post) => post.id))
-          const nextPosts = payload.posts.filter((post) => !seenIds.has(post.id))
-
-          return {
-            ...payload,
-            posts: [...current.posts, ...nextPosts]
-          }
-        })
+        setPostsPayload((current) => appendCurationPage(current, payload))
       })
       .catch((err) => {
         if (err.status === 401 && err.payload?.login_url) {
