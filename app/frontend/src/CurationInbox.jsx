@@ -9,14 +9,22 @@ import PostList from './components/PostList'
 import PreviewPane from './components/PreviewPane'
 import TagPanels from './components/TagPanels'
 import Toolbar from './components/Toolbar'
-import { activeModeKey, modeCount, modeOptions } from './components/ModeSelector'
+import {
+  COMPACT_MODE_SELECTOR_PREVIEW_PERCENT,
+  MAX_DESKTOP_PREVIEW_PERCENT,
+  MIN_DESKTOP_PREVIEW_PERCENT,
+  adjustReadCounts,
+  clamp,
+  emptyContextSuggestions,
+  keywordSuggestionFromFilterQuery,
+  parseQueryInput,
+  postsResultCountLabel,
+  queryInputValue,
+  readDesktopPreviewPercent,
+  writeDesktopPreviewPercent
+} from './curationInboxState'
 
 const emptyPreviewState = {postId: null, status: 'idle', html: '', detail: null, error: null}
-const DESKTOP_PREVIEW_STORAGE_KEY = 'hyperion.desktopPreviewPercent'
-const DEFAULT_DESKTOP_PREVIEW_PERCENT = 65
-const MIN_DESKTOP_PREVIEW_PERCENT = 28
-const MAX_DESKTOP_PREVIEW_PERCENT = 65
-const COMPACT_MODE_SELECTOR_PREVIEW_PERCENT = 50
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
   const [query, setQuery] = useState(initialQuery)
@@ -1042,99 +1050,6 @@ function useMediaQuery(query) {
 
 function previewScrollTarget(container) {
   return container
-}
-
-function readDesktopPreviewPercent() {
-  if (typeof window === 'undefined') return DEFAULT_DESKTOP_PREVIEW_PERCENT
-
-  const stored = Number(window.localStorage?.getItem(DESKTOP_PREVIEW_STORAGE_KEY))
-  return Number.isFinite(stored) && stored >= MIN_DESKTOP_PREVIEW_PERCENT && stored <= MAX_DESKTOP_PREVIEW_PERCENT ? stored : DEFAULT_DESKTOP_PREVIEW_PERCENT
-}
-
-function writeDesktopPreviewPercent(value) {
-  try {
-    window.localStorage?.setItem(DESKTOP_PREVIEW_STORAGE_KEY, String(value))
-  } catch (_error) {
-    // Ignore storage failures; resizing should still work for the current page.
-  }
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max)
-}
-
-function queryInputValue(query = {}) {
-  return [query.tag_pattern, query.author ? `@${query.author}` : ''].filter(Boolean).join(' ')
-}
-
-function parseQueryInput(value) {
-  const tokens = value.trim().split(/\s+/).filter(Boolean)
-  let author = ''
-  const tagTokens = []
-
-  tokens.forEach((token) => {
-    if (token.startsWith('@') && token.length > 1) {
-      author = token.slice(1)
-    } else {
-      tagTokens.push(token)
-    }
-  })
-
-  return {
-    tag: tagTokens.join(' '),
-    author
-  }
-}
-
-function keywordSuggestionFromFilterQuery(query = {}) {
-  return [query.tag, ...(query.other_tags || [])].filter(Boolean).join(' ').trim()
-}
-
-function emptyContextSuggestions(query, counts) {
-  const activeMode = activeModeKey(query)
-
-  return modeOptions
-    .filter((mode) => mode.key !== activeMode)
-    .map((mode) => ({...mode, count: modeCount(mode, counts)}))
-    .filter((mode) => mode.count > 0)
-}
-
-function adjustReadCounts(payload, query, readDelta) {
-  if (!readDelta || query.only_read) return payload
-
-  const counts = payload.counts ? {
-    ...payload.counts,
-    read_posts: Math.max((payload.counts.read_posts || 0) + readDelta, 0)
-  } : payload.counts
-
-  if (query.only_keyword || query.only_ignored || query.only_deleted || query.only_blacklisted) {
-    return {...payload, counts}
-  }
-
-  const totalCount = Math.max((payload.pagination?.total_count || 0) - readDelta, 0)
-  const limit = Math.max(payload.pagination?.limit || 1, 1)
-
-  return {
-    ...payload,
-    counts,
-    mode_counts: {
-      ...payload.mode_counts,
-      unread: Math.max((payload.mode_counts?.unread || 0) - readDelta, 0),
-      read: Math.max((payload.mode_counts?.read || 0) + readDelta, 0)
-    },
-    pagination: payload.pagination ? {
-      ...payload.pagination,
-      total_count: totalCount,
-      total_pages: Math.max(Math.ceil(totalCount / limit), 1)
-    } : payload.pagination
-  }
-}
-
-function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {
-  const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
-  const loadedSuffix = hasMorePosts ? ` · ${loadedPostsCount} loaded` : ''
-
-  return `${totalPosts} ${noun}${loadedSuffix}`
 }
 
 function PostListSkeleton() {
