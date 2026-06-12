@@ -6,6 +6,7 @@ import { queryParams } from './format'
 import { useCurationKeyboard } from './useCurationKeyboard'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
+import { usePostPreview } from './usePostPreview'
 import MobilePreviewDrawer from './components/MobilePreviewDrawer'
 import PostList from './components/PostList'
 import PostListSkeleton from './components/PostListSkeleton'
@@ -23,8 +24,6 @@ import {
   queryInputValue
 } from './curationInboxState'
 
-const emptyPreviewState = {postId: null, status: 'idle', html: '', detail: null, error: null}
-
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
   const [query, setQuery] = useState(initialQuery)
   const [draftTag, setDraftTag] = useState('')
@@ -34,7 +33,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const [selectedId, setSelectedId] = useState(null)
   const [selectedPostIds, setSelectedPostIds] = useState(() => new Set())
   const [allMatchingSelected, setAllMatchingSelected] = useState(false)
-  const [previewState, setPreviewState] = useState(emptyPreviewState)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -48,10 +46,10 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const desktopPreviewScrollRef = useRef(null)
   const mobilePreviewScrollRef = useRef(null)
   const loadMoreRef = useRef(null)
-  const previewRequestRef = useRef(0)
   const resetKeyRef = useRef(resetKey)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
+  const previewState = usePostPreview(selectedId, {desktopPreviewScrollRef, mobilePreviewScrollRef})
 
   const posts = postsPayload?.posts || []
   const selectedIndex = posts.findIndex((post) => post.id === selectedId)
@@ -155,32 +153,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   }, [hasMorePosts, loading, loadingMore, loadMorePosts])
 
   useEffect(() => {
-    if (!selectedId) {
-      previewRequestRef.current += 1
-      setPreviewState(emptyPreviewState)
-      return
-    }
-
-    const requestId = previewRequestRef.current + 1
-    previewRequestRef.current = requestId
-    setPreviewState({postId: selectedId, status: 'loading', html: '', detail: null, error: null})
-
-    api.post(selectedId)
-      .then((payload) => {
-        if (previewRequestRef.current !== requestId) return
-
-        setPreviewState({postId: selectedId, status: 'ready', html: payload.body_html || '', detail: payload, error: null})
-        if (desktopPreviewScrollRef.current) desktopPreviewScrollRef.current.scrollTop = 0
-        if (mobilePreviewScrollRef.current) mobilePreviewScrollRef.current.scrollTop = 0
-      })
-      .catch((err) => {
-        if (previewRequestRef.current !== requestId) return
-
-        setPreviewState({postId: selectedId, status: 'error', html: '', detail: null, error: err.message || 'Request failed'})
-      })
-  }, [selectedId])
-
-  useEffect(() => {
     if (!isMobilePreviewLayout) {
       setMobilePreviewOpen(false)
     }
@@ -277,7 +249,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
       setSelectedId(null)
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      setPreviewState(emptyPreviewState)
       return nextPosts
     }
 
@@ -296,7 +267,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
       setSelectedId(null)
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      setPreviewState(emptyPreviewState)
       return nextPosts
     }
 
