@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react'
 import { api } from './api'
 import { useCurationKeyboard } from './useCurationKeyboard'
 import { useCurationPosts } from './useCurationPosts'
@@ -10,6 +10,7 @@ import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useInfiniteLoadMore } from './useInfiniteLoadMore'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
+import { useSelectedPostListScroll } from './useSelectedPostListScroll'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
 import { postReadTransition, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
 import { curationViewState } from './curationViewState'
@@ -23,7 +24,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const [busy, setBusy] = useState(false)
   const [tagsOpen, setTagsOpen] = useState(false)
   const desktopLayoutRef = useRef(null)
-  const listScrollRef = useRef(null)
   const desktopPreviewScrollRef = useRef(null)
   const mobilePreviewScrollRef = useRef(null)
   const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
@@ -124,6 +124,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     isMobilePreviewLayout,
     desktopPreviewPercent
   })
+  const listScrollRef = useSelectedPostListScroll(selectedId)
   const loadMoreRef = useInfiniteLoadMore({hasMorePosts, loading, loadingMore, onLoadMore: loadMorePosts})
   const {
     toggleMute,
@@ -208,13 +209,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
 
     setPostsPayload((payload) => postsPayloadWithPayout(payload, postId, payoutPayload))
   }, [])
-
-  useEffect(() => {
-    if (!selectedId) return
-
-    const row = listScrollRef.current?.querySelector('[data-selected="true"]')
-    row?.scrollIntoView?.({block: 'center'})
-  }, [selectedId])
 
   const moveSelection = useCallback((direction) => {
     if (!posts.length) return
