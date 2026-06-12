@@ -8,6 +8,7 @@ import { useDesktopPreviewResize } from './useDesktopPreviewResize'
 import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
+import { postReadTransition, selectedIdsAfterPostRead, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
 import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery } from './curationQuery'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
@@ -16,16 +17,13 @@ import TagsModal from './components/TagsModal'
 import Toolbar from './components/Toolbar'
 import {
   COMPACT_MODE_SELECTOR_PREVIEW_PERCENT,
-  adjustReadCounts,
   emptyContextSuggestions,
   keywordSuggestionFromFilterQuery,
   postsResultCountLabel,
   queryInputValue,
   selectionAfterAllMatching,
   selectionAfterLoadedToggle,
-  selectionAfterPostRemoval,
-  selectionAfterPostToggle,
-  selectionAfterPostsRemoval
+  selectionAfterPostToggle
 } from './curationInboxState'
 
 const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0, resetKey = 0, theme = 'light', helpVisible = false, setHelpVisible = () => {}, onRefreshVotingPower}, ref) {
@@ -182,34 +180,15 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const selectedPostRef = useRef(null)
   selectedPostRef.current = selectedPost
 
-  const selectAfterRemoval = useCallback((removedId, direction, sourcePosts) => {
-    const selection = selectionAfterPostRemoval(removedId, direction, sourcePosts)
-
-    if (selection.cleared) {
+  const applyReadTransition = useCallback((transition) => {
+    if (transition.clearPreview) {
       setSelectedId(null)
       setPreviewActive(false)
       setMobilePreviewOpen(false)
-      return selection.posts
+      return
     }
 
-    setSelectedId(selection.selectedId)
-
-    return selection.posts
-  }, [])
-
-  const selectAfterRemovingIds = useCallback((removedIds, sourcePosts) => {
-    const selection = selectionAfterPostsRemoval(removedIds, selectedId, sourcePosts)
-
-    if (selection.cleared) {
-      setSelectedId(null)
-      setPreviewActive(false)
-      setMobilePreviewOpen(false)
-      return selection.posts
-    }
-
-    if (selection.selectedId !== selectedId) setSelectedId(selection.selectedId)
-
-    return selection.posts
+    if (transition.selectedId !== null && transition.selectedId !== selectedId) setSelectedId(transition.selectedId)
   }, [selectedId])
 
   const markPostReadAndMove = useCallback(async (post, direction = 1) => {
@@ -219,31 +198,18 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     try {
       const result = await api.markRead(post.id)
       setAllMatchingSelected(false)
-      setSelectedPostIds((current) => {
-        const next = new Set(current)
-        next.delete(post.id)
-        return next
-      })
+      setSelectedPostIds((current) => selectedIdsAfterPostRead(current, post.id))
       setPostsPayload((payload) => {
-        const markedPosts = payload.posts.map((item) => item.id === post.id ? {...item, read: result.read} : item)
-        const nextPayload = adjustReadCounts(payload, query, post.read ? 0 : 1)
-
-        if (query.only_read || query.only_keyword) {
-          const currentIndex = payload.posts.findIndex((item) => item.id === post.id)
-          const nextIndex = direction > 0 ? Math.min(currentIndex + 1, payload.posts.length - 1) : Math.max(currentIndex - 1, 0)
-          if (payload.posts[nextIndex]) setSelectedId(payload.posts[nextIndex].id)
-
-          return {...nextPayload, posts: markedPosts}
-        }
-
-        return {...nextPayload, posts: selectAfterRemoval(post.id, direction, markedPosts)}
+        const transition = postReadTransition(payload, {post, result, query, direction})
+        applyReadTransition(transition)
+        return transition.payload
       })
     } catch (err) {
       handleLoadError(err)
     } finally {
       setBusy(false)
     }
-  }, [handleLoadError, query.only_keyword, query.only_read, selectAfterRemoval])
+  }, [applyReadTransition, handleLoadError, query])
 
   const togglePostSelection = (postId) => {
     const selection = selectionAfterPostToggle(postId, posts, selectedPostIds, allMatchingSelected)
@@ -269,7 +235,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   }
 
   const markSelectedRead = async () => {
-    const postIds = posts.map((post) => post.id).filter((postId) => selectedPostIds.has(postId))
+    const postIds = selectedLoadedPostIds(posts, selectedPostIds)
     if (!postIds.length && !allMatchingSelected) return
 
     setBusy(true)
@@ -277,16 +243,9 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
       const result = await api.markManyRead(allMatchingSelected ? {all_matching: true, query} : postIds)
       clearSelection()
       setPostsPayload((payload) => {
-        const markedPostIds = allMatchingSelected ? payload.posts.map((post) => post.id) : postIds
-        const markedPosts = payload.posts.map((post) => postIds.includes(post.id) ? {...post, read: true} : post)
-        const readDelta = allMatchingSelected ? result.marked_count ?? markedPostIds.length : markedPostIds.length
-        const nextPayload = adjustReadCounts(payload, query, readDelta)
-
-        if (query.only_read || query.only_keyword) {
-          return {...nextPayload, posts: markedPosts.map((post) => markedPostIds.includes(post.id) ? {...post, read: true} : post)}
-        }
-
-        return {...nextPayload, posts: selectAfterRemovingIds(markedPostIds, markedPosts)}
+        const transition = selectedReadTransition(payload, {postIds, allMatchingSelected, result, query, selectedId})
+        applyReadTransition(transition)
+        return transition.payload
       })
     } catch (err) {
       handleLoadError(err)
