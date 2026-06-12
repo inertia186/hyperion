@@ -14,6 +14,8 @@ class ImageProxy
   MAX_BYTES = 5.megabytes
   OPEN_TIMEOUT = 2
   READ_TIMEOUT = 5
+  IPFS_OPEN_TIMEOUT = 5
+  IPFS_READ_TIMEOUT = 20
   MAX_REDIRECTS = 3
   BROWSER_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
   BROWSER_IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
@@ -31,7 +33,6 @@ class ImageProxy
     dweb.link
     gateway.pinata.cloud
   ].freeze
-  IPFS_FETCH_GATEWAY_HOST = 'dweb.link'
 
   Result = Struct.new(:body, :content_type, :cache_key, keyword_init: true)
 
@@ -144,7 +145,13 @@ private
   end
 
   def fetch_image
-    response = @fetcher ? @fetcher.call(fetch_uri) : fetch_with_net_http(fetch_uri)
+    response = if @fetcher
+      @fetcher.call(fetch_uri)
+    elsif ipfs_gateway_image?
+      fetch_with_net_http(fetch_uri, open_timeout: IPFS_OPEN_TIMEOUT, read_timeout: IPFS_READ_TIMEOUT)
+    else
+      fetch_with_net_http(fetch_uri)
+    end
     body = response.fetch(:body).to_s.b
     raise Error, 'Image is too large.' if body.bytesize > MAX_BYTES
     content_type = image_content_type(response.fetch(:content_type), body)
@@ -153,11 +160,11 @@ private
     {body: body, content_type: content_type}
   end
 
-  def fetch_with_net_http(uri, redirects_remaining = MAX_REDIRECTS)
+  def fetch_with_net_http(uri, redirects_remaining = MAX_REDIRECTS, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
     validate_public_host!(uri.host)
 
-    Timeout.timeout(OPEN_TIMEOUT + READ_TIMEOUT + 1) do
-      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+    Timeout.timeout(open_timeout + read_timeout + 1) do
+      Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', open_timeout: open_timeout, read_timeout: read_timeout) do |http|
         request = Net::HTTP::Get.new(uri.request_uri)
         apply_browser_image_headers(request)
         response = http.request(request)
@@ -171,7 +178,7 @@ private
           redirect_uri = URI.join(uri, location)
           raise Error, 'Image fetch redirected to an unsupported URL scheme.' unless %w(http https).include?(redirect_uri.scheme)
           validate_public_host!(redirect_uri.host)
-          return fetch_with_net_http(redirect_uri, redirects_remaining - 1)
+          return fetch_with_net_http(redirect_uri, redirects_remaining - 1, open_timeout: open_timeout, read_timeout: read_timeout)
         end
 
         content_length = response['Content-Length'].to_i
@@ -261,10 +268,8 @@ private
   end
 
   def fetch_uri
-    @fetch_uri ||= if ipfs_gateway_image?
-      ipfs_fetch_uri
-    elsif @size
-      if already_resized_hive_image? || hive_avatar_image?
+    @fetch_uri ||= if @size
+      if already_resized_hive_image? || hive_avatar_image? || ipfs_gateway_image?
         source_uri
       else
         URI.parse("https://#{HIVE_IMAGE_HOST}/#{@size}/#{@url}")
@@ -285,9 +290,5 @@ private
   def ipfs_gateway_image?
     IPFS_GATEWAY_HOSTS.include?(source_uri.host.to_s.downcase) &&
       source_uri.path.match?(%r{\A/ipfs/[A-Za-z0-9]+(?:/.*)?\z})
-  end
-
-  def ipfs_fetch_uri
-    URI::HTTPS.build(host: IPFS_FETCH_GATEWAY_HOST, path: source_uri.path)
   end
 end

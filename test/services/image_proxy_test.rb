@@ -152,6 +152,24 @@ class ImageProxyTest < ActiveSupport::TestCase
     end
   end
 
+  test 'ipfs gateway requests use longer network timeouts' do
+    fake_http = FakeHttp.new(http_response(body: 'ipfs-image', content_type: 'image/jpeg'))
+    start_kwargs = nil
+    source_url = 'https://ipfs.io/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9'
+
+    with_public_dns do
+      Net::HTTP.stub(:start, ->(*_args, **kwargs, &http_block) {
+        start_kwargs = kwargs
+        http_block.call(fake_http)
+      }) do
+        proxy(url: source_url, fetcher: nil).call
+      end
+    end
+
+    assert_equal ImageProxy::IPFS_OPEN_TIMEOUT, start_kwargs.fetch(:open_timeout)
+    assert_equal ImageProxy::IPFS_READ_TIMEOUT, start_kwargs.fetch(:read_timeout)
+  end
+
   test 'non-image upstream error responses are rejected' do
     fake_http = FakeHttp.new(http_response(body: '<html>not found</html>', content_type: 'text/html', code: '404', message: 'Not Found'))
 
@@ -206,7 +224,7 @@ class ImageProxyTest < ActiveSupport::TestCase
     assert_equal source_url, requested_uri.to_s
   end
 
-  test 'sized requests for IPFS gateway URLs fetch through an IPFS gateway directly' do
+  test 'sized requests for IPFS gateway URLs fetch the source directly' do
     requested_uri = nil
     source_url = 'https://ipfs.io/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9'
 
@@ -217,8 +235,7 @@ class ImageProxyTest < ActiveSupport::TestCase
       }).call
     end
 
-    assert_equal 'dweb.link', requested_uri.host
-    assert_equal '/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9', requested_uri.path
+    assert_equal source_url, requested_uri.to_s
   end
 
   test 'gateway images with generic content types are accepted when bytes identify an image' do
@@ -228,7 +245,7 @@ class ImageProxyTest < ActiveSupport::TestCase
     with_public_dns do
       result = proxy(
         url: source_url,
-        fetcher: image_fetcher(url: 'https://dweb.link/ipfs/QmWgz8KrYkhDYCgT7mHP9WERkDDtZ61uvDeyhtbwMrcZq9', body: png_body, content_type: 'application/octet-stream')
+        fetcher: image_fetcher(url: source_url, body: png_body, content_type: 'application/octet-stream')
       ).call
 
       assert_equal png_body, result.body
