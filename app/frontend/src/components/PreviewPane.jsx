@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, MessageSquare, MoreVertical, ThumbsDown, ThumbsUp, X } from 'lucide-react'
-import { api } from '../api'
 import { imageProxy } from '../format'
 import { blacklistReasonText, previewExternalLinks, replyCommentsUrl } from '../previewPaneLinks'
 import { renderPostBody } from '../renderPostBody'
@@ -8,6 +7,7 @@ import { usePreviewChainStats } from '../usePreviewChainStats'
 import { useModalDismiss } from '../useModalDismiss'
 import { usePreviewImageSources } from '../usePreviewImageSources'
 import { usePreviewVoteActions } from '../usePreviewVoteActions'
+import { useRevisionDiffModal } from '../useRevisionDiffModal'
 import CategoryTagsControl from './CategoryTagsControl'
 import HivesignerVoteModal from './HivesignerVoteModal'
 import PostActionsDrawer from './PostActionsDrawer'
@@ -54,9 +54,9 @@ export default function PreviewPane({
     }
   }, [detail?.body_markdown, displayPost, previewState.html])
   const previewHtmlMarkup = useMemo(() => ({__html: previewHtml}), [previewHtml])
-  const [diffModal, setDiffModal] = useState(null)
   const [postActionsOpen, setPostActionsOpen] = useState(false)
   const [previewTagsExpanded, setPreviewTagsExpanded] = useState(false)
+  const {diffModal, openDiffModal, closeDiffModal, selectDiffPair} = useRevisionDiffModal()
   const {stats, refreshStatsAfterVote} = usePreviewChainStats({post, displayPost, previewReady, onChainStatsRefresh})
   const {
     votePanel,
@@ -78,25 +78,6 @@ export default function PreviewPane({
 
   useModalDismiss(!!hivesignerModal, () => closeHivesignerModal())
   useModalDismiss(postActionsOpen, () => setPostActionsOpen(false))
-
-  const openDiffModal = () => {
-    if (!post) return
-
-    setDiffModal({status: 'loading', payload: null, error: null, selectedIndex: null})
-    api.postRevisions(post.id)
-      .then((payload) => setDiffModal({
-        status: 'ready',
-        payload,
-        error: null,
-        selectedIndex: Math.max((payload.revisions || []).length - 2, 0)
-      }))
-      .catch((error) => setDiffModal({
-        status: 'error',
-        payload: null,
-        error: error.message || 'Diff failed to load.',
-        selectedIndex: null
-      }))
-  }
 
   if (!post) {
     return (
@@ -197,15 +178,15 @@ export default function PreviewPane({
       {diffModal && (
         <RevisionDiffModal
           modal={diffModal}
-          onClose={() => setDiffModal(null)}
-          onSelectPair={(selectedIndex) => setDiffModal((current) => ({...current, selectedIndex}))}
+          onClose={closeDiffModal}
+          onSelectPair={selectDiffPair}
         />
       )}
       {postActionsOpen && (
         <PostActionsDrawer
           links={externalLinks}
           onClose={() => setPostActionsOpen(false)}
-          onOpenDiff={openDiffModal}
+          onOpenDiff={() => openDiffModal(post)}
         />
       )}
     </div>
