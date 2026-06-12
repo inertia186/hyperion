@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, CircleHelp, Code2, Laptop, LogOut, Menu, Monitor, Moon, PanelsTopLeft, Settings, Sun, Tags, Terminal, X } from 'lucide-react'
 import { api } from './api'
 import CurationInbox from './CurationInbox'
@@ -8,12 +8,12 @@ import TimelineModal from './components/TimelineModal'
 import { imageProxy } from './format'
 import { THEME_OPTIONS, applyTheme, normalizeTheme, storedTheme, themeOption, writeStoredTheme } from './theme'
 import { closeOnBackdropClick, useModalDismiss } from './useModalDismiss'
+import { useVotingPower } from './useVotingPower'
 import hyperionLogo from '../../assets/images/favicon.svg'
 
 export default function App() {
   const [session, setSession] = useState(null)
   const [error, setError] = useState(null)
-  const [votingPower, setVotingPower] = useState({status: 'loading', percent: null})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [timelineOpen, setTimelineOpen] = useState(false)
@@ -23,6 +23,7 @@ export default function App() {
   const [effectiveTheme, setEffectiveTheme] = useState(() => applyTheme(storedTheme()))
   const [themeSaving, setThemeSaving] = useState(false)
   const inboxRef = useRef(null)
+  const {votingPower, refreshVotingPower} = useVotingPower({authenticated: !!session?.authenticated})
 
   useEffect(() => {
     setEffectiveTheme(applyTheme(theme))
@@ -71,44 +72,6 @@ export default function App() {
         setError(err.message || 'Request failed')
       })
   }, [])
-
-  const refreshVotingPower = useCallback(() => {
-    if (!session?.authenticated) return Promise.resolve()
-
-    return api.votingPower()
-      .then((payload) => {
-        setVotingPower(payload.status === 'ready' ? {status: 'ready', percent: payload.percent} : {status: 'unavailable', percent: null})
-      })
-      .catch(() => {
-        setVotingPower({status: 'unavailable', percent: null})
-      })
-  }, [session?.authenticated])
-
-  useEffect(() => {
-    if (!session?.authenticated) return undefined
-
-    let cancelled = false
-    let intervalId
-    const guardedRefreshVotingPower = () => {
-      api.votingPower()
-        .then((payload) => {
-          if (cancelled) return
-          setVotingPower(payload.status === 'ready' ? {status: 'ready', percent: payload.percent} : {status: 'unavailable', percent: null})
-        })
-        .catch(() => {
-          if (cancelled) return
-          setVotingPower({status: 'unavailable', percent: null})
-        })
-    }
-
-    guardedRefreshVotingPower()
-    intervalId = window.setInterval(guardedRefreshVotingPower, 60_000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
-    }
-  }, [session?.authenticated])
 
   if (error) {
     return <FullPageState label={error} />
