@@ -39,6 +39,11 @@ private
         }
       },
       '/api/v1/agent/auth_challenges' => {
+        get: {
+          summary: 'Create a short-lived agent authentication challenge with GET.',
+          description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie and cannot issue POST. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
+          responses: {'201' => json_response('Agent auth challenge')}
+        },
         post: {
           summary: 'Create a short-lived agent authentication challenge.',
           description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
@@ -164,7 +169,7 @@ private
   def openapi_description
     <<~TEXT.squish
       Hyperion agent API. Agents should not scrape the SPA. Use the auth challenge flow when no _hyperion session cookie exists:
-      POST /api/v1/agent/auth_challenges, or GET /api/v1/agent/auth_challenges/start when POST is blocked before auth, show hivesigner_login_url to the user, redeem their HYP-* code by POST or the GET fallback when POST is unavailable, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
+      GET or POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code by POST or the GET fallback when POST is unavailable, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
       Agents must never ask for or handle Hive private keys, HiveSigner passwords, or signing credentials. The user completes HiveSigner privately and gives the agent only the HYP-* code.
     TEXT
   end

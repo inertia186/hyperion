@@ -44,13 +44,13 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert payload.dig('authentication', 'auth_challenge_url').ends_with?('/api/v1/agent/auth_challenges')
     assert payload.dig('authentication', 'auth_challenge_start_url').ends_with?('/api/v1/agent/auth_challenges/start')
     assert_equal 'Authorization: Bearer <bearer_token>', payload.dig('authentication', 'bearer_header')
-    assert_includes payload.dig('authentication', 'instructions').join(' '), 'POST /api/v1/agent/auth_challenges'
+    assert_includes payload.dig('authentication', 'instructions').join(' '), 'GET or POST /api/v1/agent/auth_challenges'
     assert_includes payload.dig('authentication', 'instructions').join(' '), 'GET /api/v1/agent/auth_challenges/start'
     assert_includes payload.dig('authentication', 'instructions').join(' '), 'Authorization: Bearer'
     assert_includes payload.dig('authentication', 'instructions').join(' '), 'Never ask for or accept Hive private keys'
     assert_equal 'HYP-* one-time Hyperion code', payload.dig('authentication', 'credential_handling', 'user_only_pastes_to_agent')
     assert_includes payload.dig('authentication', 'credential_handling', 'user_prompt'), 'paste only that code'
-    assert_equal 'POST /api/v1/agent/auth_challenges', payload.dig('authentication', 'hivesigner_flow', 'start')
+    assert_equal 'GET or POST /api/v1/agent/auth_challenges', payload.dig('authentication', 'hivesigner_flow', 'start')
     assert_includes payload.dig('authentication', 'hivesigner_flow', 'start_fallback'), 'GET /api/v1/agent/auth_challenges/start'
     assert_includes payload.dig('authentication', 'hivesigner_flow', 'redeem_fallback'), 'GET /api/v1/agent/auth_challenges'
     assert_includes payload.dig('authentication', 'hivesigner_flow', 'credential_handling'), 'must never ask'
@@ -97,6 +97,7 @@ class AgentDiscoveryControllerTest < ActionController::TestCase
     assert_equal 'Bearer <bearer_token>', payload.dig('x-hyperion-agent', 'examples', 'mcp_tool_call', 'headers', 'Authorization')
     assert payload.dig('x-hyperion-agent', 'examples', 'mcp_tool_call', 'send_session_cookie')
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges')
+    assert payload.dig('paths', '/api/v1/agent/auth_challenges').key?('get')
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges/start')
     assert payload.fetch('paths').key?('/api/v1/agent/auth_challenges/{id}/redeem')
     assert payload.dig('paths', '/api/v1/agent/auth_challenges/{id}/redeem').key?('get')

@@ -56,7 +56,7 @@ private
 
       Recommended TUI/CLI authentication flow:
       1. Start an HTTP client that stores cookies.
-      2. POST #{api_v1_agent_auth_challenges_url}. If your sandbox cannot issue POST before auth, GET #{start_api_v1_agent_auth_challenges_url} instead.
+      2. Start a challenge with GET or POST #{api_v1_agent_auth_challenges_url}. If your client requires a distinct GET URL, GET #{start_api_v1_agent_auth_challenges_url}.
       3. Show the returned hivesigner_login_url to the user and ask them to open it.
       4. The user completes HiveSigner privately in their own browser. The agent must not ask for, receive, store, or handle Hive private keys, HiveSigner passwords, or signing credentials.
       5. After HiveSigner redirects back to Hyperion, the user sees a one-time code like HYP-ABC123.
@@ -78,8 +78,8 @@ private
       Keychain-capable agents may use the returned keychain.message/keychain.digest and POST account_name, public_key, digest, and signature to /api/v1/agent/auth_challenges/{challenge_id}/keychain.
 
       Useful endpoints:
-      - POST #{api_v1_agent_auth_challenges_url}
-      - GET #{start_api_v1_agent_auth_challenges_url} (POST-restricted sandbox fallback for starting auth only)
+      - GET or POST #{api_v1_agent_auth_challenges_url}
+      - GET #{start_api_v1_agent_auth_challenges_url} (alternate POST-restricted sandbox fallback for starting auth only)
       - GET #{api_v1_agent_session_url}
       - GET #{api_v1_agent_digest_url}?limit=10
       - GET #{api_v1_agent_digest_url}?query=california
@@ -91,8 +91,10 @@ private
       - POST #{mcp_url}
 
       Example curl flow:
+      curl -c hyperion.cookies #{api_v1_agent_auth_challenges_url}
+      # POST also works:
       curl -c hyperion.cookies -X POST #{api_v1_agent_auth_challenges_url}
-      # POST-restricted sandbox fallback:
+      # Alternate GET fallback:
       curl -c hyperion.cookies #{start_api_v1_agent_auth_challenges_url}
       ask the user to open hivesigner_login_url privately, then:
       curl -b hyperion.cookies -c hyperion.cookies -H 'Content-Type: application/json' -d '{"code":"HYP-ABC123"}' #{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}
@@ -110,8 +112,8 @@ private
 
   def auth_instructions
     [
-      'If you do not already have a Hyperion session cookie, POST /api/v1/agent/auth_challenges before any authenticated call.',
-      'If your sandbox cannot issue POST before auth, GET /api/v1/agent/auth_challenges/start as the challenge-start fallback.',
+      'If you do not already have a Hyperion session cookie, GET or POST /api/v1/agent/auth_challenges before any authenticated call.',
+      'If your client requires a distinct fallback URL, GET /api/v1/agent/auth_challenges/start also creates the same challenge payload.',
       'Persist cookies from the challenge response and reuse the same cookie jar when redeeming.',
       'For HiveSigner, show hivesigner_login_url to the user and ask them to complete HiveSigner privately in their own browser.',
       'Only ask the user to paste the displayed HYP-* code. Never ask for or accept Hive private keys, HiveSigner passwords, or signing credentials.',
@@ -134,8 +136,8 @@ private
 
   def hivesigner_flow_metadata
     {
-      start: 'POST /api/v1/agent/auth_challenges',
-      start_fallback: 'GET /api/v1/agent/auth_challenges/start creates the same challenge payload for POST-restricted sandboxes.',
+      start: 'GET or POST /api/v1/agent/auth_challenges',
+      start_fallback: 'GET /api/v1/agent/auth_challenges/start also creates the same challenge payload for POST-restricted sandboxes.',
       user_action: 'Open hivesigner_login_url, complete HiveSigner privately in your browser, then copy only the displayed HYP-* code.',
       redeem: 'POST /api/v1/agent/auth_challenges/{challenge_id}/redeem with {"code":"HYP-ABC123"} using the same cookie jar.',
       redeem_fallback: 'GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123 using the same cookie jar, only when POST is unavailable.',
@@ -147,8 +149,8 @@ private
 
   def keychain_flow_metadata
     {
-      start: 'POST /api/v1/agent/auth_challenges',
-      start_fallback: 'GET /api/v1/agent/auth_challenges/start creates the same challenge payload for POST-restricted sandboxes.',
+      start: 'GET or POST /api/v1/agent/auth_challenges',
+      start_fallback: 'GET /api/v1/agent/auth_challenges/start also creates the same challenge payload for POST-restricted sandboxes.',
       sign: 'Ask Hive Keychain to sign keychain.message with Posting authority.',
       submit: 'POST /api/v1/agent/auth_challenges/{challenge_id}/keychain with account_name, public_key, digest, and signature.',
       result: 'The keychain response returns bearer_token and sets the _hyperion session cookie.'
@@ -171,6 +173,11 @@ private
   def example_requests
     {
       create_auth_challenge: {
+        method: 'GET',
+        url: api_v1_agent_auth_challenges_url,
+        store_cookies: true
+      },
+      create_auth_challenge_post: {
         method: 'POST',
         url: api_v1_agent_auth_challenges_url,
         store_cookies: true

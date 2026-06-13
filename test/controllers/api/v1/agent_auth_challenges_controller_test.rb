@@ -18,6 +18,17 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
   end
 
   test 'starts an auth challenge with GET for post restricted sandboxes' do
+    get :create
+
+    assert_response :created
+    payload = response_json
+    assert_equal 'pending', payload.fetch('status')
+    assert payload.fetch('challenge_id').present?
+    assert_includes payload.fetch('hivesigner_login_url'), 'https://hivesigner.com/oauth2/authorize?'
+    assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
+  end
+
+  test 'starts an auth challenge with alternate GET fallback path' do
     get :start
 
     assert_response :created

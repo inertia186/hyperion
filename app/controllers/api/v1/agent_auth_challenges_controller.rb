@@ -5,15 +5,11 @@ class Api::V1::AgentAuthChallengesController < Api::V1::BaseController
   rescue_from ActiveRecord::RecordNotFound, with: :not_found
 
   def create
-    challenge = AgentAuthChallenge.issue!
-
-    render json: challenge_payload(challenge), status: :created
+    render_new_challenge
   end
 
   def start
-    challenge = AgentAuthChallenge.issue!
-
-    render json: challenge_payload(challenge), status: :created
+    render_new_challenge
   end
 
   def show
@@ -82,6 +78,12 @@ class Api::V1::AgentAuthChallengesController < Api::V1::BaseController
   end
 
 private
+  def render_new_challenge
+    challenge = AgentAuthChallenge.issue!
+
+    render json: challenge_payload(challenge), status: :created
+  end
+
   def challenge_payload(challenge)
     challenge_status_payload(challenge).merge(
       hivesigner_login_url: hivesigner_login_url(challenge),

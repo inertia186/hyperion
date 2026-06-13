@@ -12,6 +12,7 @@ Rails.application.routes.draw do
     namespace :v1 do
       resources :agent_auth_challenges, path: '/agent/auth_challenges', only: %i(create show) do
         collection do
+          get '/', action: :create
           get :start
         end
 
