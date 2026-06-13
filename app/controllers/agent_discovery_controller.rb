@@ -21,6 +21,8 @@ class AgentDiscoveryController < ApplicationController
         auth_challenge_start_url: start_api_v1_agent_auth_challenges_url,
         cookie_name: Rails.application.config.session_options[:key],
         bearer_header: 'Authorization: Bearer <bearer_token>',
+        stateless_agent_flow_supported: true,
+        browser_cookie_persistence_required: false,
         instructions: auth_instructions,
         credential_handling: credential_handling_metadata,
         hivesigner_flow: hivesigner_flow_metadata,
@@ -55,14 +57,14 @@ private
       Hyperion exposes a session-cookie or bearer-token authenticated JSON API for AI agents. Do not scrape the SPA.
 
       Recommended TUI/CLI authentication flow:
-      1. Start an HTTP client that stores cookies.
+      1. Start an HTTP client. Cookie storage is optional; stateless agents can keep only challenge_id and bearer_token.
       2. Start a challenge with GET or POST #{api_v1_agent_auth_challenges_url}. If your client requires a distinct GET URL, GET #{start_api_v1_agent_auth_challenges_url}.
       3. Show the returned hivesigner_login_url to the user and ask them to open it.
       4. The user completes HiveSigner privately in their own browser. The agent must not ask for, receive, store, or handle Hive private keys, HiveSigner passwords, or signing credentials.
       5. After HiveSigner redirects back to Hyperion, the user sees a one-time code like HYP-ABC123.
       6. Ask the user to paste only that HYP-* code back to you.
-      7. POST {"code":"HYP-ABC123"} to /api/v1/agent/auth_challenges/{challenge_id}/redeem with the same cookie jar. If your sandbox cannot issue POST, GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123.
-      8. Keep the returned bearer_token or _hyperion cookie and use it for subsequent API and MCP requests.
+      7. Redeem with challenge_id + code. POST {"code":"HYP-ABC123"} to /api/v1/agent/auth_challenges/{challenge_id}/redeem, or GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123 if your sandbox cannot issue POST. The redeem request does not require browser cookies.
+      8. Keep the returned bearer_token and use Authorization: Bearer for subsequent API and MCP requests. Browser-capable agents may use the _hyperion cookie instead.
 
       Suggested user-facing prompt:
       "#{hivesigner_user_prompt}"
@@ -73,6 +75,7 @@ private
       - The user completes HiveSigner directly; the agent only receives the final HYP-* code.
       - If HiveSigner asks for a private key or password, tell the user to handle that only on the HiveSigner page and never paste it into the agent.
       - Prefer POST for redeem. Use the GET redeem fallback only when the agent sandbox cannot POST; the HYP-* code is one-time and short-lived.
+      - Do not tell the user that persistent browser/cookie support is required for agent auth; the challenge_id plus HYP-* code can be redeemed statelessly for a bearer token.
 
       Browser-side agents may use the existing browser session cookie if they are running same-origin with Hyperion.
       Keychain-capable agents may use the returned keychain.message/keychain.digest and POST account_name, public_key, digest, and signature to /api/v1/agent/auth_challenges/{challenge_id}/keychain.
@@ -91,15 +94,15 @@ private
       - POST #{mcp_url}
 
       Example curl flow:
-      curl -c hyperion.cookies #{api_v1_agent_auth_challenges_url}
+      curl #{api_v1_agent_auth_challenges_url}
       # POST also works:
-      curl -c hyperion.cookies -X POST #{api_v1_agent_auth_challenges_url}
+      curl -X POST #{api_v1_agent_auth_challenges_url}
       # Alternate GET fallback:
-      curl -c hyperion.cookies #{start_api_v1_agent_auth_challenges_url}
+      curl #{start_api_v1_agent_auth_challenges_url}
       ask the user to open hivesigner_login_url privately, then:
-      curl -b hyperion.cookies -c hyperion.cookies -H 'Content-Type: application/json' -d '{"code":"HYP-ABC123"}' #{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}
+      curl -H 'Content-Type: application/json' -d '{"code":"HYP-ABC123"}' #{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}
       # POST-restricted sandbox redeem fallback:
-      curl -b hyperion.cookies -c hyperion.cookies "#{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}?code=HYP-ABC123"
+      curl "#{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}?code=HYP-ABC123"
       curl -H 'Authorization: Bearer hyp_at_...' #{api_v1_agent_digest_url}?limit=5
 
       Vote broadcasting is done through HiveSigner links. Hyperion does not store posting keys or broadcast votes server-side.
@@ -114,11 +117,11 @@ private
     [
       'If you do not already have a Hyperion session cookie, GET or POST /api/v1/agent/auth_challenges before any authenticated call.',
       'If your client requires a distinct fallback URL, GET /api/v1/agent/auth_challenges/start also creates the same challenge payload.',
-      'Persist cookies from the challenge response and reuse the same cookie jar when redeeming.',
+      'Cookie persistence is optional for agent auth. A stateless agent can store challenge_id, ask the user for the HYP-* code, redeem challenge_id + code, then keep the returned bearer_token.',
       'For HiveSigner, show hivesigner_login_url to the user and ask them to complete HiveSigner privately in their own browser.',
       'Only ask the user to paste the displayed HYP-* code. Never ask for or accept Hive private keys, HiveSigner passwords, or signing credentials.',
       'POST the pasted code to /api/v1/agent/auth_challenges/{challenge_id}/redeem.',
-      'If your sandbox cannot issue POST for redeem, GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123 with the same cookie jar.',
+      'If your sandbox cannot issue POST for redeem, GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123. No browser cookies are required for redeem.',
       'After redeem succeeds, use either Authorization: Bearer <bearer_token> or the _hyperion cookie for HTTP API and MCP requests.',
       'Do not ask the user for Hive private keys. Hyperion only creates HiveSigner vote links; it does not broadcast votes server-side.'
     ]
@@ -139,9 +142,10 @@ private
       start: 'GET or POST /api/v1/agent/auth_challenges',
       start_fallback: 'GET /api/v1/agent/auth_challenges/start also creates the same challenge payload for POST-restricted sandboxes.',
       user_action: 'Open hivesigner_login_url, complete HiveSigner privately in your browser, then copy only the displayed HYP-* code.',
-      redeem: 'POST /api/v1/agent/auth_challenges/{challenge_id}/redeem with {"code":"HYP-ABC123"} using the same cookie jar.',
-      redeem_fallback: 'GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123 using the same cookie jar, only when POST is unavailable.',
+      redeem: 'POST /api/v1/agent/auth_challenges/{challenge_id}/redeem with {"code":"HYP-ABC123"}. Cookies are optional; challenge_id + code is enough.',
+      redeem_fallback: 'GET /api/v1/agent/auth_challenges/{challenge_id}/redeem?code=HYP-ABC123, only when POST is unavailable. Cookies are optional.',
       result: 'The redeem response returns bearer_token and sets the _hyperion session cookie.',
+      stateless_agent_flow: 'Supported. Store challenge_id, ask for the HYP-* code, redeem it, then use the returned bearer_token. No persistent browser session is required.',
       user_prompt: hivesigner_user_prompt,
       credential_handling: 'The agent must never ask for or receive Hive private keys, HiveSigner passwords, or signing credentials.'
     }
@@ -175,17 +179,20 @@ private
       create_auth_challenge: {
         method: 'GET',
         url: api_v1_agent_auth_challenges_url,
-        store_cookies: true
+        store_cookies: false,
+        store_challenge_id: true
       },
       create_auth_challenge_post: {
         method: 'POST',
         url: api_v1_agent_auth_challenges_url,
-        store_cookies: true
+        store_cookies: false,
+        store_challenge_id: true
       },
       create_auth_challenge_get_fallback: {
         method: 'GET',
         url: start_api_v1_agent_auth_challenges_url,
-        store_cookies: true,
+        store_cookies: false,
+        store_challenge_id: true,
         use_when: 'The agent sandbox cannot issue POST before authentication.'
       },
       redeem_hivesigner_code: {
@@ -193,12 +200,14 @@ private
         url: redeem_api_v1_agent_auth_challenge_url(':challenge_id'),
         headers: {'Content-Type' => 'application/json'},
         body: {code: 'HYP-ABC123'},
-        reuse_challenge_cookies: true
+        reuse_challenge_cookies: false,
+        requires_browser_cookies: false
       },
       redeem_hivesigner_code_get_fallback: {
         method: 'GET',
         url: "#{redeem_api_v1_agent_auth_challenge_url(':challenge_id')}?code=HYP-ABC123",
-        reuse_challenge_cookies: true,
+        reuse_challenge_cookies: false,
+        requires_browser_cookies: false,
         use_when: 'The agent sandbox cannot issue POST. The HYP-* code is one-time and short-lived.'
       },
       get_digest: {

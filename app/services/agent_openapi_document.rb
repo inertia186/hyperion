@@ -15,6 +15,8 @@ class AgentOpenapiDocument
         authentication: {
           cookie_name: Rails.application.config.session_options[:key],
           bearer_header: 'Authorization: Bearer <bearer_token>',
+          stateless_agent_flow_supported: true,
+          browser_cookie_persistence_required: false,
           instructions: context.send(:auth_instructions),
           credential_handling: context.send(:credential_handling_metadata),
           hivesigner_flow: context.send(:hivesigner_flow_metadata),
@@ -41,19 +43,19 @@ private
       '/api/v1/agent/auth_challenges' => {
         get: {
           summary: 'Create a short-lived agent authentication challenge with GET.',
-          description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie and cannot issue POST. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
+          description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie and cannot issue POST. Cookie storage is optional; stateless agents can store challenge_id and redeem challenge_id + HYP-* code for a bearer token.',
           responses: {'201' => json_response('Agent auth challenge')}
         },
         post: {
           summary: 'Create a short-lived agent authentication challenge.',
-          description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
+          description: 'Unauthenticated. Use this first when the agent does not already have a Hyperion session cookie. Cookie storage is optional; stateless agents can store challenge_id and redeem challenge_id + HYP-* code for a bearer token.',
           responses: {'201' => json_response('Agent auth challenge')}
         }
       },
       '/api/v1/agent/auth_challenges/start' => {
         get: {
           summary: 'Create a short-lived agent authentication challenge with GET.',
-          description: 'Unauthenticated POST-restricted sandbox fallback. Returns the same payload as POST /api/v1/agent/auth_challenges. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
+          description: 'Unauthenticated POST-restricted sandbox fallback. Returns the same payload as POST /api/v1/agent/auth_challenges. Cookie storage is optional; stateless agents can store challenge_id and redeem challenge_id + HYP-* code for a bearer token.',
           responses: {'201' => json_response('Agent auth challenge')}
         }
       },
@@ -68,13 +70,13 @@ private
       '/api/v1/agent/auth_challenges/{id}/redeem' => {
         post: {
           summary: 'Redeem a HiveSigner copy/paste code and receive agent credentials.',
-          description: 'Unauthenticated before redeem. Submit the HYP-* code shown to the user after they open hivesigner_login_url. The response includes bearer_token and sets the _hyperion cookie; use either for later agent requests.',
+          description: 'Unauthenticated before redeem. Submit the HYP-* code shown to the user after they open hivesigner_login_url. The request does not require browser cookies. The response includes bearer_token and sets the _hyperion cookie; stateless agents should use the bearer_token for later requests.',
           parameters: [path_parameter('id', 'string', 'Challenge id')],
           responses: {'200' => json_response('Authenticated account state')}
         },
         get: {
           summary: 'Redeem a HiveSigner copy/paste code with GET.',
-          description: 'POST-restricted sandbox fallback. Submit the HYP-* code as the code query parameter using the same cookie jar. Prefer POST when available because URLs may be logged.',
+          description: 'POST-restricted sandbox fallback. Submit the HYP-* code as the code query parameter. The request does not require browser cookies. Prefer POST when available because URLs may be logged.',
           parameters: [
             path_parameter('id', 'string', 'Challenge id'),
             query_parameter('code', 'string', 'One-time HYP-* code shown to the user.')
@@ -169,7 +171,7 @@ private
   def openapi_description
     <<~TEXT.squish
       Hyperion agent API. Agents should not scrape the SPA. Use the auth challenge flow when no _hyperion session cookie exists:
-      GET or POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code by POST or the GET fallback when POST is unavailable, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
+      GET or POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code by POST or the GET fallback when POST is unavailable, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests. Browser cookie persistence is optional; stateless agents can store challenge_id and bearer_token.
       Agents must never ask for or handle Hive private keys, HiveSigner passwords, or signing credentials. The user completes HiveSigner privately and gives the agent only the HYP-* code.
     TEXT
   end
