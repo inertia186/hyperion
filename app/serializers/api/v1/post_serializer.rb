@@ -7,32 +7,31 @@ class Api::V1::PostSerializer
 
   def list(post, result)
     display_post = post.display_post(result.post_bodies[post.id])
-    display_community = display_post == post ? nil : Community.find_by(name: display_post.category)
-    fallback_community = result.post_communities[display_post.category] || {}
     thumbnail_url = display_post == post ? post.post_image_url(result.post_bodies[post.id]) : display_post.post_image_url
 
     {
       id: post.id,
       param: post.to_param,
-      author: display_post.author,
-      permlink: display_post.permlink,
+      author: post.author,
+      permlink: post.permlink,
       title: display_post.title,
-      category: display_post.category,
-      category_name: display_community&.title || fallback_community[:name] || display_post.category,
-      category_image_url: display_community&.profile_image_url || fallback_community[:image_url],
+      category: post.category,
+      category_name: result.post_communities[post.category]&.fetch(:name, nil) || post.category,
+      category_image_url: result.post_communities[post.category]&.fetch(:image_url, nil),
       tags: tags_json(post, result),
       tags_count: post.tags_count,
       thumbnail_url: thumbnail_url,
-      author_avatar_url: display_post.author_avatar_url,
+      author_avatar_url: post.author_avatar_url,
       placeholder_image_url: post.placeholder_image_url,
-      canonical_url: display_post.canonical_url,
-      app: display_post.app,
-      created_at: display_post.created_at.iso8601,
-      updated_at: display_post.updated_at&.iso8601 || post.updated_at.iso8601,
+      canonical_url: post.canonical_url,
+      app: post.app,
+      created_at: post.created_at.iso8601,
+      updated_at: post.updated_at.iso8601,
       deleted: post.deleted?,
       blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
       blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
-      author_reputation: display_post.author_reputation,
+      cross_post: cross_post_json(post, display_post),
+      author_reputation: post.author_reputation,
       payout: post.payout,
       payout_amount: post.payout_amount&.to_s,
       payout_currency: post.payout_currency,
@@ -40,52 +39,53 @@ class Api::V1::PostSerializer
       payout_unavailable_at: post.payout_unavailable_at&.iso8601,
       payout_source: post.payout_source,
       read: result.read_post_ids.include?(post.id),
-      muted_author: current_account.muted_authors.include?(display_post.author)
+      muted_author: current_account.muted_authors.include?(post.author)
     }
   end
 
   def detail(post, display_post = post)
-    display_community = Community.find_by(name: display_post.category)
-    display_category_name = display_community&.title || display_post.category
-    display_category_image_url = display_community&.profile_image_url
+    community = Community.find_by(name: post.category)
+    category_name = community&.title || post.category
+    category_image_url = community&.profile_image_url
 
     {
       id: post.id,
       param: post.to_param,
-      author: display_post.author,
-      permlink: display_post.permlink,
+      author: post.author,
+      permlink: post.permlink,
       title: display_post.title,
-      category: display_post.category,
-      category_name: display_category_name,
-      category_image_url: display_category_image_url,
-      app: display_post.app,
-      created_at: display_post.created_at.iso8601,
+      category: post.category,
+      category_name: category_name,
+      category_image_url: category_image_url,
+      app: post.app,
+      created_at: post.created_at.iso8601,
       deleted: post.deleted?,
       blacklisted: effective_blacklist_reasons(post.blacklist_reasons).any?,
       blacklist_reasons: blacklist_reasons_json(effective_blacklist_reasons(post.blacklist_reasons)),
-      author_reputation: display_post.author_reputation,
+      cross_post: cross_post_json(post, display_post),
+      author_reputation: post.author_reputation,
       read: current_account.post_read?(post.id),
       body_markdown: display_post.display_body,
       body_html: body_renderer.call(post).to_s,
       content_sandbox_url: url_helpers.content_sandbox_post_path(post, pp: :skip),
-      canonical_url: display_post.canonical_url,
+      canonical_url: post.canonical_url,
       display_post: {
         id: display_post.id,
         author: display_post.author,
         permlink: display_post.permlink,
         title: display_post.title,
         category: display_post.category,
-        category_name: display_category_name,
-        category_image_url: display_category_image_url,
+        category_name: display_post_category_name(display_post),
+        category_image_url: display_post_category_image_url(display_post),
         app: display_post.app,
         canonical_url: display_post.canonical_url
       },
       urls: {
-        canonical: display_post.canonical_url,
-        hive_blog: "https://hive.blog/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        peakd: "https://peakd.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        hiveblocks: display_post.deleted? ? "https://hiveblocks.com/tx/#{display_post.trx_id}" : "https://hiveblocks.com/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}",
-        hive_db: "https://hivehub.dev/#{display_post.category}/@#{display_post.author}/#{display_post.permlink}"
+        canonical: post.canonical_url,
+        hive_blog: "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}",
+        peakd: "https://peakd.com/#{post.category}/@#{post.author}/#{post.permlink}",
+        hiveblocks: post.deleted? ? "https://hiveblocks.com/tx/#{post.trx_id}" : "https://hiveblocks.com/#{post.category}/@#{post.author}/#{post.permlink}",
+        hive_db: "https://hivehub.dev/#{post.category}/@#{post.author}/#{post.permlink}"
       }
     }
   end
@@ -114,5 +114,26 @@ private
     Array(reasons).select do |reason|
       blacklist_sources.include?(reason['account'] || reason[:account])
     end
+  end
+
+  def cross_post_json(post, display_post)
+    return nil if display_post == post
+
+    {
+      author: post.author,
+      permlink: post.permlink,
+      source_author: display_post.author,
+      source_permlink: display_post.permlink,
+      source_title: display_post.title
+    }
+  end
+
+  def display_post_category_name(display_post)
+    community = Community.find_by(name: display_post.category)
+    community&.title || display_post.category
+  end
+
+  def display_post_category_image_url(display_post)
+    Community.find_by(name: display_post.category)&.profile_image_url
   end
 end

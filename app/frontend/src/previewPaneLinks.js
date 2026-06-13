@@ -5,6 +5,12 @@ export function blacklistReasonText(reasons) {
   return `Blacklisted: author appears on ${accounts.join(', ')}.`
 }
 
+export function crossPostText(crossPost) {
+  if (!crossPost?.source_author || !crossPost?.source_permlink) return 'Cross-post: showing original content.'
+
+  return `Cross-post: showing original content from @${crossPost.source_author}/${crossPost.source_permlink}.`
+}
+
 export function previewExternalLinks(urls, displayPost) {
   const builtInLinks = [
     {key: 'hive_blog', href: urls.hive_blog, label: 'hive.blog'},

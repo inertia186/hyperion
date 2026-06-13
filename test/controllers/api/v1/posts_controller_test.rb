@@ -350,8 +350,49 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     payload = response_json.fetch('posts').find { |candidate| candidate.fetch('id') == post.id }
 
     assert_equal original.title, payload.fetch('title')
-    assert_equal original.author, payload.fetch('author')
+    assert_equal post.author, payload.fetch('author')
+    assert_equal post.permlink, payload.fetch('permlink')
+    assert_equal post.category, payload.fetch('category')
     assert_equal 'https://example.com/original.png', payload.fetch('thumbnail_url')
+    assert_equal({
+      'author' => post.author,
+      'permlink' => post.permlink,
+      'source_author' => original.author,
+      'source_permlink' => original.permlink,
+      'source_title' => original.title
+    }, payload.fetch('cross_post'))
+  end
+
+  test 'post list age uses cross post wrapper time' do
+    travel_to Time.utc(2026, 6, 12, 18, 0, 0) do
+      original = Post.create!(
+        author: 'alice',
+        permlink: 'original',
+        title: 'Original',
+        body: 'Original image https://example.com/original.png',
+        category: 'hive-13323',
+        metadata: {},
+        block_num: 300,
+        trx_id: 'original-trx',
+        created_at: 7.hours.ago,
+        updated_at: 7.hours.ago
+      )
+      post = posts(:allowed_unread)
+      post.update!(
+        body: 'This is a cross post of [@alice/original](/hive-1/@alice/original) by @bob.<br><br>Actual image https://example.com/cross.png',
+        metadata: {tags: %w(cross-post)},
+        created_at: 2.minutes.ago,
+        updated_at: 2.minutes.ago
+      )
+      post.tags.find_or_create_by!(tag: 'cross-post', category: false)
+
+      get :index, params: {sort: 'latest', limit: 30}
+
+      payload = response_json.fetch('posts').find { |candidate| candidate.fetch('id') == post.id }
+
+      assert_equal original.title, payload.fetch('title')
+      assert_equal post.created_at.iso8601, payload.fetch('created_at')
+    end
   end
 
   test 'muted authors disappear when mute is enabled' do
@@ -697,12 +738,21 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal post.id, response_json.fetch('id')
-    assert_equal original.author, response_json.fetch('author')
-    assert_equal original.permlink, response_json.fetch('permlink')
+    assert_equal post.author, response_json.fetch('author')
+    assert_equal post.permlink, response_json.fetch('permlink')
     assert_equal original.title, response_json.fetch('title')
+    assert_equal post.category, response_json.fetch('category')
+    assert_equal post.app, response_json.fetch('app')
+    assert_equal({
+      'author' => post.author,
+      'permlink' => post.permlink,
+      'source_author' => original.author,
+      'source_permlink' => original.permlink,
+      'source_title' => original.title
+    }, response_json.fetch('cross_post'))
     assert_includes response_json.fetch('body_html'), 'Original post content'
     assert_not_includes response_json.fetch('body_html'), 'This is a cross post'
-    assert_equal "https://hive.blog/#{original.category}/@#{original.author}/#{original.permlink}", response_json.fetch('urls').fetch('hive_blog')
+    assert_equal "https://hive.blog/#{post.category}/@#{post.author}/#{post.permlink}", response_json.fetch('urls').fetch('hive_blog')
   end
 
   test 'chain stats proxy returns payout votes replies and current vote' do

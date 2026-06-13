@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { blacklistReasonText, previewExternalLinks, replyCommentsUrl } from './previewPaneLinks'
+import { blacklistReasonText, crossPostText, previewExternalLinks, replyCommentsUrl } from './previewPaneLinks'
 
 describe('preview pane links', () => {
   test('adds canonical links only when they point outside built-in hosts', () => {
@@ -24,5 +24,10 @@ describe('preview pane links', () => {
   test('formats blacklist reasons with unique account names', () => {
     expect(blacklistReasonText([{name: 'spaminator'}, {account: 'hivewatchers'}, {name: 'spaminator'}])).toBe('Blacklisted: author appears on spaminator, hivewatchers.')
     expect(blacklistReasonText([])).toBe('Blacklisted: author appears on a Hive blacklist.')
+  })
+
+  test('formats cross post provenance', () => {
+    expect(crossPostText({source_author: 'alice', source_permlink: 'original'})).toBe('Cross-post: showing original content from @alice/original.')
+    expect(crossPostText(null)).toBe('Cross-post: showing original content.')
   })
 })

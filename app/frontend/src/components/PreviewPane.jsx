@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, MessageSquare, MoreVertical, ThumbsDown, ThumbsUp, X } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, CheckSquare, ChevronDown, ChevronUp, Info, MessageSquare, MoreVertical, ThumbsDown, ThumbsUp, X } from 'lucide-react'
 import { imageProxy } from '../format'
-import { blacklistReasonText, previewExternalLinks, replyCommentsUrl } from '../previewPaneLinks'
+import { blacklistReasonText, crossPostText, previewExternalLinks, replyCommentsUrl } from '../previewPaneLinks'
 import { renderPostBody } from '../renderPostBody'
 import { usePreviewChainStats } from '../usePreviewChainStats'
 import { useModalDismiss } from '../useModalDismiss'
@@ -37,11 +37,19 @@ export default function PreviewPane({
   const urls = detail?.urls || {}
   const previewReady = !!post && previewState.status === 'ready' && previewState.postId === post.id
   const blacklistReasons = detail?.blacklist_reasons || post?.blacklist_reasons || []
+  const crossPost = detail?.cross_post || post?.cross_post
   const displayPost = useMemo(() => {
-    if (!post || !detail?.display_post) return post
+    if (!post) return post
 
-    return {...post, ...detail.display_post, id: post.id, tags: post.tags}
-  }, [detail?.display_post, post])
+    return {
+      ...post,
+      title: detail?.title || post.title,
+      category_name: detail?.category_name || post.category_name,
+      category_image_url: detail?.category_image_url || post.category_image_url,
+      app: detail?.app || post.app,
+      canonical_url: detail?.canonical_url || post.canonical_url
+    }
+  }, [detail?.app, detail?.canonical_url, detail?.category_image_url, detail?.category_name, detail?.title, post])
   const externalLinks = useMemo(() => previewExternalLinks(urls, displayPost).filter((link) => link.href), [displayPost, urls])
   const commentsUrl = useMemo(() => replyCommentsUrl(urls, displayPost), [displayPost, urls])
   const previewHtml = useMemo(() => {
@@ -139,6 +147,12 @@ export default function PreviewPane({
           <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             <AlertTriangle className="mt-0.5 shrink-0" size={14} />
             <span>{blacklistReasonText(blacklistReasons)}</span>
+          </div>
+        )}
+        {crossPost && (
+          <div className="mt-3 flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+            <Info className="mt-0.5 shrink-0" size={14} />
+            <span>{crossPostText(crossPost)}</span>
           </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">

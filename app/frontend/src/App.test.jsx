@@ -1383,13 +1383,27 @@ describe('App', () => {
     expect(screen.getByText('Blacklisted: author appears on fixture-curator, hive.blog.')).toBeInTheDocument()
   })
 
-  test('uses referenced display post details in the preview', async () => {
+  test('uses referenced cross-post content without replacing preview identity', async () => {
     const detail = deferred()
     detailResponses.set(1, detail)
     detail.resolve({
       id: 1,
+      author: 'visible-author',
+      permlink: 'first-post',
       title: 'Original Post',
+      category: 'hive-13323',
+      category_name: 'Hive',
+      category_image_url: 'https://example.com/hive-community.png',
+      app: 'peakd',
+      canonical_url: 'https://hive.blog/hive-13323/@visible-author/first-post',
       body_html: '<p>Original body</p>',
+      cross_post: {
+        author: 'visible-author',
+        permlink: 'first-post',
+        source_author: 'original-author',
+        source_permlink: 'original-post',
+        source_title: 'Original Post'
+      },
       display_post: {
         author: 'original-author',
         permlink: 'original-post',
@@ -1401,16 +1415,17 @@ describe('App', () => {
         canonical_url: 'https://hive.blog/hive-13323/@original-author/original-post'
       },
       urls: {
-        canonical: 'https://hive.blog/hive-13323/@original-author/original-post',
-        hive_blog: 'https://hive.blog/hive-13323/@original-author/original-post'
+        canonical: 'https://hive.blog/hive-13323/@visible-author/first-post',
+        hive_blog: 'https://hive.blog/hive-13323/@visible-author/first-post'
       }
     })
 
     await renderApp({waitForPreview: false})
 
     expect(await screen.findByRole('heading', {name: 'Original Post'})).toBeInTheDocument()
-    expect(screen.getByRole('button', {name: 'Focus author @original-author'})).toBeInTheDocument()
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=original-author&permlink=original-post', expect.objectContaining({credentials: 'same-origin'})))
+    expect(screen.getAllByRole('button', {name: 'Focus author @visible-author'}).length).toBeGreaterThan(0)
+    expect(screen.getByText('Cross-post: showing original content from @original-author/original-post.')).toBeInTheDocument()
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post', expect.objectContaining({credentials: 'same-origin'})))
   })
 
   test('casts keychain upvotes with the selected weight', async () => {
