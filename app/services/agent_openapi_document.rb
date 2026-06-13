@@ -45,6 +45,13 @@ private
           responses: {'201' => json_response('Agent auth challenge')}
         }
       },
+      '/api/v1/agent/auth_challenges/start' => {
+        get: {
+          summary: 'Create a short-lived agent authentication challenge with GET.',
+          description: 'Unauthenticated POST-restricted sandbox fallback. Returns the same payload as POST /api/v1/agent/auth_challenges. Preserve cookies from this response and use the same cookie jar when redeeming the code.',
+          responses: {'201' => json_response('Agent auth challenge')}
+        }
+      },
       '/api/v1/agent/auth_challenges/{id}' => {
         get: {
           summary: 'Return auth challenge status.',
@@ -58,6 +65,15 @@ private
           summary: 'Redeem a HiveSigner copy/paste code and receive agent credentials.',
           description: 'Unauthenticated before redeem. Submit the HYP-* code shown to the user after they open hivesigner_login_url. The response includes bearer_token and sets the _hyperion cookie; use either for later agent requests.',
           parameters: [path_parameter('id', 'string', 'Challenge id')],
+          responses: {'200' => json_response('Authenticated account state')}
+        },
+        get: {
+          summary: 'Redeem a HiveSigner copy/paste code with GET.',
+          description: 'POST-restricted sandbox fallback. Submit the HYP-* code as the code query parameter using the same cookie jar. Prefer POST when available because URLs may be logged.',
+          parameters: [
+            path_parameter('id', 'string', 'Challenge id'),
+            query_parameter('code', 'string', 'One-time HYP-* code shown to the user.')
+          ],
           responses: {'200' => json_response('Authenticated account state')}
         }
       },
@@ -148,7 +164,7 @@ private
   def openapi_description
     <<~TEXT.squish
       Hyperion agent API. Agents should not scrape the SPA. Use the auth challenge flow when no _hyperion session cookie exists:
-      POST /api/v1/agent/auth_challenges, show hivesigner_login_url to the user, redeem their HYP-* code, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
+      POST /api/v1/agent/auth_challenges, or GET /api/v1/agent/auth_challenges/start when POST is blocked before auth, show hivesigner_login_url to the user, redeem their HYP-* code by POST or the GET fallback when POST is unavailable, then use the returned bearer_token or resulting _hyperion cookie for API and MCP requests.
       Agents must never ask for or handle Hive private keys, HiveSigner passwords, or signing credentials. The user completes HiveSigner privately and gives the agent only the HYP-* code.
     TEXT
   end

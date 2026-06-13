@@ -1,10 +1,16 @@
 class Api::V1::AgentAuthChallengesController < Api::V1::BaseController
   protect_from_forgery except: %i(create redeem keychain)
   skip_before_action :sign_in
-  before_action :validate_agent_origin!, only: %i(create redeem keychain)
+  before_action :validate_agent_origin!, only: %i(create start redeem keychain)
   rescue_from ActiveRecord::RecordNotFound, with: :not_found
 
   def create
+    challenge = AgentAuthChallenge.issue!
+
+    render json: challenge_payload(challenge), status: :created
+  end
+
+  def start
     challenge = AgentAuthChallenge.issue!
 
     render json: challenge_payload(challenge), status: :created

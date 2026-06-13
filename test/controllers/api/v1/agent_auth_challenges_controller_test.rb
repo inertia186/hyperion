@@ -17,6 +17,17 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
   end
 
+  test 'starts an auth challenge with GET for post restricted sandboxes' do
+    get :start
+
+    assert_response :created
+    payload = response_json
+    assert_equal 'pending', payload.fetch('status')
+    assert payload.fetch('challenge_id').present?
+    assert_includes payload.fetch('hivesigner_login_url'), 'https://hivesigner.com/oauth2/authorize?'
+    assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
+  end
+
   test 'returns challenge status' do
     challenge = AgentAuthChallenge.issue!
 
@@ -78,6 +89,32 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert_equal accounts(:curated).id, session[:current_account].id
     assert challenge.reload.redeemed_at.present?
     assert_equal accounts(:curated), AgentAccessToken.account_for(response_json.fetch('bearer_token'))
+  end
+
+  test 'redeems hivesigner copy code with GET for post restricted sandboxes' do
+    challenge = AgentAuthChallenge.issue!
+    code = challenge.authorize_for_copy_code!(accounts(:curated))
+
+    get :redeem, params: {id: challenge.token, code: code.downcase}
+
+    assert_response :success
+    assert_equal true, response_json.fetch('authenticated')
+    assert_match(/\Ahyp_at_/, response_json.fetch('bearer_token'))
+    assert_equal 'fixture-curator', response_json.dig('account', 'name')
+    assert_equal accounts(:curated).id, session[:current_account].id
+    assert challenge.reload.redeemed_at.present?
+  end
+
+  test 'GET redeem rejects foreign browser origins' do
+    challenge = AgentAuthChallenge.issue!
+    code = challenge.authorize_for_copy_code!(accounts(:curated))
+    @request.headers['Origin'] = 'https://evil.example'
+
+    get :redeem, params: {id: challenge.token, code: code}
+
+    assert_response :forbidden
+    assert_equal 'Forbidden origin', response_json.fetch('error')
+    assert_nil session[:current_account]
   end
 
   test 'hivesigner callback after redeem does not reset redeemed challenge' do
@@ -164,6 +201,15 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     @request.headers['Origin'] = 'https://evil.example'
 
     post :create
+
+    assert_response :forbidden
+    assert_equal 'Forbidden origin', response_json.fetch('error')
+  end
+
+  test 'start rejects foreign browser origins' do
+    @request.headers['Origin'] = 'https://evil.example'
+
+    get :start
 
     assert_response :forbidden
     assert_equal 'Forbidden origin', response_json.fetch('error')

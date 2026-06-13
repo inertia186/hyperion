@@ -11,9 +11,14 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resources :agent_auth_challenges, path: '/agent/auth_challenges', only: %i(create show) do
+        collection do
+          get :start
+        end
+
         member do
           get :hivesigner_callback
           post :redeem
+          get :redeem
           post :keychain
         end
       end
