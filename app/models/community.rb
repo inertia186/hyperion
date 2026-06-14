@@ -12,20 +12,10 @@ class Community < ApplicationRecord
   
   def refresh_community
     Rails.logger.info "Fetching community: #{name} ..."
+    community = fetch_community_payload
     
-    bridge = Hive::Bridge.new(url: DEFAULT_NODE_URLS.sample)
-    community = bridge.get_community(name: name).result rescue nil
-    
-    if !!community
-      %w(about avatar_url description flag_text is_nsfw lang name num_authors
-        num_pending subscribers sum_pending title type_id).each do |key|
-        self[key] = community[key]
-      end
-      
-      self.context = community.contest || {}
-      self.created_at = Time.parse(community.created_at + 'Z')
-      self.settings = community.settings || {}
-      self.team = community.team || []
+    if community
+      apply_community_payload(community)
     end
 
     self.community_account = fetch_community_account || community_account
@@ -64,6 +54,30 @@ class Community < ApplicationRecord
   end
 
 private
+  def fetch_community_payload
+    community = nil
+    self.class.with_simple_failover do
+      community = self.class.bridge.get_community(name: name).result
+    end
+
+    community
+  rescue StandardError => e
+    Rails.logger.warn "Unable to fetch community #{name}: #{e.class}: #{e.message}"
+    nil
+  end
+
+  def apply_community_payload(community)
+    %w(about avatar_url description flag_text is_nsfw lang name num_authors
+      num_pending subscribers sum_pending title type_id).each do |key|
+      self[key] = community[key]
+    end
+
+    self.context = community.contest || {}
+    self.created_at = Time.parse(community.created_at + 'Z')
+    self.settings = community.settings || {}
+    self.team = community.team || []
+  end
+
   def fetch_community_account
     account = nil
 

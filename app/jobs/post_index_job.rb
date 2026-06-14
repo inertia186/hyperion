@@ -6,7 +6,6 @@ class PostIndexJob < ApplicationJob
   
   queue_as :default
   
-  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.hive.blog').split(',')
   HIVE_MAX_WITNESSES = 21
   BLOCK_INTERVAL_SEC = 3
   BLOCK_INTERVAL_7_DAYS = (Time.now.utc - 7.days.ago) / BLOCK_INTERVAL_SEC

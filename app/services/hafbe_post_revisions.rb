@@ -1,14 +1,17 @@
 require 'net/http'
+require 'timeout'
 require 'uri'
 
 class HafbePostRevisions
   DEFAULT_BASE_URL = 'https://api.hive.blog/hafbe-api/'
+  DEFAULT_TIMEOUT = ENV.fetch('HAFBE_TIMEOUT', 4).to_f
 
   MissingBaseUrl = Class.new(StandardError)
   FetchError = Class.new(StandardError)
 
-  def initialize(base_url: ENV.fetch('HAFBE_BASE_URL', DEFAULT_BASE_URL))
+  def initialize(base_url: ENV.fetch('HAFBE_BASE_URL', DEFAULT_BASE_URL), timeout: DEFAULT_TIMEOUT)
     @base_url = base_url.to_s.strip
+    @timeout = timeout
   end
 
   def call(post:, local_body:, render_body:)
@@ -51,8 +54,12 @@ class HafbePostRevisions
   end
 
 private
+  attr_reader :timeout
+
   def fetch_operations(author, permlink)
-    response = Net::HTTP.get_response(revisions_uri(author, permlink))
+    response = Timeout.timeout(timeout) do
+      Net::HTTP.get_response(revisions_uri(author, permlink))
+    end
     raise FetchError, "HAFBE returned #{response.code}" unless response.code.to_i.between?(200, 299)
 
     JSON.parse(response.body)

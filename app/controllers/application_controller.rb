@@ -3,8 +3,6 @@ require 'open-uri'
 class ApplicationController < ActionController::Base
   include Pagy::Method
   
-  DEFAULT_NODE_URLS = (ENV['HYPERION_NODE_URLS'] || 'https://api.hive.blog').split(',')
-  
   helper_method :best_title
   helper_method :current_account
   helper_method :post_to_slug
@@ -258,16 +256,12 @@ private
     @poisoned_pill_tags ||= current_account.poisoned_pill_tags.pluck(:tag)
   end
   
-  def cycle_node_url
-    DEFAULT_NODE_URLS.sample
-  end
-  
   def reset_bridge
     @bridge = nil
   end
   
   def bridge
-    @bridge ||= Hive::Bridge.new(url: cycle_node_url)
+    @bridge ||= Hive::Bridge.new(url: HiveNodeSelector.next_url)
   end
   
   def random_oneliner
