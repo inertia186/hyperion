@@ -29,6 +29,24 @@ class PostIndexJobTest < ActiveJob::TestCase
     end
   end
 
+  test 'RPC indexer runs inside shared failover wrapper' do
+    job = PostIndexJob.new
+    called = false
+    wrapped = false
+
+    PostIndexJob.stub(:with_simple_failover, ->(&block) {
+      wrapped = true
+      block.call
+    }) do
+      job.stub(:perform_with_rpc_once, ->(*) { called = true }) do
+        job.perform_with_rpc
+      end
+    end
+
+    assert wrapped
+    assert called
+  end
+
   test 'blacklist extracts direct blacklist follows' do
     api = FakeApi.new(
       ['fixture-curator', '', 'follow_blacklist'] => [],

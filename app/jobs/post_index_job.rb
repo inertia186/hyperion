@@ -41,6 +41,14 @@ class PostIndexJob < ApplicationJob
   end
 
   def perform_with_rpc(*args)
+    PostIndexJob::with_simple_failover do
+      perform_with_rpc_once(*args)
+    end
+  end
+
+  def perform_with_rpc_once(*args)
+    @blacklist_service = nil
+
     head_block_num, blockchain_time = PostIndexJob::database_api.get_dynamic_global_properties do |dgpo|
       [dgpo.head_block_number, Time.parse(dgpo.time + 'Z')]
     end

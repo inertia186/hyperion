@@ -13,6 +13,12 @@ class ImmutableTest < ActiveSupport::TestCase
     end
   end
 
+  test 'simple failover returns yielded result' do
+    target = Class.new { extend Immutable }
+
+    assert_equal 'ok', target.with_simple_failover { 'ok' }
+  end
+
   test 'simple failover records failed node and resets cached clients before retrying' do
     target = Class.new { extend Immutable }
     attempts = 0

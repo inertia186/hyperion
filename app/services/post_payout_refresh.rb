@@ -8,7 +8,7 @@ class PostPayoutRefresh
 
   Result = Struct.new(:checked, :updated, :unavailable, :failed, :errors, keyword_init: true)
 
-  def initialize(window: DEFAULT_WINDOW, limit: DEFAULT_LIMIT, api: Account.api, logger: Rails.logger, pending_payout_comment_limit: PENDING_PAYOUT_COMMENT_LIMIT, pending_payout_payload_limit: PENDING_PAYOUT_PAYLOAD_LIMIT)
+  def initialize(window: DEFAULT_WINDOW, limit: DEFAULT_LIMIT, api: nil, logger: Rails.logger, pending_payout_comment_limit: PENDING_PAYOUT_COMMENT_LIMIT, pending_payout_payload_limit: PENDING_PAYOUT_PAYLOAD_LIMIT)
     @window = window
     @limit = [limit.to_i, 1].max
     @api = api
@@ -69,6 +69,14 @@ class PostPayoutRefresh
 private
   attr_reader :window, :limit, :api, :logger, :pending_payout_comment_limit, :pending_payout_payload_limit
 
+  def rpc_execute(api_name, method, args)
+    return api.rpc_client.rpc_execute(api_name, method, args) if api
+
+    Account.with_simple_failover do
+      Account.api.rpc_client.rpc_execute(api_name, method, args)
+    end
+  end
+
   def posts
     Post.
       where('posts.created_at >= ?', window.ago).
@@ -116,7 +124,7 @@ private
 
   def pending_payouts_for(posts)
     comments = posts.map { |post| [post.author, post.permlink] }
-    response = api.rpc_client.rpc_execute(:database_api, :get_comment_pending_payouts, {comments: comments})
+    response = rpc_execute(:database_api, :get_comment_pending_payouts, {comments: comments})
     raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
     cashout_infos = chain_value(response.result, :cashout_infos)
@@ -146,7 +154,7 @@ private
   end
 
   def post_reward_fund
-    response = api.rpc_client.rpc_execute(:database_api, :get_reward_funds, {})
+    response = rpc_execute(:database_api, :get_reward_funds, {})
     raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
     Array(chain_value(response.result, :funds)).find { |fund| chain_value(fund, :name).to_s == 'post' } ||
@@ -154,7 +162,7 @@ private
   end
 
   def current_price_feed
-    response = api.rpc_client.rpc_execute(:database_api, :get_current_price_feed, {})
+    response = rpc_execute(:database_api, :get_current_price_feed, {})
     raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
     response.result

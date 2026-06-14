@@ -154,6 +154,41 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
     assert_nil posts(:allowed_unread).reload.payout_unavailable_at
   end
 
+  test 'default API path uses account failover wrapper' do
+    posts(:allowed_unread).update!(created_at: 1.day.ago, payout: nil, payout_amount: nil, payout_currency: nil, payout_fetched_at: nil, payout_unavailable_at: nil)
+    success_api = PayoutApi.new(
+      cashout_infos: {
+        [posts(:allowed_unread).author, posts(:allowed_unread).permlink] => {net_rshares: 2, reward_weight: 10_000, max_accepted_payout: hbd_asset('1000000.000')}
+      }
+    )
+    failure_api = TimeoutPreflightApi.new
+    apis = [failure_api, success_api]
+    attempts = 0
+    failover_calls = 0
+
+    Account.stub(:api, -> { apis.fetch(attempts) }) do
+      Account.stub(:with_simple_failover, ->(&block) {
+        failover_calls += 1
+        begin
+          block.call
+        rescue Timeout::Error
+          attempts += 1
+          block.call
+        end
+      }) do
+        result = PostPayoutRefresh.new(window: 7.days, limit: 1).call
+
+        assert_equal 1, result.checked
+        assert_equal 1, result.updated
+        assert_equal 0, result.failed
+      end
+    end
+
+    assert_operator failover_calls, :>=, 1
+    assert_equal 1, attempts
+    assert_equal 1, success_api.pending_calls.size
+  end
+
   test 'estimated payout clamps negative rshares and caps max accepted payout' do
     Post.where.not(id: [posts(:allowed_unread).id, posts(:muted_unread).id]).update_all(created_at: 10.days.ago)
     posts(:allowed_unread).update!(created_at: 2.days.ago, payout: nil, payout_amount: nil, payout_currency: nil, payout_fetched_at: nil, payout_unavailable_at: nil, payout_source: nil)

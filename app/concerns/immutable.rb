@@ -12,9 +12,9 @@ module Immutable
     loop do; begin
       tries = tries + 1
 
-      yield
+      result = yield
 
-      break
+      break result
     rescue => e
       raise e if tries > MAX_RETRY
 
