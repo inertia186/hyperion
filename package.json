@@ -29,7 +29,7 @@
     "select2": "4.1.0",
     "@hive/hive-content-renderer": "file:vendor/hive-content-renderer",
     "turbolinks": "^5.2.0",
-    "vite": "^7.2.0",
+    "vite": "^7.3.5",
     "vite-plugin-ruby": "^5.2.0"
   },
   "version": "0.1.0",
