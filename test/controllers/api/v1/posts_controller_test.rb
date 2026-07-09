@@ -117,6 +117,68 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal Post.count, response_json.fetch('mode_counts').fetch('keyword')
   end
 
+  test 'signal filter returns high tag utilization posts and counts all signal options' do
+    tagged = create_post_with_tag(author: 'tag-heavy', permlink: 'tag-heavy-post', title: 'Tag Heavy Post', tag: 'haf', author_reputation: 35)
+    7.times do |index|
+      tagged.tags.create!(tag: "extra-#{index}", category: false)
+    end
+
+    create_post_with_tag(author: 'tag-light', permlink: 'tag-light-post', title: 'Tag Light Post', tag: 'haf', author_reputation: 35)
+    assert_equal 0, tagged.reload.tags_count
+
+    get :index, params: {signal: 'high_tag_utilization', sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, 'Tag Heavy Post'
+    assert_not_includes titles, 'Tag Light Post'
+    assert_equal 'high_tag_utilization', response_json.dig('query', 'signal')
+    assert_operator response_json.fetch('signal_counts').fetch('high_tag_utilization'), :>=, 1
+    assert response_json.fetch('signal_counts').key?('high_prolific_author')
+  end
+
+  test 'prolific author signal uses the selected primary tag like prolific sort' do
+    7.times do |index|
+      create_post_with_tag(author: 'tag-prolific', permlink: "tag-prolific-haf-#{index}", title: "Tag Prolific Haf #{index}", tag: 'haf', author_reputation: 35)
+    end
+    7.times do |index|
+      create_post_with_tag(author: 'other-prolific', permlink: "other-prolific-food-#{index}", title: "Other Prolific Food #{index}", tag: 'food', author_reputation: 35)
+    end
+
+    get :index, params: {tag: 'haf', signal: 'high_prolific_author', sort: 'most_prolific', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, 'Tag Prolific Haf 0'
+    assert_not_includes titles, 'Other Prolific Food 0'
+    assert_equal 'high_prolific_author', response_json.dig('query', 'signal')
+    assert_operator response_json.fetch('signal_counts').fetch('high_prolific_author'), :>=, 7
+  end
+
+  test 'poisoned pills signal returns active unread posts by poisoned authors' do
+    account = accounts(:curated)
+    account.poisoned_pill_tags.create!(tag: 'deplorable')
+    pill = create_post_with_tag(author: 'bob', permlink: 'deplorable-post', title: 'Bob Used Deplorable', tag: 'deplorable', author_reputation: 35)
+    noise = create_post_with_tag(author: 'bob', permlink: 'ordinary-post', title: 'Bob Ordinary Noise', tag: 'haf', author_reputation: 35)
+    other = create_post_with_tag(author: 'carol', permlink: 'ordinary-post', title: 'Carol Ordinary Post', tag: 'haf', author_reputation: 35)
+
+    get :index, params: {sort: 'latest', limit: 30}
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_not_includes titles, pill.title
+    assert_not_includes titles, noise.title
+    assert_includes titles, other.title
+
+    get :index, params: {signal: 'poisoned_pills', sort: 'latest', limit: 30}
+
+    assert_response :success
+    titles = response_json.fetch('posts').map { |post| post.fetch('title') }
+    assert_includes titles, pill.title
+    assert_includes titles, noise.title
+    assert_not_includes titles, other.title
+    assert_equal 'poisoned_pills', response_json.dig('query', 'signal')
+    assert_operator response_json.fetch('signal_counts').fetch('poisoned_pills'), :>=, 2
+  end
+
   test 'keyword mode treats leading at signs as user mention syntax' do
     posts(:allowed_unread).update!(body: 'This post mentions alice without the punctuation.')
 
@@ -911,7 +973,7 @@ private
     end
   end
 
-  def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current, author_reputation: 25)
+  def create_post_with_tag(author:, permlink:, title:, tag:, created_at: Time.current, author_reputation: 25, tags_count: 0)
     post = Post.create!(
       author: author,
       permlink: permlink,
@@ -922,6 +984,7 @@ private
       block_num: 1000 + Post.count,
       trx_id: "#{author}-#{permlink}",
       author_reputation: author_reputation,
+      tags_count: tags_count,
       created_at: created_at,
       updated_at: created_at
     )

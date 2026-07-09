@@ -120,9 +120,9 @@ class Post < ApplicationRecord
   }
 
   scope :order_by_tag_count, lambda { |direction = :desc|
-    direction = direction.to_s.downcase == 'asc' ? :asc : :desc
+    direction = direction.to_s.downcase == 'asc' ? 'ASC' : 'DESC'
 
-    order(tags_count: direction)
+    order(Arel.sql("(SELECT count(*) FROM tags post_tags WHERE post_tags.post_id = posts.id) #{direction}, posts.created_at DESC, posts.id DESC"))
   }
   
   scope :order_by_prolific, lambda {|tag = nil, direction = :desc|
