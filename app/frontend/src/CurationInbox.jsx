@@ -1,9 +1,9 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react'
-import { api } from './api'
 import { useCurationKeyboard } from './useCurationKeyboard'
 import { useCurationPosts } from './useCurationPosts'
 import { useCurationPreferences } from './useCurationPreferences'
 import { useCurationPreviewState } from './useCurationPreviewState'
+import { useCurationReadActions } from './useCurationReadActions'
 import { useCurationSearch } from './useCurationSearch'
 import { useCurationSelection } from './useCurationSelection'
 import { useDesktopPreviewResize } from './useDesktopPreviewResize'
@@ -12,7 +12,6 @@ import { useMediaQuery } from './useMediaQuery'
 import { usePostPreview } from './usePostPreview'
 import { useSelectedPostListScroll } from './useSelectedPostListScroll'
 import { postsPayloadWithChainStats, postsPayloadWithPayout } from './postPayloadUpdates'
-import { postReadTransition, selectedLoadedPostIds, selectedReadTransition } from './curationReadState'
 import { curationViewState } from './curationViewState'
 import { scrollPreviewPane } from './previewScroll'
 import CurationPostListPanel from './components/CurationPostListPanel'
@@ -127,6 +126,34 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   })
   const listScrollRef = useSelectedPostListScroll(selectedId)
   const loadMoreRef = useInfiniteLoadMore({hasMorePosts, loading, loadingMore, onLoadMore: loadMorePosts})
+
+  const applyReadTransition = useCallback((transition) => {
+    if (applySelectionReadTransition(transition)) {
+      setPreviewActive(false)
+      setMobilePreviewOpen(false)
+    }
+  }, [applySelectionReadTransition, setMobilePreviewOpen, setPreviewActive])
+
+  const {
+    markSelectedRead,
+    markSelectedReadAndMove,
+    markSelectedReadAndMoveNext
+  } = useCurationReadActions({
+    posts,
+    selectedPost,
+    selectedPostIds,
+    allMatchingSelected,
+    query,
+    selectedId,
+    applyReadTransition,
+    clearAllMatchingSelection,
+    clearSelection,
+    handleError: handleLoadError,
+    removeSelectedPostId,
+    setBusy,
+    setPostsPayload
+  })
+
   const {
     toggleMute,
     toggleOnlyFavorites,
@@ -147,56 +174,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setBusy,
     handleError: handleLoadError
   })
-
-  const selectedPostRef = useRef(null)
-  selectedPostRef.current = selectedPost
-
-  const applyReadTransition = useCallback((transition) => {
-    if (applySelectionReadTransition(transition)) {
-      setPreviewActive(false)
-      setMobilePreviewOpen(false)
-    }
-  }, [applySelectionReadTransition, setMobilePreviewOpen, setPreviewActive])
-
-  const markPostReadAndMove = useCallback(async (post, direction = 1) => {
-    if (!post) return
-
-    setBusy(true)
-    try {
-      const result = await api.markRead(post.id)
-      clearAllMatchingSelection()
-      removeSelectedPostId(post.id)
-      setPostsPayload((payload) => {
-        const transition = postReadTransition(payload, {post, result, query, direction})
-        applyReadTransition(transition)
-        return transition.payload
-      })
-    } catch (err) {
-      handleLoadError(err)
-    } finally {
-      setBusy(false)
-    }
-  }, [applyReadTransition, clearAllMatchingSelection, handleLoadError, query, removeSelectedPostId])
-
-  const markSelectedRead = async () => {
-    const postIds = selectedLoadedPostIds(posts, selectedPostIds)
-    if (!postIds.length && !allMatchingSelected) return
-
-    setBusy(true)
-    try {
-      const result = await api.markManyRead(allMatchingSelected ? {all_matching: true, query} : postIds)
-      clearSelection()
-      setPostsPayload((payload) => {
-        const transition = selectedReadTransition(payload, {postIds, allMatchingSelected, result, query, selectedId})
-        applyReadTransition(transition)
-        return transition.payload
-      })
-    } catch (err) {
-      handleLoadError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const updatePostChainStats = useCallback((postId, statsPayload, options = {}) => {
     if (!statsPayload || statsPayload.status !== 'ready') return
@@ -221,14 +198,6 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     openTags: () => setTagsOpen(true),
     focusAuthor
   }), [focusAuthor])
-
-  const markSelectedReadAndMove = useCallback((direction) => {
-    markPostReadAndMove(selectedPostRef.current, direction)
-  }, [markPostReadAndMove])
-
-  const markSelectedReadAndMoveNext = useCallback(() => {
-    markPostReadAndMove(selectedPostRef.current, 1)
-  }, [markPostReadAndMove])
 
   const scrollPreview = useCallback((direction) => {
     const pane = mobilePreviewOpen ? mobilePreviewScrollRef.current : desktopPreviewScrollRef.current
