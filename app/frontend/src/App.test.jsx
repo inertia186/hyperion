@@ -247,16 +247,19 @@ const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
   const query = params.get('query') || ''
   const author = params.get('author') || ''
+  const signal = params.get('signal') || ''
   const page = Number(params.get('page') || 1)
   const limit = Number(params.get('limit') || 30)
   const onlyKeyword = params.get('only_keyword') === 'true'
-  const filteredPosts = onlyKeyword && query === 'frist' ? [] : emptyTags.has(tag) ? [] : currentPosts
+  const signalPosts = signal === 'high_tag_utilization' ? currentPosts.filter((post) => post.tags_count >= 8) : signal === 'high_prolific_author' ? currentPosts.filter((post) => post.author === 'visible-author') : signal === 'poisoned_pills' ? currentPosts.filter((post) => post.author === 'poisoned-author') : currentPosts
+  const filteredPosts = onlyKeyword && query === 'frist' ? [] : emptyTags.has(tag) ? [] : signalPosts
   const pagePosts = filteredPosts.slice((page - 1) * limit, page * limit)
 
   return {
     query: {
       tag,
       tag_pattern: tag,
+      signal,
       query,
       author,
       muted_authors_enabled: false,
@@ -273,6 +276,7 @@ const postsPayload = (params = new URLSearchParams()) => {
     keyword_suggestion: onlyKeyword && query === 'frist' ? 'first' : null,
     pagination: {page, limit, total_count: filteredPosts.length, total_pages: Math.max(Math.ceil(filteredPosts.length / limit), 1)},
     mode_counts: {unread: filteredPosts.length, keyword: query || onlyKeyword ? filteredPosts.length : 0, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
+    signal_counts: {high_prolific_author: currentPosts.filter((post) => post.author === 'visible-author').length, high_tag_utilization: currentPosts.filter((post) => post.tags_count >= 8).length, poisoned_pills: currentPosts.filter((post) => post.author === 'poisoned-author').length},
     posts: pagePosts,
     related_tags: [{name: 'haf', tag: 'haf', count: 24}, {name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png', count: 6}],
     related_authors: ['visible-author'],
@@ -1787,6 +1791,45 @@ describe('App', () => {
     fireEvent.click(viewMode.getByRole('button', {name: /Ignored/}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_ignored=true'), expect.any(Object)))
     expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('only_read=true'), expect.any(Object))
+  })
+
+  test('switches to signal filtering with counts and restores other tab queries', async () => {
+    currentPosts = [
+      {...posts[0], tags_count: 8},
+      {...posts[1], tags_count: 1},
+      {...posts[2], tags_count: 1}
+    ]
+
+    await renderApp()
+
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'curation'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    fireEvent.change(screen.getByPlaceholderText('Search title or body keywords'), {target: {value: 'first'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Signals'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=high_prolific_author'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=most_prolific'), expect.any(Object))
+    expect(screen.getByLabelText('Signal filter')).toHaveTextContent('Prolific authors · 7+ posts (1)')
+
+    fireEvent.change(screen.getByLabelText('Signal filter'), {target: {value: 'high_tag_utilization'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=high_tag_utilization'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=most_tags'), expect.any(Object))
+
+    fireEvent.change(screen.getByLabelText('Signal filter'), {target: {value: 'poisoned_pills'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=poisoned_pills'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=latest'), expect.any(Object))
+    expect(screen.getByLabelText('Signal filter')).toHaveTextContent('Poisoned Pills · poisoned authors (0)')
+
+    fireEvent.click(screen.getByRole('button', {name: 'Filters'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
   })
 
   test('shows mode counts on desktop mode selector', async () => {

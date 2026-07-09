@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery } from './curationQuery'
+import { filterInputQuery, keywordOnlyQuery, queryWithUpdates, resetFilterQuery, signalQuery } from './curationQuery'
 
 describe('curation query helpers', () => {
   test('applies updates and resets pagination unless a page is provided', () => {
@@ -20,6 +20,7 @@ describe('curation query helpers', () => {
     expect(keywordOnlyQuery('  hive curation  ')).toEqual({
       tag: '',
       author: '',
+      signal: '',
       query: 'hive curation',
       only_keyword: true,
       only_read: false,
@@ -33,12 +34,28 @@ describe('curation query helpers', () => {
     expect(filterInputQuery('hive curation @alice')).toEqual({
       tag: 'hive curation',
       author: 'alice',
+      signal: '',
       query: '',
       only_keyword: false
     })
   })
 
   test('builds reset filter query updates', () => {
-    expect(resetFilterQuery()).toEqual({tag: '', query: '', author: '', only_keyword: false})
+    expect(resetFilterQuery()).toEqual({tag: '', query: '', author: '', signal: '', only_keyword: false})
+  })
+
+  test('builds signal queries with matching default sort', () => {
+    expect(signalQuery('high_tag_utilization')).toEqual({
+      tag: '',
+      author: '',
+      query: '',
+      signal: 'high_tag_utilization',
+      sort: 'most_tags',
+      only_keyword: false,
+      only_read: false,
+      only_ignored: false,
+      only_deleted: false,
+      only_blacklisted: false
+    })
   })
 })

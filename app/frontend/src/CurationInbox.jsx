@@ -65,6 +65,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
     setSearchMode,
     applyLoadedQuery,
     updateQuery,
+    updateSignal,
     submitQuery,
     resetQueryInput,
     searchKeywordsFromFilters,
@@ -288,6 +289,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
             submitQuery={submitQuery}
             resetQueryInput={resetQueryInput}
             updateQuery={updateQuery}
+            updateSignal={updateSignal}
             markSelectedRead={markSelectedRead}
             selectedCount={visibleSelectionCount}
             toggleIgnoredTag={toggleIgnoredTag}

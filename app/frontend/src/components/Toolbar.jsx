@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckSquare, Eye, Filter, RotateCcw, Search, Star, StarOff, Volume2, VolumeX, X } from 'lucide-react'
-import { SORTS } from '../constants'
+import { CheckSquare, Eye, Filter, RotateCcw, Search, Signal, Star, StarOff, Volume2, VolumeX, X } from 'lucide-react'
+import { SIGNALS, SORTS } from '../constants'
 import ModeSelector from './ModeSelector'
 
 const SEARCH_FORM_COMPACT_WIDTH = 520
@@ -13,6 +13,7 @@ export default function Toolbar({
   setDraftQuery,
   searchMode,
   setSearchMode,
+  updateSignal,
   submitQuery,
   resetQueryInput,
   updateQuery,
@@ -28,6 +29,7 @@ export default function Toolbar({
   compactModeSelector = false
 }) {
   const keywordMode = searchMode === 'keyword'
+  const signalsMode = searchMode === 'signals'
   const actionRowRef = useRef(null)
   const [compactSearchForm, setCompactSearchForm] = useState(false)
   const [selectionFeedback, setSelectionFeedback] = useState('')
@@ -73,11 +75,12 @@ export default function Toolbar({
             <select className="min-w-0 bg-transparent text-base outline-none md:text-sm" value={searchMode} onChange={(event) => setSearchMode(event.target.value)} aria-label="Search form">
               <option value="filters">Filters</option>
               <option value="keyword">Keywords</option>
+              <option value="signals">Signals</option>
             </select>
           </label>
         ) : (
           <div className="inline-flex min-w-0 flex-1 overflow-hidden rounded-md border border-slate-300 bg-white sm:flex-none" role="group" aria-label="Search form">
-            <button className={`inline-flex h-10 flex-1 items-center justify-center gap-2 border-r border-slate-300 px-3 text-sm sm:h-9 sm:flex-none ${!keywordMode ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50'}`} type="button" onClick={() => setSearchMode('filters')} aria-pressed={!keywordMode}>
+            <button className={`inline-flex h-10 flex-1 items-center justify-center gap-2 border-r border-slate-300 px-3 text-sm sm:h-9 sm:flex-none ${!keywordMode && !signalsMode ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50'}`} type="button" onClick={() => setSearchMode('filters')} aria-pressed={!keywordMode && !signalsMode}>
               <Filter size={16} />
               Filters
             </button>
@@ -85,9 +88,13 @@ export default function Toolbar({
               <Search size={16} />
               Keywords
             </button>
+            <button className={`inline-flex h-10 flex-1 items-center justify-center gap-2 border-l border-slate-300 px-3 text-sm sm:h-9 sm:flex-none ${signalsMode ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50'}`} type="button" onClick={() => setSearchMode('signals')} aria-pressed={signalsMode}>
+              <Signal size={16} />
+              Signals
+            </button>
           </div>
         )}
-        {!keywordMode && (
+        {!keywordMode && !signalsMode && (
           <button className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 disabled:opacity-50 sm:ml-auto sm:h-9 sm:flex-none" type="button" onClick={toggleIgnoredTag} disabled={!activeTag || loading}>
             {activeTagIgnored ? <Eye size={16} /> : <X size={16} />}
             {activeTagIgnored ? 'Unignore tag' : 'Ignore tag'}
@@ -108,6 +115,16 @@ export default function Toolbar({
             <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Search size={16} className="text-slate-400" />
               <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Search title or body keywords" />
+            </div>
+          </label>
+        ) : signalsMode ? (
+          <label className="toolbar-search-field min-w-[18rem] flex-[999_1_24rem] max-[520px]:min-w-full">
+            <span className="toolbar-search-label mb-1 block text-xs font-medium text-slate-500">Signal</span>
+            <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
+              <Signal size={16} className="text-slate-400" />
+              <select className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={query.signal || SIGNALS[0][0]} onChange={(event) => updateSignal(event.target.value)} aria-label="Signal filter">
+                {SIGNALS.map(([value, label, threshold]) => <option key={value} value={value}>{signalLabel(label, threshold, payload?.signal_counts?.[value])}</option>)}
+              </select>
             </div>
           </label>
         ) : (
@@ -137,8 +154,8 @@ export default function Toolbar({
       </form>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {!keywordMode && <ModeSelector query={query} counts={payload?.mode_counts} compact={compactModeSelector} onChange={updateQuery} />}
-        {!keywordMode && (
+        {!keywordMode && !signalsMode && <ModeSelector query={query} counts={payload?.mode_counts} compact={compactModeSelector} onChange={updateQuery} />}
+        {!keywordMode && !signalsMode && (
           <>
             <PreferenceChip active={payload?.query?.muted_authors_enabled} iconOn={VolumeX} iconOff={Volume2} label="Mute" onClick={toggleMute} disabled={!payload || loading} />
             <PreferenceChip active={payload?.query?.only_favorite_tags} iconOn={Star} iconOff={StarOff} label="Favorites" onClick={toggleOnlyFavorites} disabled={!payload || loading} />
@@ -147,6 +164,11 @@ export default function Toolbar({
       </div>
     </div>
   )
+}
+
+function signalLabel(label, threshold, count) {
+  const countLabel = Number.isFinite(count) ? ` (${count})` : ''
+  return `${label} · ${threshold}${countLabel}`
 }
 
 function PreferenceChip({active, iconOn: IconOn, iconOff: IconOff, label, onClick, disabled}) {
