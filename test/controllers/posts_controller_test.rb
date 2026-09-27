@@ -54,6 +54,21 @@ class PostsControllerTest < ActionController::TestCase
     assert_not_includes response.body, 'steem-content-renderer'
   end
 
+  test 'content sandbox sanitizes markdown-generated javascript links' do
+    post = posts(:allowed_unread)
+    post.body = '[click](javascript:alert(1)) and [safe](https://example.com)'
+
+    post.stub(:refresh_latest_revision!, -> {}) do
+      Post.stub(:find, post) do
+        get :content_sandbox, params: {id: post.id}
+      end
+    end
+
+    assert_response :success
+    assert_select '#input a[href^="javascript:"]', false
+    assert_select '#input a[href="https://example.com"]'
+  end
+
   test 'legacy index hides active posts by poisoned pill authors' do
     accounts(:curated).poisoned_pill_tags.create!(tag: 'deplorable')
     create_post_with_tag(author: 'bob', permlink: 'deplorable-post', title: 'Bob Used Deplorable', tag: 'deplorable')

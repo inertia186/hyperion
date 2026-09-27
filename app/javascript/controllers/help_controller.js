@@ -2,9 +2,6 @@ import { Controller } from '@hotwired/stimulus'
 
 import $ from 'jquery';
 
-var bindingHelpShowKey;
-var bindingHelpDismissKey;
-
 export default class extends Controller {
   static targets = ['help']
   
@@ -13,19 +10,17 @@ export default class extends Controller {
   }
   
   disconnect() {
-    bindingHelpShowKey = this.showKey.bind(this);
-    document.removeEventListener('keydown', bindingHelpShowKey);
+    document.removeEventListener('keydown', this.bindingHelpShowKey);
     
-    bindingHelpDismissKey = this.hideKey.bind(this);
-    document.removeEventListener('keydown', bindingHelpDismissKey);
+    document.removeEventListener('keydown', this.bindingHelpDismissKey);
   }
   
   bindHelpKeys() {
-    bindingHelpShowKey = this.showKey.bind(this);
-    document.addEventListener('keydown', bindingHelpShowKey);
+    this.bindingHelpShowKey = this.showKey.bind(this);
+    document.addEventListener('keydown', this.bindingHelpShowKey);
     
-    bindingHelpDismissKey = this.hideKey.bind(this);
-    document.addEventListener('keydown', bindingHelpDismissKey);
+    this.bindingHelpDismissKey = this.hideKey.bind(this);
+    document.addEventListener('keydown', this.bindingHelpDismissKey);
   }
   
   show(e) {

@@ -100,6 +100,7 @@ private
     markdown_ready_body = markdown_ready_body.gsub(/<\/(.*) markdown="span">/, "\n</\\1>")
     kramdown = Kramdown::Document.new(markdown_ready_body)
     html_body = harden_post_body_html(kramdown.to_html)
+    html_body = ActionController::Base.helpers.sanitize(html_body, tags: ALLOWED_TAGS, attributes: ALLOWED_ATTRIBUTES)
     
     html_body.html_safe
   end
