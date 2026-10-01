@@ -12,6 +12,24 @@ rake db:create
 rake db:seed
 ```
 
+# HiveSigner callbacks
+
+Select the `hyperion.zone` app account at https://hivesigner.com/profile and
+register these exact Redirect URIs, one per line:
+
+```text
+https://hyperion.zone/sessions/authorized
+https://www.hyperion.zone/sessions/authorized
+https://hyperion.zone/api/v1/agent/auth_challenges/hivesigner_callback
+https://www.hyperion.zone/api/v1/agent/auth_challenges/hivesigner_callback
+```
+
+Browser sign-in uses `/sessions/authorized`. Agent device-code sign-in uses
+the fixed API callback and carries the challenge ID in OAuth `state`, which
+HiveSigner returns to Hyperion. Do not include challenge IDs or `scope=login`
+in the registered callback. Each callback must match the request's host and
+path exactly. After deploying a callback change, start a fresh device challenge.
+
 # HafSQL indexing
 
 Post indexing uses HafSQL by default. It connects to the public HafSQL endpoint

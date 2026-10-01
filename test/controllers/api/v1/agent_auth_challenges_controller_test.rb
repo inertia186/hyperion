@@ -12,7 +12,10 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert payload.fetch('challenge_id').present?
     assert payload.fetch('expires_at').present?
     assert_includes payload.fetch('hivesigner_login_url'), 'https://hivesigner.com/oauth2/authorize?'
-    assert_includes payload.fetch('hivesigner_login_url'), CGI.escape(hivesigner_callback_api_v1_agent_auth_challenge_url(payload.fetch('challenge_id')))
+    authorize_params = URI.decode_www_form(URI.parse(payload.fetch('hivesigner_login_url')).query).to_h
+    assert_equal hivesigner_callback_api_v1_agent_auth_challenges_url, authorize_params.fetch('redirect_uri')
+    assert_equal payload.fetch('challenge_id'), authorize_params.fetch('state')
+    assert_equal 'login', authorize_params.fetch('scope')
     assert_includes payload.dig('keychain', 'message'), payload.fetch('challenge_id')
     assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
   end
@@ -26,6 +29,41 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     assert payload.fetch('challenge_id').present?
     assert_includes payload.fetch('hivesigner_login_url'), 'https://hivesigner.com/oauth2/authorize?'
     assert_match(/\A[0-9a-f]{64}\z/, payload.dig('keychain', 'digest'))
+  end
+
+  test 'device login uses a fixed callback on the requesting host across challenges' do
+    @request.host = 'www.hyperion.zone'
+    @request.env['HTTPS'] = 'on'
+
+    requests = 2.times.map do
+      post :create
+      assert_response :created
+      payload = response_json
+      params = URI.decode_www_form(URI.parse(payload.fetch('hivesigner_login_url')).query).to_h
+      assert_equal payload.fetch('challenge_id'), params.fetch('state')
+      assert_equal 'https://www.hyperion.zone/api/v1/agent/auth_challenges/hivesigner_callback', params.fetch('redirect_uri')
+      params
+    end
+
+    assert_not_equal requests.first.fetch('state'), requests.last.fetch('state')
+    assert_recognizes(
+      {controller: 'api/v1/agent_auth_challenges', action: 'hivesigner_callback'},
+      '/api/v1/agent/auth_challenges/hivesigner_callback'
+    )
+  end
+
+  test 'hivesigner callback rejects missing unknown and expired state before verifying token' do
+    expired = AgentAuthChallenge.issue!
+    expired.update!(expires_at: 1.minute.ago)
+
+    HivesignerAuthenticator.stub(:new, ->(_token) { flunk 'Invalid state must not authenticate' }) do
+      [nil, 'unknown', expired.token].each do |state|
+        get :hivesigner_callback, params: {state: state, access_token: 'token'}
+        assert_response :not_found
+      end
+    end
+
+    assert_nil expired.reload.account
   end
 
   test 'starts an auth challenge with alternate GET fallback path' do
@@ -54,7 +92,7 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     account = accounts(:curated)
 
     HivesignerAuthenticator.stub(:new, ->(_token) { FakeHivesignerAuthenticator.new(account) }) do
-      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+      get :hivesigner_callback, params: {state: challenge.token, access_token: 'token'}
     end
 
     assert_response :success
@@ -70,13 +108,13 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     account = accounts(:curated)
 
     HivesignerAuthenticator.stub(:new, ->(_token) { FakeHivesignerAuthenticator.new(account) }) do
-      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+      get :hivesigner_callback, params: {state: challenge.token, access_token: 'token'}
     end
 
     original_digest = challenge.reload.verification_code_digest
 
     HivesignerAuthenticator.stub(:new, ->(_token) { flunk 'HiveSigner should not be revalidated after challenge authorization' }) do
-      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+      get :hivesigner_callback, params: {state: challenge.token, access_token: 'token'}
     end
 
     assert_response :success
@@ -136,7 +174,7 @@ class Api::V1::AgentAuthChallengesControllerTest < ActionController::TestCase
     original_digest = challenge.verification_code_digest
 
     HivesignerAuthenticator.stub(:new, ->(_token) { flunk 'HiveSigner should not be revalidated after challenge redeem' }) do
-      get :hivesigner_callback, params: {id: challenge.token, access_token: 'token'}
+      get :hivesigner_callback, params: {state: challenge.token, access_token: 'token'}
     end
 
     assert_response :success
