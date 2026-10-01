@@ -29,7 +29,7 @@
     "select2": "4.1.0",
     "@hive/hive-content-renderer": "file:vendor/hive-content-renderer",
     "turbolinks": "^5.2.0",
-    "vite": "^7.2.0",
+    "vite": "^7.3.5",
     "vite-plugin-ruby": "^5.2.0"
   },
   "version": "0.1.0",
@@ -38,11 +38,14 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.1.0",
     "autoprefixer": "^10.4.20",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "sass": "^1.93.0",
     "tailwindcss": "^3.4.17",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
+  },
+  "resolutions": {
+    "vite": "^7.3.5"
   }
 }
