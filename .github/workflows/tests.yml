@@ -47,7 +47,8 @@ jobs:
         with:
           bundler-cache: true
       - name: Prepare test database
-        run: bundle exec rails db:prepare
+        # Tests load fixtures; application seeds depend on live Hive data.
+        run: bundle exec rails db:create db:schema:load
       - name: Build assets used by controller tests
         run: |
           yarn build
