@@ -78,6 +78,7 @@
     %header
       %script{crossorigin: "anonymous", integrity: "sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=", src: "https://code.jquery.com/jquery-3.5.1.slim.min.js"}
       = javascript_include_tag 'hive-content-renderer'
+      = javascript_include_tag 'post-heading-anchors'
 
     %div{style: 'max-width: 80%; display: flex; margin-left: auto; margin-right: auto;'}
       #source{style: 'display: none;'}
@@ -90,6 +91,7 @@
     :javascript
       window.onload = function() {
         // $('#cycle-view').focus();
+        scrollToHeading();
       }
       
       function keyPressed(e) {
@@ -103,6 +105,8 @@
         }
       });
       
+      var currentView = '#input';
+
       try {
         const renderer = new HiveContentRenderer.DefaultRenderer({
           baseUrl: "https://hive.blog/",
@@ -128,17 +132,35 @@
         const output = renderer.render(input);
         
         outputElem.html(output);
+        window.HyperionPostHeadings.addIds(outputElem[0]);
+        // Hidden fallback markup must not duplicate the visible heading IDs.
+        $('#input [id]').removeAttr('id');
         outputMarkupElem.text(output);
         
         $('#input').hide();
         $('#output').show();
+        currentView = '#output';
       } catch(e) {
         console.log(e);
       }
       
-      var currentView = '#output';
+      function scrollToHeading() {
+        window.HyperionPostHeadings.scrollToFragment(document.querySelector(currentView), window.location.hash);
+      }
+
+      $('#input, #output').on('click', function(event) {
+        if (window.HyperionPostHeadings.followFragment(event, this)) {
+          // Use this document's URL, not the external <base href>.
+          const url = new URL(window.location.href);
+          url.hash = event.target.closest('a').getAttribute('href');
+          if (url.href !== window.location.href) window.history.pushState(null, '', url.href);
+        }
+      });
+      window.addEventListener('hashchange', scrollToHeading);
+      scrollToHeading();
       
       function cycleView ( ) {
+        $('#input [id], #output [id]').removeAttr('id');
         $('#source').hide();
         $('#input').hide();
         $('#output').hide();
@@ -152,6 +174,8 @@
         }
         
         $(currentView).show();
+        window.HyperionPostHeadings.addIds(document.querySelector(currentView));
+        scrollToHeading();
       }
     
     %div#markdown-controls{style: 'opacity: 0;'}

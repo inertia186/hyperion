@@ -665,6 +665,31 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_not_includes body_html, '<h3 id="welcome-without-space">'
   end
 
+  test 'preview supports generated heading fragment links without allowing authored ids' do
+    post = posts(:allowed_unread)
+    post.update!(body: "# Real Heading\n\n[Jump](#real-heading)\n\n## Real Heading\n\n<div id=\"supplied\">Plain</div>\n\n## Custom {#supplied-heading}\n\n[unsafe](javascript:alert(1))")
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
+    assert_equal ['real-heading', 'real-heading-1', 'custom'], fragment.css('h1, h2').map { |heading| heading['id'] }
+    assert_equal '#real-heading', fragment.at_css('a')['href']
+    assert_empty fragment.css('#supplied, #supplied-heading, div[id], a[href^="javascript:"]')
+  end
+
+  test 'preview assigns anchors to all heading levels while keeping no-space markers literal' do
+    post = posts(:allowed_unread)
+    post.update!(body: (1..6).flat_map { |level| ["#{'#' * level} Level #{level}", "#{'#' * level}literal"] }.join("\n\n"))
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
+    assert_equal (1..6).map { |level| ["h#{level}", "level-#{level}"] }, fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
+    assert_equal (1..6).map { |level| "#{'#' * level}literal" }, fragment.css('p').map(&:text)
+  end
+
   test 'preview hardens embedded iframe html' do
     post = posts(:allowed_unread)
     post.update!(body: '<iframe src="https://www.youtube.com/embed/abc" width="640" height="360"></iframe>')

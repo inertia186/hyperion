@@ -101,12 +101,14 @@ private
     kramdown = Kramdown::Document.new(markdown_ready_body)
     html_body = harden_post_body_html(kramdown.to_html)
     html_body = ActionController::Base.helpers.sanitize(html_body, tags: ALLOWED_TAGS, attributes: ALLOWED_ATTRIBUTES)
+    html_body = PostHeadingAnchors.call(html_body)
     
     html_body.html_safe
   end
 
   def normalize_post_markdown(body)
-    body.gsub(/^([ \t]{0,3}\#{1,6})(?=\S)/) { "\\#{$1}" }
+    # Do not backtrack into a valid multi-hash heading's marker.
+    body.gsub(/^([ \t]{0,3}\#{1,6})(?=[^#\s])/) { "\\#{$1}" }
   end
 
   def harden_post_body_html(html)

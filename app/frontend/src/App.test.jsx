@@ -2492,14 +2492,18 @@ describe('App', () => {
     detail.resolve({
       id: 1,
       title: 'First Post',
-      body_markdown: '# Real Heading\n\n#c-c-c #hivegc',
+      body_markdown: '# Real Heading\n\n#c-c-c #hivegc\n\n[Jump to heading](#real-heading)',
       body_html: '<h1 id="c-c-c-hivegc">c-c-c #hivegc</h1>',
       urls: {}
     })
 
     await renderApp({waitForPreview: false})
 
-    expect(await screen.findByRole('heading', {name: 'Real Heading'})).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', {name: 'Real Heading'})
+    expect(heading).toHaveAttribute('id', 'real-heading')
+    heading.scrollIntoView = vi.fn()
+    fireEvent.click(screen.getByRole('link', {name: 'Jump to heading'}))
+    expect(heading.scrollIntoView).toHaveBeenCalledWith({block: 'start'})
     expect(screen.getByRole('link', {name: '#c-c-c'})).toBeInTheDocument()
     expect(screen.getByRole('link', {name: '#hivegc'})).toBeInTheDocument()
     expect(screen.queryByRole('heading', {name: 'c-c-c #hivegc'})).not.toBeInTheDocument()
