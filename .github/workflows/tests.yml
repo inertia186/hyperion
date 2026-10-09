@@ -1,0 +1,74 @@
+name: Tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rails:
+    name: Rails tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RAILS_ENV: test
+      BUNDLE_WITHOUT: development
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/hyperion_test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hyperion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hyperion_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Install Yarn Classic
+        run: npm install --global yarn@1.22.22
+      - name: Install frontend dependencies
+        run: yarn install --frozen-lockfile
+      - name: Install native gem build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential automake pkg-config libtool libffi-dev libssl-dev libgmp-dev libpq-dev
+      # Reads .ruby-version and the BUNDLED WITH version in Gemfile.lock.
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Prepare test database
+        # Tests load fixtures; application seeds depend on live Hive data.
+        run: bundle exec rails db:create db:schema:load
+      - name: Build assets used by controller tests
+        run: |
+          yarn build
+          yarn build:css
+          bundle exec rails vite:build
+      - name: Run Rails tests
+        run: bundle exec rails test
+
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Install Yarn Classic
+        run: npm install --global yarn@1.22.22
+      - name: Install frontend dependencies
+        run: yarn install --frozen-lockfile
+      - name: Run frontend tests
+        run: yarn test:frontend
