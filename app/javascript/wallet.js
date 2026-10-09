@@ -81,9 +81,11 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
       if (window.isSecureContext === false) unavailableReason = 'HiveAuth needs a secure connection. Open Hyperion over HTTPS, or use localhost on the computer running it.'
       else if (typeof window.crypto?.randomUUID !== 'function' || !window.crypto?.subtle) unavailableReason = 'HiveAuth needs browser encryption support. Please update your browser and open Hyperion over HTTPS.'
     }
+    const available = !unavailableReason && (provider === 'hivesigner' || (!!names[provider] && getCore().isProviderEnabled(provider)))
+    if (!available && provider === 'peakvault') unavailableReason = 'Peak Vault extension was not detected. Use Chrome or Firefox with Peak Vault installed and enabled for this site, then reload. In Safari, use HiveAuth or HiveSigner.'
     return {
       name: names[provider],
-      available: !unavailableReason && (provider === 'hivesigner' || (!!names[provider] && getCore().isProviderEnabled(provider))),
+      available,
       unavailableReason,
       signChallenge: !!names[provider] && provider !== 'hivesigner',
       vote: !!names[provider]

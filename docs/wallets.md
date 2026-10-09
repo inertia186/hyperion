@@ -27,6 +27,12 @@ computer; plain HTTP on a LAN hostname or IP will not work. On the computer
 running Rails, `http://localhost:3000` is also a secure context. Hyperion checks
 these capabilities before starting HiveAuth and explains how to proceed.
 
+Peak Vault requires its extension in the browser running Hyperion. Its
+[official releases](https://vault.peakd.com/peakvault/releases) list Chrome and
+Firefox builds, with no Safari build. Install or enable the extension for the
+site and reload; use HiveAuth or HiveSigner in Safari. When the extension is
+not detected, Hyperion explains these options before creating a login challenge.
+
 HiveSigner deliberately uses the existing Rails OAuth flow behind the adapter,
 with only `scope=login`. Its Aioha provider is not registered: Aioha's token
 broadcast path must not silently replace per-vote approval. The access token
@@ -95,22 +101,21 @@ The desktop login page has been visually checked with all four providers.
 On `http://localhost:3000`, a real HiveAuth request reached the QR approval
 dialog; cancellation removed the dialog and restored the login buttons.
 On the HTTP LAN hostname, the capability check displayed the HTTPS/localhost
-guidance before opening a request. No wallet approval or live transaction was
-completed. The phone QR handoff reached Keychain's approval screen, but approval
-stalled. Reproducing its signing bridge confirmed that the multiline challenge
-caused a JavaScript syntax error; a single-line challenge signs unchanged in the
-same reproduction. A model regression test covers the message format. A fresh
-phone approval after this fix and end-to-end desktop/mobile checks remain pending.
-Simulated extension tests are not evidence of real-wallet compatibility. Keep the PR in draft until the
-default providers pass the following checks; keep HiveAuth and Peak Vault
-disabled until their rows pass too.
+guidance before opening a request. After the single-line challenge fix, the user
+confirmed a successful HiveAuth login using mobile Keychain and localhost.
+HiveAuth voting, rejection, expiry, and logout checks remain pending; no live
+transaction has been verified. Peak Vault correctly reported a missing extension
+in Safari, and now explains the supported browser options. Its real extension
+login remains unverified. Simulated extension tests are not evidence of
+real-wallet compatibility. Keep the PR in draft until the default providers pass
+the following checks; keep HiveAuth and Peak Vault disabled until their rows pass too.
 
 | Provider | Desktop | Mobile / return flow |
 | --- | --- | --- |
 | Keychain | Pending: installed and missing extension, login, reload, vote, rejection, switch account, logout | Pending in Keychain's supported mobile browser |
 | HiveSigner | Pending: registered callback, login-only scope, explicit up/down/changed-weight approvals, close without approval | Pending: OAuth return and signing-page return |
-| HiveAuth | QR display and cancellation verified on localhost; phone handoff reached Keychain; pending approval after the single-line challenge fix, rejection, expiry, login and vote | Pending: deep link, approve, return, cancel, background/timeout |
-| Peak Vault | Pending: extension availability, signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
+| HiveAuth | QR display/cancellation verified; user confirmed mobile Keychain approval and localhost login after the single-line challenge fix; pending reload, rejection, expiry, vote and logout | QR approval/return confirmed by user; pending deep link, cancel and background/timeout |
+| Peak Vault | Missing extension handled in Safari with browser guidance; pending installed extension login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 
 For each supported environment, check an upvote, downvote, and changed weight
 against the chain result. Also expire the Rails session and change the wallet

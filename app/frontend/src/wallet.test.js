@@ -28,9 +28,24 @@ beforeEach(() => {
   vi.stubGlobal('isSecureContext', true)
   vi.stubGlobal('crypto', webcrypto)
 })
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain })
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain; delete window.peakvault })
 
 describe('wallet adapter', () => {
+  test('missing Peak Vault explains browser requirements without starting login, and detects it after installation', async () => {
+    delete window.peakvault
+    const fetcher = vi.fn()
+    const adapter = createWallet({fetcher})
+    const capability = adapter.capabilities('peakvault')
+    expect(capability.available).toBe(false)
+    expect(capability.unavailableReason).toContain('Chrome or Firefox')
+    expect(capability.unavailableReason).toContain('In Safari, use HiveAuth or HiveSigner')
+    await expect(adapter.connect({accountName, provider: 'peakvault'})).rejects.toThrow('Peak Vault extension was not detected')
+    expect(fetcher).not.toHaveBeenCalled()
+    window.peakvault = {requestSignBuffer: vi.fn()}
+    expect(adapter.capabilities('peakvault').available).toBe(true)
+    expect(adapter.capabilities('peakvault').unavailableReason).toBeUndefined()
+  })
+
   test('HiveAuth rejects HTTP origins before opening a wallet or creating a challenge', async () => {
     vi.stubGlobal('isSecureContext', false)
     const {adapter, core, fetcher} = setup({provider: 'hiveauth'})
