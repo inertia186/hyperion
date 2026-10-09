@@ -658,11 +658,10 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     body_html = response_json.fetch('body_html')
-    assert_includes body_html, '<h1 id="real-heading">Real Heading</h1>'
-    assert_includes body_html, '#c-c-c #hivegc #gaming'
-    assert_includes body_html, '###Welcome without space'
-    assert_not_includes body_html, '<h1 id="c-c-c-hivegc-gaming">'
-    assert_not_includes body_html, '<h3 id="welcome-without-space">'
+    fragment = Nokogiri::HTML::DocumentFragment.parse(body_html)
+    headings = fragment.css('h1, h2, h3, h4, h5, h6')
+    assert_equal [['h1', 'Real Heading']], headings.map { |heading| [heading.name, heading.text] }
+    assert_equal ['#c-c-c #hivegc #gaming', '###Welcome without space'], fragment.css('p').map(&:text)
   end
 
   test 'preview hardens embedded iframe html' do
