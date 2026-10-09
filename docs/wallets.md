@@ -105,8 +105,10 @@ guidance before opening a request. After the single-line challenge fix, the user
 confirmed a successful HiveAuth login using mobile Keychain and localhost.
 HiveAuth voting, rejection, expiry, and logout checks remain pending; no live
 transaction has been verified. Peak Vault correctly reported a missing extension
-in Safari, and now explains the supported browser options. Its real extension
-login remains unverified. Simulated extension tests are not evidence of
+in Safari, and now explains the supported browser options. The user confirmed
+that Hyperion successfully invoked the installed Peak Vault extension in Brave.
+No account had been imported, so signed login and voting remain unverified.
+Simulated extension tests are not evidence of
 real-wallet compatibility. Keep the PR in draft until the default providers pass
 the following checks; keep HiveAuth and Peak Vault disabled until their rows pass too.
 
@@ -115,7 +117,7 @@ the following checks; keep HiveAuth and Peak Vault disabled until their rows pas
 | Keychain | Pending: installed and missing extension, login, reload, vote, rejection, switch account, logout | Pending in Keychain's supported mobile browser |
 | HiveSigner | Pending: registered callback, login-only scope, explicit up/down/changed-weight approvals, close without approval | Pending: OAuth return and signing-page return |
 | HiveAuth | QR display/cancellation verified; user confirmed mobile Keychain approval and localhost login after the single-line challenge fix; pending reload, rejection, expiry, vote and logout | QR approval/return confirmed by user; pending deep link, cancel and background/timeout |
-| Peak Vault | Missing extension handled in Safari with browser guidance; pending installed extension login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
+| Peak Vault | User confirmed extension invocation in Brave; no account imported yet. Missing extension handled in Safari. Pending signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 
 For each supported environment, check an upvote, downvote, and changed weight
 against the chain result. Also expire the Rails session and change the wallet
