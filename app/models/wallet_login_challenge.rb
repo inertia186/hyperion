@@ -13,10 +13,11 @@ class WalletLoginChallenge < ApplicationRecord
     raise ArgumentError, 'This wallet is not enabled.' unless enabled_providers.include?(provider)
 
     token = SecureRandom.urlsafe_base64(32)
+    # Keychain mobile's signing bridge cannot handle literal line breaks.
     create!(
       token: token, account_name: account_name, provider: provider,
       session_digest: Digest::SHA256.hexdigest(binding), expires_at: TTL.from_now,
-      message: "Sign in to Hyperion at #{origin} as @#{account_name} using #{provider}.\nPosting authority only.\nChallenge: #{token}"
+      message: "Sign in to Hyperion at #{origin} as @#{account_name} using #{provider}. Posting authority only. Challenge: #{token}"
     )
   end
 

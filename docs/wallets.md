@@ -46,6 +46,13 @@ posting key must meet the account's posting weight threshold. Active, owner,
 memo, delegated account authorities, and signatures below that threshold are
 not accepted by the signature verifier. No private keys are requested.
 
+Keep the challenge on one line: Keychain mobile's
+[signing bridge](https://github.com/hive-keychain/hive-keychain-mobile/blob/e6f2de660fbe143a5ca01b07c5497221fa9e911d/src/components/bridge/index.tsx#L26)
+inserts string arguments into JavaScript without escaping line breaks. A
+multiline challenge causes a syntax error before signing and can leave its
+Approve screen waiting indefinitely. Rails issues and verifies the same
+single-line message; the client must not alter it before signing.
+
 HiveSigner instead returns to `/sessions/authorized` with the challenge token
 in OAuth `state`. Rails requires the same browser binding and the account
 returned by `/api/me` to match the challenge. Redemption is locked, checked
@@ -89,8 +96,12 @@ On `http://localhost:3000`, a real HiveAuth request reached the QR approval
 dialog; cancellation removed the dialog and restored the login buttons.
 On the HTTP LAN hostname, the capability check displayed the HTTPS/localhost
 guidance before opening a request. No wallet approval or live transaction was
-submitted. End-to-end desktop/mobile checks remain pending. Simulated extension
-tests are not evidence of real-wallet compatibility. Keep the PR in draft until the
+completed. The phone QR handoff reached Keychain's approval screen, but approval
+stalled. Reproducing its signing bridge confirmed that the multiline challenge
+caused a JavaScript syntax error; a single-line challenge signs unchanged in the
+same reproduction. A model regression test covers the message format. A fresh
+phone approval after this fix and end-to-end desktop/mobile checks remain pending.
+Simulated extension tests are not evidence of real-wallet compatibility. Keep the PR in draft until the
 default providers pass the following checks; keep HiveAuth and Peak Vault
 disabled until their rows pass too.
 
@@ -98,7 +109,7 @@ disabled until their rows pass too.
 | --- | --- | --- |
 | Keychain | Pending: installed and missing extension, login, reload, vote, rejection, switch account, logout | Pending in Keychain's supported mobile browser |
 | HiveSigner | Pending: registered callback, login-only scope, explicit up/down/changed-weight approvals, close without approval | Pending: OAuth return and signing-page return |
-| HiveAuth | QR display and cancellation verified on localhost; pending phone handoff, approved/rejected/expired requests, login and vote | Pending: deep link, approve, return, cancel, background/timeout |
+| HiveAuth | QR display and cancellation verified on localhost; phone handoff reached Keychain; pending approval after the single-line challenge fix, rejection, expiry, login and vote | Pending: deep link, approve, return, cancel, background/timeout |
 | Peak Vault | Pending: extension availability, signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 
 For each supported environment, check an upvote, downvote, and changed weight

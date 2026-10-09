@@ -1,6 +1,15 @@
 require 'test_helper'
 
 class WalletLoginChallengeTest < ActiveSupport::TestCase
+  test 'HiveAuth challenges stay on one line for the Keychain mobile signing bridge' do
+    with_env('HYPERION_WALLET_PROVIDERS' => 'hiveauth') do
+      challenge = issue(provider: 'hiveauth')
+      assert_no_match(/[\r\n]/, challenge.message)
+      assert_includes challenge.message, 'Posting authority only.'
+      assert_includes challenge.message, "Challenge: #{challenge.token}"
+    end
+  end
+
   test 'a challenge is consumed only once even with the same browser binding' do
     challenge = issue
     assert_equal accounts(:curated), challenge.consume!('binding') { accounts(:curated) }
@@ -21,7 +30,7 @@ class WalletLoginChallengeTest < ActiveSupport::TestCase
   end
 
 private
-  def issue
-    WalletLoginChallenge.issue!(account_name: 'fixture-curator', provider: 'keychain', binding: 'binding', origin: 'https://hyperion.zone')
+  def issue(provider: 'keychain')
+    WalletLoginChallenge.issue!(account_name: 'fixture-curator', provider: provider, binding: 'binding', origin: 'https://hyperion.zone')
   end
 end
