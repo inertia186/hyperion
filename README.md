@@ -30,6 +30,9 @@ HiveSigner returns to Hyperion. Do not include challenge IDs or `scope=login`
 in the registered callback. Each callback must match the request's host and
 path exactly. After deploying a callback change, start a fresh device challenge.
 
+See [browser wallets](docs/wallets.md) for provider capabilities, authentication
+policy, rollout settings, and the desktop/mobile verification checklist.
+
 # HafSQL indexing
 
 Post indexing uses HafSQL by default. It connects to the public HafSQL endpoint

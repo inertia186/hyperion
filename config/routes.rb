@@ -74,6 +74,7 @@ Rails.application.routes.draw do
   resources :sessions, only: %i(new create destroy) do
     collection do
       get :authorized # hivesigner
+      post :complete
     end
     
     member do

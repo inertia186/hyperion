@@ -3,21 +3,20 @@
     .jumbotron
       %h1.display-4 Hyperion
 .row
-  .col-4
-  .col-4
+  .col-12.col-md-6.offset-md-3
     .text-center.mb-3
       = link_to 'Are you a robot? Use the Hyperion Agent API', hyperion_agent_discovery_path, class: 'btn btn-outline-secondary btn-block', data: {agent_discovery: true}
-    = form_tag sessions_path, remote: true, 'data-controller' => 'sessions', 'data-action' => 'ajax:success->sessions#beginLogin' do
+    = form_tag sessions_path, 'data-controller' => 'sessions', 'data-action' => 'submit->sessions#beginLogin' do
       .form-group
         .form-row
           .col-12
             = label_tag :account_name, 'Account Name', class: 'col-form-label mb-2'
-            = text_field_tag :account_name, @account_name, class: 'form-control mb-2'
+            = text_field_tag :account_name, @account_name, class: 'form-control mb-2', required: true, autocomplete: 'username', autocapitalize: 'none'
       .form-group
         .form-row
-          .mx-auto= image_submit_tag image_url('hive-keychain.png'), style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
-          .mx-auto= image_submit_tag image_url('hivesigner.svg'), name: 'hivesigner', style: 'width: 143px; height: 30px;', class: 'btn btn-primary'
+          - {'keychain' => 'Hive Keychain', 'hivesigner' => 'HiveSigner', 'hiveauth' => 'HiveAuth', 'peakvault' => 'Peak Vault'}.each do |provider, name|
+            - if WalletLoginChallenge.enabled_providers.include?(provider)
+              .mx-auto.mb-2= button_tag name, name: 'provider', value: provider, class: 'btn btn-primary'
     
-    #success-alert.alert.alert-primary{style: 'display: none;'}
-    #error-alert.alert.alert-danger{style: 'display: none;'}
-  .col-4
+    #success-alert.alert.alert-primary{hidden: true, role: 'status'}
+    #error-alert.alert.alert-danger{hidden: flash[:alert].blank?, role: 'alert'}= flash[:alert]

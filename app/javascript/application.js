@@ -44,3 +44,8 @@ document.addEventListener("turbolinks:load", () => {
 })
 
 require("./controllers")
+
+const { wallet } = require('./wallet')
+document.addEventListener('click', (event) => {
+  if (event.target.closest('a[data-method="delete"][href^="/sessions/"]')) wallet.disconnect().catch(() => {})
+})

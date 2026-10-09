@@ -13,8 +13,6 @@
     %meta{content: ENV.fetch('HYPERION_BROWSER_NODE_URL', 'https://api.openhive.network'), name: 'hive-api-url'}
     %script{src: "https://cdn.jsdelivr.net/npm/@hiveio/hive-js/dist/hive.min.js"}
     -# %script{src: "https://cdn.jsdelivr.net/npm/hivesigner"}
-    :javascript
-      var hivesignerAccessToken = "#{session[:hivesigner_access_token]}";
     = stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload'
     = javascript_include_tag 'application', 'data-turbolinks-track': 'reload', defer: true
   %body.disabled-overlay{data: {controller: 'hyperion'}}
@@ -56,7 +54,7 @@
         %code.badge.badge-light ? = toggle help
 
     - if !!current_account
-      .container#current-account{data: {name: current_account.name}}
+      .container#current-account{data: {name: current_account.name, wallet_provider: session[:wallet_provider]}}
     .container#icon-set{style: 'display: none; pointer-events: none;'}
       #icon-star-fill-stroke-black= icon('star-fill', stroke: 'black')
       #icon-star-stroke-black= icon('star', stroke: 'black')

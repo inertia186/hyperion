@@ -1,140 +1,201 @@
 require 'test_helper'
 
 class SessionsControllerTest < ActionDispatch::IntegrationTest
-  HIVE_KEYCHAIN_ACCOUNT = 'inertia'
-  HIVE_KEYCHAIN_PUBLIC_KEY = 'STM5LmctctRD4qavoB43BWCs1WJ8TmJV1xZoTRngpacrSc7Dwq349'
-  HIVE_KEYCHAIN_SIGNATURE = '1f720017ab6a297648dfeabd997d4aece902cc7303b646311b20c54915d7bf89854d260aef211138752891a8f00a4ccb084abe19f8d4c99d28ff97b9148ddd3e80'
-  HIVE_KEYCHAIN_DIGEST = 'b86d09e4c042e841fd8907a3e15e654bd86a92ae4d5aebdf122b66ff287e2669'
-
-  def test_routings
-    assert_routing 'sessions/account/authorized', controller: 'sessions', action: 'authorized', id: 'account'
-    assert_routing 'sessions/authorized', controller: 'sessions', action: 'authorized'
-    assert_routing 'sessions/new', controller: 'sessions', action: 'new'
-    assert_routing({ method: 'post', path: '/sessions' }, controller: 'sessions', action: 'create')
-    assert_routing({ method: 'delete', path: '/sessions/account' }, controller: 'sessions', action: 'destroy', id: 'account')
-  end
-
-  def test_new_session_links_agents_to_well_known_manifest
+  test 'login shows enabled wallets and agent discovery' do
     get new_session_path
 
     assert_response :success
-    assert_select 'link[rel="hyperion-agent"][href="/.well-known/hyperion-agent.json"][type="application/json"]'
-    assert_select 'meta[name="hyperion-agent-discovery"][content="/.well-known/hyperion-agent.json"]'
-    assert_select 'a.btn[data-agent-discovery="true"][href="/.well-known/hyperion-agent.json"]', text: 'Are you a robot? Use the Hyperion Agent API'
+    assert_select 'a[data-agent-discovery="true"][href="/.well-known/hyperion-agent.json"]'
+    assert_select 'button[value="keychain"]', text: 'Hive Keychain'
+    assert_select 'button[value="hivesigner"]', text: 'HiveSigner'
+    assert_select 'button[value="hiveauth"]', count: 0
+    assert_select 'button[value="peakvault"]', count: 0
   end
 
-  def test_hivesigner_redirect_uses_current_host
-    host! 'hyperion.test'
-
-    post sessions_path, params: { account_name: 'inertia', hivesigner: '' }
-
-    assert_redirected_to %r{\Ahttps://hivesigner\.com/oauth2/authorize\?}
-    uri = URI.parse(response.location)
-    params = Rack::Utils.parse_query(uri.query)
-
-    assert_equal 'hyperion.zone', params['client_id']
-    assert_equal 'http://hyperion.test/sessions/authorized', params['redirect_uri']
-    assert_equal 'login', params['scope']
+  test 'additional wallets can be enabled for verification' do
+    with_env('HYPERION_WALLET_PROVIDERS' => 'keychain,hivesigner,hiveauth,peakvault') do
+      get new_session_path
+      assert_select 'button[value="hiveauth"]'
+      assert_select 'button[value="peakvault"]'
+    end
   end
 
-  def test_hivesigner_xhr_navigates_browser_to_current_host_callback
-    host! '192.168.141.168:3000'
+  test 'issues a challenge bound to the normalized account and browser' do
+    challenge = start_login(account_name: ' @Fixture-Curator ')
 
-    post sessions_path,
-      params: { account_name: 'inertia', hivesigner: '' },
-      headers: { 'X-Requested-With' => 'XMLHttpRequest' }
+    assert_equal 'fixture-curator', challenge.account_name
+    assert_equal 'keychain', challenge.provider
+    assert_includes challenge.message, challenge.token
+    assert_includes challenge.message, 'http://www.example.com'
+    assert_includes challenge.message, '@fixture-curator'
+    assert challenge.available_for?(session[:wallet_login_binding])
+    assert_nil session[:current_account]
+  end
+
+  test 'rejects unknown providers and invalid accounts' do
+    ['metamasksnap', 'hiveauth', '', 'keychain'].each do |provider|
+      post sessions_path, params: {account_name: '<script>', provider: provider}, as: :json
+      assert_response :unprocessable_entity
+    end
+    assert_equal 0, WalletLoginChallenge.count
+  end
+
+  test 'signed login verifies the server message and rotates the session without issuing an agent token' do
+    challenge = start_login
+    verifier = ->(account_name:, message:, signature:) do
+      assert_equal 'fixture-curator', account_name
+      assert_equal challenge.message, message
+      assert_equal 'signed-proof', signature
+      true
+    end
+    assert_no_difference('AgentAccessToken.count') do
+      WalletSignatureAuthenticator.stub(:valid?, verifier) do
+        post complete_sessions_path, params: {token: challenge.token, signature: 'signed-proof', digest: 'attacker-digest', account_name: 'attacker'}, as: :json
+      end
+    end
 
     assert_response :success
-    assert_equal 'text/javascript', response.media_type
-    assert_includes response.body, 'window.location.assign'
-    assert_includes response.body, 'redirect_uri=http%3A%2F%2F192.168.141.168%3A3000%2Fsessions%2Fauthorized'
+    assert_equal 'fixture-curator', session[:current_account].name
+    assert_equal 'keychain', session[:wallet_provider]
+    assert_nil session[:wallet_login_binding]
+    assert challenge.reload.consumed_at
   end
 
-  def test_hivesigner_redirect_supports_tailscale_host_callback
-    host! 'toto.tail1b9f02.ts.net:3000'
-
-    post sessions_path, params: { account_name: 'inertia', hivesigner: '' }
-
-    assert_redirected_to %r{\Ahttps://hivesigner\.com/oauth2/authorize\?}
-    uri = URI.parse(response.location)
-    params = Rack::Utils.parse_query(uri.query)
-
-    assert_equal 'http://toto.tail1b9f02.ts.net:3000/sessions/authorized', params['redirect_uri']
-  end
-
-  def test_hivesigner_cert_store_does_not_require_crl
-    store = SessionsController.new.send(:hivesigner_cert_store)
-
-    assert_instance_of OpenSSL::X509::Store, store
-  end
-
-  def test_hive_keychain_authorized_signs_in_with_valid_signature
-    Account.stub(:public_keys, [HIVE_KEYCHAIN_PUBLIC_KEY]) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params
+  test 'expired and replayed challenges never authenticate' do
+    challenge = start_login
+    challenge.update!(expires_at: 1.second.ago)
+    WalletSignatureAuthenticator.stub(:valid?, ->(**) { flunk 'Expired challenge must not verify' }) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
+      assert_response :unprocessable_entity
     end
-
-    assert_redirected_to root_path
-    assert_equal HIVE_KEYCHAIN_ACCOUNT, session[:current_account].name
+    challenge = start_login
+    WalletSignatureAuthenticator.stub(:valid?, true) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
+      assert_response :success
+    end
+    WalletSignatureAuthenticator.stub(:valid?, ->(**) { flunk 'Used challenge must not verify' }) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
+      assert_response :unprocessable_entity
+    end
   end
 
-  def test_hive_keychain_authorized_redirects_to_spa_when_return_to_is_legacy_inbox
-    get posts_path
+  test 'a challenge from a different browser cannot be redeemed' do
+    challenge = start_login
+    other = open_session
+    WalletSignatureAuthenticator.stub(:valid?, ->(**) { flunk 'Wrong browser must not verify' }) do
+      other.post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
+      assert_equal 422, other.response.status
+    end
+    assert_nil challenge.reload.consumed_at
+  end
 
+  test 'invalid signatures do not establish a session or consume the challenge' do
+    challenge = start_login
+    WalletSignatureAuthenticator.stub(:valid?, false) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'bad-proof'}, as: :json
+    end
+    assert_response :unprocessable_entity
+    assert_nil session[:current_account]
+    assert_nil challenge.reload.consumed_at
+  end
+
+  test 'legacy client supplied digest login is rejected' do
+    get authorized_session_path('fixture-curator'), params: {digest: 'a' * 64, signature: 'a' * 130, public_key: 'key'}
     assert_redirected_to new_session_url
+    assert_nil session[:current_account]
+  end
 
-    Account.stub(:public_keys, [HIVE_KEYCHAIN_PUBLIC_KEY]) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params
+  test 'HiveSigner uses a fixed callback on the current host and only login scope' do
+    host! 'hyperion.test'
+    challenge = start_login(provider: 'hivesigner')
+    params = URI.decode_www_form(URI.parse(response.parsed_body.fetch('redirect_url')).query).to_h
+    assert_equal 'http://hyperion.test/sessions/authorized', params.fetch('redirect_uri')
+    assert_equal 'login', params.fetch('scope')
+    assert_equal 'hyperion.zone', params.fetch('client_id')
+    assert_equal challenge.token, params.fetch('state')
+  end
+
+  test 'HiveSigner callback verifies the token and account and consumes state' do
+    challenge = start_login(provider: 'hivesigner')
+    authenticator = Struct.new(:account).new(accounts(:curated))
+    HivesignerAuthenticator.stub(:new, ->(token) { assert_equal 'token', token; authenticator }) do
+      get authorized_sessions_path, params: {state: challenge.token, access_token: 'token', username: 'untrusted-name'}
     end
-
     assert_redirected_to root_path
-    assert_nil session[:return_to]
-    assert_equal HIVE_KEYCHAIN_ACCOUNT, session[:current_account].name
+    assert_equal 'fixture-curator', session[:current_account].name
+    assert_equal 'hivesigner', session[:wallet_provider]
+    assert_nil session[:hivesigner_access_token]
+    assert challenge.reload.consumed_at
+    HivesignerAuthenticator.stub(:new, ->(*) { flunk 'Used state must not verify' }) do
+      get authorized_sessions_path, params: {state: challenge.token, access_token: 'token'}
+    end
+    assert_redirected_to new_session_url
   end
 
-  def test_hive_keychain_authorized_redirects_when_public_key_is_not_on_account
-    Account.stub(:public_keys, []) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params
+  test 'HiveSigner rejects another account and missing state' do
+    challenge = start_login(provider: 'hivesigner')
+    authenticator = Struct.new(:account).new(Account.new(name: 'different-account'))
+    HivesignerAuthenticator.stub(:new, authenticator) do
+      get authorized_sessions_path, params: {state: challenge.token, access_token: 'token'}
     end
-
-    assert_redirected_to new_session_url(account_name: HIVE_KEYCHAIN_ACCOUNT)
+    assert_redirected_to new_session_url
     assert_nil session[:current_account]
+    assert_nil challenge.reload.consumed_at
+    get authorized_sessions_path, params: {access_token: 'token'}
+    assert_redirected_to new_session_url
   end
 
-  def test_hive_keychain_authorized_redirects_when_signature_is_malformed
-    Account.stub(:public_keys, [HIVE_KEYCHAIN_PUBLIC_KEY]) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params(signature: 'not-hex')
+  test 'logout clears the Rails wallet and account' do
+    challenge = start_login
+    WalletSignatureAuthenticator.stub(:valid?, true) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
     end
-
-    assert_redirected_to new_session_url(account_name: HIVE_KEYCHAIN_ACCOUNT)
+    delete session_path('fixture-curator')
+    assert_redirected_to new_session_url
     assert_nil session[:current_account]
+    assert_nil session[:wallet_provider]
   end
 
-  def test_hive_keychain_authorized_redirects_when_public_key_is_malformed
-    public_key = 'STM'
-
-    Account.stub(:public_keys, [public_key]) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params(public_key: public_key)
+  test 'HiveSigner network failures return a useful login error without consuming state' do
+    challenge = start_login(provider: 'hivesigner')
+    authenticator = Object.new
+    def authenticator.account = raise(SocketError, 'unavailable')
+    HivesignerAuthenticator.stub(:new, authenticator) do
+      get authorized_sessions_path, params: {state: challenge.token, access_token: 'token'}
     end
-
-    assert_redirected_to new_session_url(account_name: HIVE_KEYCHAIN_ACCOUNT)
+    assert_redirected_to new_session_url
     assert_nil session[:current_account]
+    assert_nil challenge.reload.consumed_at
+    follow_redirect!
+    assert_select '#error-alert:not([hidden])', text: 'Login could not be verified. Please start again.'
   end
 
-  def test_hive_keychain_authorized_redirects_when_signature_does_not_match_public_key
-    Account.stub(:public_keys, [HIVE_KEYCHAIN_PUBLIC_KEY]) do
-      get authorized_session_path(HIVE_KEYCHAIN_ACCOUNT), params: hive_keychain_params(digest: '0' * 64)
+  test 'browser challenge endpoints require CSRF protection and responses are not cached' do
+    previous = SessionsController.allow_forgery_protection
+    SessionsController.allow_forgery_protection = true
+    assert_no_difference('WalletLoginChallenge.count') do
+      post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json
     end
-
-    assert_redirected_to new_session_url(account_name: HIVE_KEYCHAIN_ACCOUNT)
-    assert_nil session[:current_account]
+    assert_response :unprocessable_entity
+    assert_includes response.body, 'InvalidAuthenticityToken'
+    get new_session_path
+    token = css_select('meta[name="csrf-token"]').first['content']
+    post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => token}
+    assert_response :created
+    assert_equal 'no-store', response.headers['Cache-Control']
+    WalletSignatureAuthenticator.stub(:valid?, ->(**) { flunk 'CSRF failure must not verify a signature' }) do
+      post complete_sessions_path, params: {token: response.parsed_body.fetch('token'), signature: 'proof'}, as: :json
+    end
+    assert_response :unprocessable_entity
+    assert_includes response.body, 'InvalidAuthenticityToken'
+  ensure
+    SessionsController.allow_forgery_protection = previous
   end
 
 private
-  def hive_keychain_params(overrides = {})
-    {
-      public_key: HIVE_KEYCHAIN_PUBLIC_KEY,
-      signature: HIVE_KEYCHAIN_SIGNATURE,
-      digest: HIVE_KEYCHAIN_DIGEST
-    }.merge(overrides)
+  def start_login(account_name: 'fixture-curator', provider: 'keychain')
+    post sessions_path, params: {account_name: account_name, provider: provider}, as: :json
+    assert_response :created
+    WalletLoginChallenge.find_by!(token: response.parsed_body.fetch('token'))
   end
 end

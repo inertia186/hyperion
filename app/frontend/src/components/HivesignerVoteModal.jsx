@@ -14,6 +14,7 @@ export default function HivesignerVoteModal({url, onClose}) {
             <X size={15} />
           </button>
         </div>
+        <p className="px-3 py-2 text-sm text-slate-700">Approve the vote in HiveSigner. Closing this window only checks the latest vote state.</p>
         <iframe className="min-h-0 flex-1 border-0" title="Hivesigner vote" src={url} />
       </div>
     </div>
