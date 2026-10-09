@@ -21,6 +21,12 @@ verification instance, use `keychain,hivesigner,hiveauth,peakvault` to exercise
 the additional providers. Do not enable them in production until their checks
 below pass. An empty allowlist disables new browser wallet logins.
 
+HiveAuth needs a secure browser context for both `crypto.randomUUID()` and
+`crypto.subtle` encryption. Use HTTPS when reaching development from another
+computer; plain HTTP on a LAN hostname or IP will not work. On the computer
+running Rails, `http://localhost:3000` is also a secure context. Hyperion checks
+these capabilities before starting HiveAuth and explains how to proceed.
+
 HiveSigner deliberately uses the existing Rails OAuth flow behind the adapter,
 with only `scope=login`. Its Aioha provider is not registered: Aioha's token
 broadcast path must not silently replace per-vote approval. The access token
@@ -78,11 +84,13 @@ clicks, and dismissing HiveSigner without false success. The real Aioha Keychain
 bridge is exercised with a simulated extension, including reload and logout.
 Both the legacy esbuild bundle and React/Vite build are checked.
 
-Real-wallet desktop and mobile checks have **not** been performed for any
-provider in this change. No live transaction was submitted. The local Rails
-login page returned HTTP 200, but the collaborative preview browser failed to
-navigate to it; visual verification remains pending. Simulated extension tests
-are not evidence of real-wallet compatibility. Keep the PR in draft until the
+The desktop login page has been visually checked with all four providers.
+On `http://localhost:3000`, a real HiveAuth request reached the QR approval
+dialog; cancellation removed the dialog and restored the login buttons.
+On the HTTP LAN hostname, the capability check displayed the HTTPS/localhost
+guidance before opening a request. No wallet approval or live transaction was
+submitted. End-to-end desktop/mobile checks remain pending. Simulated extension
+tests are not evidence of real-wallet compatibility. Keep the PR in draft until the
 default providers pass the following checks; keep HiveAuth and Peak Vault
 disabled until their rows pass too.
 
@@ -90,7 +98,7 @@ disabled until their rows pass too.
 | --- | --- | --- |
 | Keychain | Pending: installed and missing extension, login, reload, vote, rejection, switch account, logout | Pending in Keychain's supported mobile browser |
 | HiveSigner | Pending: registered callback, login-only scope, explicit up/down/changed-weight approvals, close without approval | Pending: OAuth return and signing-page return |
-| HiveAuth | Pending: QR handoff, approved/rejected/expired requests, login and vote | Pending: deep link, approve, return, cancel, background/timeout |
+| HiveAuth | QR display and cancellation verified on localhost; pending phone handoff, approved/rejected/expired requests, login and vote | Pending: deep link, approve, return, cancel, background/timeout |
 | Peak Vault | Pending: extension availability, signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 
 For each supported environment, check an upvote, downvote, and changed weight

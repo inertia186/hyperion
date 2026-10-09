@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { webcrypto } from 'node:crypto'
 import { createWallet } from '../../javascript/wallet'
 
 const accountName = 'fixture-curator'
@@ -22,10 +23,36 @@ function setup({provider = 'keychain', timeoutMs = 120000} = {}) {
   return {adapter, core, fetcher, onRequest, close}
 }
 
-beforeEach(() => localStorage.clear())
-afterEach(() => { vi.useRealTimers(); delete window.hive_keychain })
+beforeEach(() => {
+  localStorage.clear()
+  vi.stubGlobal('isSecureContext', true)
+  vi.stubGlobal('crypto', webcrypto)
+})
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain })
 
 describe('wallet adapter', () => {
+  test('HiveAuth rejects HTTP origins before opening a wallet or creating a challenge', async () => {
+    vi.stubGlobal('isSecureContext', false)
+    const {adapter, core, fetcher} = setup({provider: 'hiveauth'})
+    expect(adapter.capabilities('hiveauth').available).toBe(false)
+    expect(adapter.capabilities('peakvault').available).toBe(true)
+    await expect(adapter.connect({accountName, provider: 'hiveauth'})).rejects.toThrow('HTTPS, or use localhost')
+    await expect(adapter.signChallenge({account_name: accountName, provider: 'hiveauth', message: 'challenge'})).rejects.toThrow('secure connection')
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(core.logoutAll).not.toHaveBeenCalled()
+    expect(core.login).not.toHaveBeenCalled()
+    await expect(adapter.vote({...voteArgs, provider: 'hiveauth'})).rejects.toThrow('secure connection')
+    expect(core.vote).not.toHaveBeenCalled()
+  })
+
+  test.each(['randomUUID', 'subtle'])('HiveAuth explains missing %s support in a secure context', async (missing) => {
+    vi.stubGlobal('crypto', {randomUUID: webcrypto.randomUUID.bind(webcrypto), subtle: webcrypto.subtle, [missing]: undefined})
+    const {adapter, core, fetcher} = setup({provider: 'hiveauth'})
+    await expect(adapter.connect({accountName, provider: 'hiveauth'})).rejects.toThrow('update your browser')
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(core.login).not.toHaveBeenCalled()
+  })
+
   test.each(['keychain', 'hiveauth', 'peakvault'])('verifies a server-issued %s challenge before completing Rails login', async (provider) => {
     const {adapter, core, fetcher} = setup({provider})
     fetcher.mockResolvedValueOnce(response({token: 'token', account_name: accountName, provider, message: 'server challenge'}))

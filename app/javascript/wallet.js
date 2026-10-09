@@ -76,12 +76,23 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
   }
 
   function capabilities(provider) {
+    let unavailableReason
+    if (provider === 'hiveauth') {
+      if (window.isSecureContext === false) unavailableReason = 'HiveAuth needs a secure connection. Open Hyperion over HTTPS, or use localhost on the computer running it.'
+      else if (typeof window.crypto?.randomUUID !== 'function' || !window.crypto?.subtle) unavailableReason = 'HiveAuth needs browser encryption support. Please update your browser and open Hyperion over HTTPS.'
+    }
     return {
       name: names[provider],
-      available: provider === 'hivesigner' || (!!names[provider] && getCore().isProviderEnabled(provider)),
+      available: !unavailableReason && (provider === 'hivesigner' || (!!names[provider] && getCore().isProviderEnabled(provider))),
+      unavailableReason,
       signChallenge: !!names[provider] && provider !== 'hivesigner',
       vote: !!names[provider]
     }
+  }
+
+  function requireAvailable(provider) {
+    const capability = capabilities(provider)
+    if (!capability.available) throw new Error(capability.unavailableReason || `${names[provider]} is not available in this browser.`)
   }
 
   async function disconnect() {
@@ -92,7 +103,7 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
   async function signChallenge(challenge) {
     const {provider, account_name: accountName, message} = challenge
     if (!capabilities(provider).signChallenge) throw new Error('This wallet cannot sign a login challenge.')
-    if (!capabilities(provider).available) throw new Error(`${names[provider]} is not available in this browser.`)
+    requireAvailable(provider)
     const result = await walletRequest((aioha) => aioha.login(provider, accountName, {msg: message, keyType: KeyTypes.Posting}))
     if (result.username !== accountName || result.provider !== provider) throw new Error('The wallet account changed. Please sign in again.')
     return result.result
@@ -100,6 +111,7 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
 
   async function connect({accountName, provider}) {
     if (!names[provider]) throw new Error('Choose a supported wallet.')
+    requireAvailable(provider)
     await disconnect()
     const challenge = await request('/sessions', {account_name: accountName, provider})
     if (provider === 'hivesigner') return {redirect_url: challenge.redirect_url}
@@ -127,7 +139,7 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
         localStorage.getItem('aiohaUsername') !== accountName || localStorage.getItem('aiohaProvider') !== provider) {
       throw new Error('Reconnect your wallet by signing in again before voting.')
     }
-    if (!capabilities(provider).available) throw new Error(`${names[provider]} is not available in this browser.`)
+    requireAvailable(provider)
     const result = await walletRequest((client) => client.vote(author, permlink, weight))
     return {status: 'submitted', transactionId: result.result}
   }
