@@ -27,6 +27,13 @@ class HyperionAgent
   def digest(params = {})
     query_params = normalize_query_params(params).merge(sort: 'interesting')
     result = PostCurationQuery.new(account: account, params: query_params, session: session).call
+    posts = result.posts.map { |post| post_presenter.digest(post, result) }
+    votes = PostChainPayload.new(account: account).current_votes(posts.map { |post| [post[:author], post[:permlink]] })
+    posts.each do |post|
+      identity = [post[:author], post[:permlink]]
+      post[:current_vote] = votes[identity]
+      post[:current_vote_status] = votes.key?(identity) ? 'ready' : 'unavailable'
+    end
 
     {
       query: result.query_state,
@@ -38,7 +45,7 @@ class HyperionAgent
       },
       mode_counts: result.mode_counts,
       context_matches: context_matches(result),
-      posts: result.posts.map { |post| post_presenter.digest(post, result) },
+      posts: posts,
       ignored_tags: result.ignored_tags,
       favorite_tags: result.favorite_tag_set.to_a
     }

@@ -95,6 +95,7 @@ private
       '/api/v1/agent/digest' => {
         get: {
           summary: 'Return curated unread posts for agent summarization.',
+          description: 'Each post includes current_vote in Hive weight units (10000 = 100%, negative = downvote, 0 = removed vote). When current_vote_status is ready, null means no vote was found. When unavailable, vote data could not be confirmed; do not treat null as an unvoted post.',
           parameters: [
             query_parameter('limit', 'integer', 'Maximum posts to return. Defaults to 10.'),
             query_parameter('tag', 'string', 'Optional tag/category filter.'),

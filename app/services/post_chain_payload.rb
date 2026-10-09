@@ -3,8 +3,9 @@ require 'timeout'
 class PostChainPayload
   CACHE_TTL = 2.minutes
   TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
+  ACTIVE_VOTES_LIMIT = 1_000
 
-  def initialize(account:, api: Account.api, cache: Rails.cache, timeout: TIMEOUT)
+  def initialize(account:, api: nil, cache: Rails.cache, timeout: TIMEOUT)
     @account = account
     @api = api
     @cache = cache
@@ -16,7 +17,6 @@ class PostChainPayload
     votes = payload.fetch(:votes)
     replies = payload.fetch(:replies)
     content = payload.fetch(:content)
-    current_vote = Array(votes).find { |vote| chain_value(vote, :voter) == account.name }
     payout = payout_value(content)
     persist_payout(post, payout)
 
@@ -29,8 +29,37 @@ class PostChainPayload
       payout_currency: post.payout_currency,
       payout_fetched_at: post.payout_fetched_at&.iso8601,
       payout_source: post.payout_source,
-      current_vote: chain_value(current_vote, :percent)
+      current_vote: vote_percent(votes)
     }
+  end
+
+  def current_votes(identities)
+    votes = {}
+    return votes if identities.empty?
+
+    Timeout.timeout(timeout) do
+      client = api.rpc_client
+      identities.uniq.each_slice(Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM) do |batch|
+        requests = batch.map { |identity| client.put(:condenser_api, :get_active_votes, identity).first }
+        identities_by_id = requests.to_h { |request| [request.fetch(:id), request.fetch(:params)] }
+
+        client.rpc_batch_execute(api_name: :condenser_api, request_object: requests) do |result, error, id|
+          identity = identities_by_id[id]
+          next unless identity && error.blank? && result.is_a?(Array)
+
+          percent = vote_percent(result)
+          # A capped list can prove a vote exists, but cannot prove its absence.
+          next if percent.nil? && result.size >= ACTIVE_VOTES_LIMIT
+
+          votes[identity] = percent
+        end
+      end
+    end
+
+    votes
+  rescue StandardError => e
+    Rails.logger.warn "Unable to fetch digest votes: #{e.class}: #{e.message}"
+    votes
   end
 
   def payout(post, author, permlink)
@@ -49,7 +78,16 @@ class PostChainPayload
   end
 
 private
-  attr_reader :account, :api, :cache, :timeout
+  attr_reader :account, :cache, :timeout
+
+  def api
+    @api ||= Account.api
+  end
+
+  def vote_percent(votes)
+    vote = Array(votes).find { |candidate| chain_value(candidate, :voter) == account.name }
+    chain_value(vote, :percent)
+  end
 
   def cached_chain_stats_payload(author, permlink, refresh:)
     cache_key = ['chain-stats', author, permlink]

@@ -26,7 +26,6 @@ class HyperionAgentPostPresenter
       author_reputation: display_post.author_reputation,
       read: result.read_post_ids.include?(post.id),
       muted_author: account.muted_authors.include?(display_post.author),
-      current_vote: nil,
       vote_links: vote_links(display_post),
       interest_reasons: interest_reasons(post, display_post)
     }
