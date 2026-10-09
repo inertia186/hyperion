@@ -5,6 +5,14 @@ provides `connect`, `signChallenge`, `vote`, `disconnect`, and `capabilities`
 for the React inbox and the legacy pages. Aioha core is pinned to 1.8.5;
 QR codes are rendered locally with qrcode 1.5.4.
 
+The login buttons use locally served provider artwork with visible text labels:
+[Keychain](https://github.com/hive-keychain/hive-keychain-extension/blob/master/public/assets/images/keychain-round-logo.svg),
+[HiveSigner](https://hivesigner.com/icons/icon-128.png),
+[HiveAuth](https://hiveauth.com/wp-content/uploads/2022/02/HiveAuth_logo_safezone.svg),
+and [Peak Vault](https://vault.peakd.com/peakvault.svg). The decorative images have
+empty alt text so screen readers announce each wallet name once. The buttons
+include keyboard focus indicators and stack on small screens.
+
 ## Providers and rollout
 
 | Provider | Rails login proof | Voting | Availability |

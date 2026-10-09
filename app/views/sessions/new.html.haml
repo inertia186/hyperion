@@ -13,10 +13,12 @@
             = label_tag :account_name, 'Account Name', class: 'col-form-label mb-2'
             = text_field_tag :account_name, @account_name, class: 'form-control mb-2', required: true, autocomplete: 'username', autocapitalize: 'none'
       .form-group
-        .form-row
-          - {'keychain' => 'Hive Keychain', 'hivesigner' => 'HiveSigner', 'hiveauth' => 'HiveAuth', 'peakvault' => 'Peak Vault'}.each do |provider, name|
+        .wallet-buttons
+          - {'keychain' => ['Hive Keychain', 'keychain.svg'], 'hivesigner' => ['HiveSigner', 'hivesigner.png'], 'hiveauth' => ['HiveAuth', 'hiveauth.svg'], 'peakvault' => ['Peak Vault', 'peakvault.svg']}.each do |provider, (name, logo)|
             - if WalletLoginChallenge.enabled_providers.include?(provider)
-              .mx-auto.mb-2= button_tag name, name: 'provider', value: provider, class: 'btn btn-primary'
+              = button_tag name: 'provider', value: provider, class: "btn wallet-button wallet-button--#{provider}" do
+                = image_tag "wallets/#{logo}", alt: '', width: 36, height: 36, class: 'wallet-button__logo'
+                %span= name
     
     #success-alert.alert.alert-primary{hidden: true, role: 'status'}
     #error-alert.alert.alert-danger{hidden: flash[:alert].blank?, role: 'alert'}= flash[:alert]
