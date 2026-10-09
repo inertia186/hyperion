@@ -3,6 +3,11 @@ require 'test_helper'
 class HiveNodeSelectorTest < ActiveSupport::TestCase
   BeaconResponse = Struct.new(:code, :body)
 
+  setup do
+    # Other tests can populate the process-wide cache before our HTTP stubs run.
+    HiveNodeSelector.clear_cache!
+  end
+
   teardown do
     HiveNodeSelector.clear_cache!
   end
