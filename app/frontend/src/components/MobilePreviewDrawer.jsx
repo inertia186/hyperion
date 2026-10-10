@@ -8,7 +8,7 @@ export default function MobilePreviewDrawer({
   previewActive,
   previewScrollRef,
   accountName,
-  hivesignerAvailable,
+  walletProvider,
   theme,
   onClose,
   onPrevious,
@@ -33,7 +33,7 @@ export default function MobilePreviewDrawer({
             previewActive={previewActive}
             previewScrollRef={previewScrollRef}
             accountName={accountName}
-            hivesignerAvailable={hivesignerAvailable}
+            walletProvider={walletProvider}
             theme={theme}
             onClose={onClose}
             onPrevious={onPrevious}

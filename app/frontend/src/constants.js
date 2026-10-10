@@ -9,11 +9,18 @@ export const SORTS = [
   ['lowest_payout', 'Lowest payout']
 ]
 
+export const SIGNALS = [
+  ['high_prolific_author', 'Prolific authors', '7+ posts', 'most_prolific'],
+  ['high_tag_utilization', 'High tag use', '8+ tags', 'most_tags'],
+  ['poisoned_pills', 'Poisoned Pills', 'poisoned authors', 'latest']
+]
+
 export const initialQuery = {
   tag: '',
   query: '',
   author: '',
   sort: 'latest',
+  signal: '',
   limit: '30',
   page: '1',
   only_read: false,

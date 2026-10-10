@@ -12,6 +12,47 @@ rake db:create
 rake db:seed
 ```
 
+# Post heading links
+
+Rendered headings have generated fragment IDs in API HTML and both preview
+renderers. For example, `# Real Heading` becomes `id="user-content-real-heading"`
+and can be targeted with `[Jump](#real-heading)`. IDs use the rendered heading
+text and Kramdown's basic ASCII slug convention; empty slugs use `section`.
+Repeated or colliding names receive unique `-1`, `-2`, etc. suffixes within the
+post. The `user-content-` prefix keeps author-controlled headings from colliding
+with page IDs or window globals; the preview's fragment handling maps the bare
+slug to the prefixed ID, so plain `#slug` links need that script.
+
+IDs are generated after sanitization; author-supplied HTML and Markdown IDs
+are not preserved. Fragment links scroll within the current preview. A direct
+legacy sandbox URL can include a fragment, such as
+`/posts/42/content_sandbox#real-heading`. The React preview still requires the
+post to be selected; its fragments do not encode a post selection.
+
+# HiveSigner callbacks
+
+Select the `hyperion.zone` app account at https://hivesigner.com/profile and
+register these exact Redirect URIs, one per line:
+
+```text
+https://hyperion.zone/sessions/authorized
+https://www.hyperion.zone/sessions/authorized
+https://hyperion.zone/api/v1/agent/auth_challenges/hivesigner_callback
+https://www.hyperion.zone/api/v1/agent/auth_challenges/hivesigner_callback
+```
+
+Browser sign-in uses `/sessions/authorized`. Agent device-code sign-in uses
+the fixed API callback and carries the challenge ID in OAuth `state`, which
+HiveSigner returns to Hyperion. Do not include challenge IDs or `scope=login`
+in the registered callback. Each callback must match the request's host and
+path exactly. After deploying a callback change, start a fresh device challenge.
+
+For local browser sign-in, also register
+`http://localhost:3000/sessions/authorized`, then start a fresh login.
+
+See [browser wallets](docs/wallets.md) for provider capabilities, authentication
+policy, rollout settings, and the desktop/mobile verification checklist.
+
 # HafSQL indexing
 
 Post indexing uses HafSQL by default. It connects to the public HafSQL endpoint

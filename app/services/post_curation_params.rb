@@ -1,11 +1,12 @@
 class PostCurationParams
   SORTS = PostCurationSort::SORTS
   DEFAULT_SORT = PostCurationSort::DEFAULT_SORT
+  SIGNALS = PostCurationSignal::SIGNALS
   DEFAULT_LIMIT = 30
 
   attr_reader :sort, :limit, :page, :tag, :other_tags, :query, :author, :app,
     :only_ignored, :only_read, :only_keyword, :only_blacklisted, :only_deleted,
-    :without_tags, :tag_pattern
+    :without_tags, :tag_pattern, :signal
 
   def initialize(params:, account:, session:, track_past_tags: true)
     @params = params
@@ -29,6 +30,7 @@ class PostCurationParams
       other_tags: other_tags,
       without_tags: without_tags,
       tag_pattern: tag_pattern,
+      signal: signal,
       query: query,
       author: author,
       app: app,
@@ -62,6 +64,8 @@ class PostCurationParams
   def read
     @sort = params[:sort].presence || DEFAULT_SORT
     @sort = DEFAULT_SORT unless SORTS.include?(@sort)
+    @signal = params[:signal].presence || PostCurationSignal::DEFAULT_SIGNAL
+    @signal = PostCurationSignal::DEFAULT_SIGNAL unless SIGNALS.include?(@signal)
     @limit = [(params[:limit].presence || DEFAULT_LIMIT).to_i, 1].max
     @page = [(params[:page].presence || 1).to_i, 1].max
     @tag = [params[:tag].presence || ''].flatten.first.to_s

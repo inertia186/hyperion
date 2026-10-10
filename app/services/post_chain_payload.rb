@@ -3,8 +3,9 @@ require 'timeout'
 class PostChainPayload
   CACHE_TTL = 2.minutes
   TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
+  VOTE_BATCH_SIZE = Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM
 
-  def initialize(account:, api: Account.api, cache: Rails.cache, timeout: TIMEOUT)
+  def initialize(account:, api: nil, cache: Rails.cache, timeout: TIMEOUT)
     @account = account
     @api = api
     @cache = cache
@@ -16,7 +17,6 @@ class PostChainPayload
     votes = payload.fetch(:votes)
     replies = payload.fetch(:replies)
     content = payload.fetch(:content)
-    current_vote = Array(votes).find { |vote| chain_value(vote, :voter) == account.name }
     payout = payout_value(content)
     persist_payout(post, payout)
 
@@ -29,8 +29,48 @@ class PostChainPayload
       payout_currency: post.payout_currency,
       payout_fetched_at: post.payout_fetched_at&.iso8601,
       payout_source: post.payout_source,
-      current_vote: chain_value(current_vote, :percent)
+      current_vote: vote_percent(votes)
     }
+  end
+
+  def current_votes(identities)
+    votes = {}
+    identities = identities.uniq
+    return votes if identities.empty?
+
+    Timeout.timeout(timeout) do
+      identities.each_slice(VOTE_BATCH_SIZE) do |batch|
+        responses = vote_batch_responses(batch)
+
+        batch.each_with_index do |identity, id|
+          entries = responses[id]
+          next unless entries&.one? && !entries.first.key?('error')
+
+          result = entries.first['result']
+          next unless result.is_a?(Hash) && result['votes'].is_a?(Array)
+
+          # by_comment_voter returns the next vote in index order when this voter has none.
+          vote = result['votes'].first
+          if result['votes'].empty? || (vote.is_a?(Hash) && vote.values_at('author', 'permlink', 'voter') != [*identity, account.name])
+            votes[identity] = nil
+          elsif vote.is_a?(Hash) && vote['vote_percent'].is_a?(Integer)
+            votes[identity] = vote['vote_percent']
+          end
+        end
+      end
+    end
+
+    # Single posts fail routinely (e.g. deleted on chain); warn only when none resolved.
+    unresolved = identities.size - votes.size
+    if unresolved.positive?
+      Rails.logger.public_send(votes.empty? ? :warn : :debug, "Digest vote lookup left #{unresolved} of #{identities.size} posts unavailable")
+    end
+    votes
+  rescue StandardError => e
+    # Same policy as Api::V1::PostsController#expected_chain_fetch_error?.
+    expected = e.is_a?(Timeout::Error) || e.is_a?(Hive::ArgumentError)
+    Rails.logger.public_send(expected ? :debug : :warn, "Unable to fetch digest votes: #{e.class}: #{e.message}")
+    votes
   end
 
   def payout(post, author, permlink)
@@ -49,7 +89,41 @@ class PostChainPayload
   end
 
 private
-  attr_reader :account, :api, :cache, :timeout
+  attr_reader :account, :cache, :timeout
+
+  # Not memoized: Account resets its client when failover moves to another node.
+  def api
+    @api || Account.api
+  end
+
+  def vote_percent(votes)
+    vote = Array(votes).find { |candidate| chain_value(candidate, :voter) == account.name }
+    chain_value(vote, :percent)
+  end
+
+  # Returns batch responses grouped by request id (the identity's index in batch).
+  def vote_batch_responses(batch)
+    requests = batch.each_with_index.map do |(author, permlink), id|
+      {jsonrpc: '2.0', id: id, method: 'database_api.list_votes', params: {start: [author, permlink, account.name], limit: 1, order: 'by_comment_voter'}}
+    end
+    return post_vote_batch(@api.rpc_client, requests) if @api
+
+    Account.with_simple_failover { post_vote_batch(Account.api.rpc_client, requests) }
+  end
+
+  def post_vote_batch(client, requests)
+    # hive-ruby 1.0.6 validates batch IDs by position; JSON-RPC permits any order.
+    request = client.http_post(:database_api)
+    request.body = requests.to_json
+    response = client.http_request(request)
+    raise Hive::UnknownError, "Vote batch returned HTTP #{response.code}" unless response.code == '200'
+
+    results = JSON.parse(response.body)
+    # A whole-batch failure is a single error object; raise so failover tries another node.
+    raise Hive::UnknownError, "Vote batch failed: #{response.body.truncate(200)}" unless results.is_a?(Array)
+
+    results.grep(Hash).group_by { |result| result['id'] }
+  end
 
   def cached_chain_stats_payload(author, permlink, refresh:)
     cache_key = ['chain-stats', author, permlink]

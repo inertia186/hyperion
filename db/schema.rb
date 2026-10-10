@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_11_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -170,6 +170,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_000000) do
     t.string "tag", null: false
     t.index ["post_id", "tag"], name: "index_post_id_tag_on_tags", unique: true
     t.index ["tag", "post_id"], name: "index_tags_tag_post_id"
+  end
+
+  create_table "wallet_login_challenges", force: :cascade do |t|
+    t.string "token", null: false
+    t.string "account_name", null: false
+    t.string "provider", null: false
+    t.string "session_digest", null: false
+    t.text "message", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "consumed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["expires_at"], name: "index_wallet_login_challenges_on_expires_at"
+    t.index ["token"], name: "index_wallet_login_challenges_on_token", unique: true
   end
 
   add_foreign_key "agent_access_tokens", "accounts"

@@ -1,6 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from './App'
+import { wallet, hivesignerVoteUrl } from '../../javascript/wallet'
+
+vi.mock('../../javascript/wallet', async (importOriginal) => ({
+  ...await importOriginal(),
+  wallet: {vote: vi.fn(), disconnect: vi.fn().mockResolvedValue()}
+}))
 import { imageProxy } from './format'
 import { PROFESSIONAL_THEMES, THEME_OPTIONS, THEMES } from './theme'
 
@@ -247,16 +253,19 @@ const postsPayload = (params = new URLSearchParams()) => {
   const tag = params.get('tag') || ''
   const query = params.get('query') || ''
   const author = params.get('author') || ''
+  const signal = params.get('signal') || ''
   const page = Number(params.get('page') || 1)
   const limit = Number(params.get('limit') || 30)
   const onlyKeyword = params.get('only_keyword') === 'true'
-  const filteredPosts = onlyKeyword && query === 'frist' ? [] : emptyTags.has(tag) ? [] : currentPosts
+  const signalPosts = signal === 'high_tag_utilization' ? currentPosts.filter((post) => post.tags_count >= 8) : signal === 'high_prolific_author' ? currentPosts.filter((post) => post.author === 'visible-author') : signal === 'poisoned_pills' ? currentPosts.filter((post) => post.author === 'poisoned-author') : currentPosts
+  const filteredPosts = onlyKeyword && query === 'frist' ? [] : emptyTags.has(tag) ? [] : signalPosts
   const pagePosts = filteredPosts.slice((page - 1) * limit, page * limit)
 
   return {
     query: {
       tag,
       tag_pattern: tag,
+      signal,
       query,
       author,
       muted_authors_enabled: false,
@@ -273,6 +282,7 @@ const postsPayload = (params = new URLSearchParams()) => {
     keyword_suggestion: onlyKeyword && query === 'frist' ? 'first' : null,
     pagination: {page, limit, total_count: filteredPosts.length, total_pages: Math.max(Math.ceil(filteredPosts.length / limit), 1)},
     mode_counts: {unread: filteredPosts.length, keyword: query || onlyKeyword ? filteredPosts.length : 0, read: 1, ignored: 2, deleted: 3, blacklisted: 4},
+    signal_counts: {high_prolific_author: currentPosts.filter((post) => post.author === 'visible-author').length, high_tag_utilization: currentPosts.filter((post) => post.tags_count >= 8).length, poisoned_pills: currentPosts.filter((post) => post.author === 'poisoned-author').length},
     posts: pagePosts,
     related_tags: [{name: 'haf', tag: 'haf', count: 24}, {name: 'Hive', tag: 'hive-13323', image_url: 'https://example.com/hive-community.png', count: 6}],
     related_authors: ['visible-author'],
@@ -363,7 +373,9 @@ describe('App', () => {
     installLocalStorage()
     systemDarkMatches = false
     setMobileLayout(false)
-    window.hive_keychain = {requestVote: vi.fn((_voter, _permlink, _author, _weight, callback) => callback({success: true}))}
+    wallet.vote.mockImplementation(async (args) => args.provider === 'hivesigner'
+      ? {status: 'approval_required', url: hivesignerVoteUrl(args)}
+      : {status: 'submitted', transactionId: 'tx'})
     window.hive = {
       api: {
         getActiveVotes: vi.fn((_author, _permlink, callback) => callback(null, [{voter: 'fixture-curator', percent: 10000}, {voter: 'other-curator', percent: 5000}])),
@@ -376,6 +388,7 @@ describe('App', () => {
       if (url === '/api/v1/session') {
         return jsonResponse({
           authenticated: true,
+          wallet: {provider: hivesignerAvailable ? 'hivesigner' : 'keychain'},
           account: {name: 'fixture-curator', avatar_url: 'avatar.png'},
           preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, theme: sessionTheme, minimum_reputation: minimumReputation, hivewatchers_blacklist_enabled: hivewatchersBlacklistEnabled, hivesigner_available: hivesignerAvailable},
           blacklist_sources: [
@@ -1433,9 +1446,9 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByText('Votes: 2'))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '42'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
-    expect(window.hive_keychain.requestVote).toHaveBeenCalledWith('fixture-curator', 'first-post', 'visible-author', 4200, expect.any(Function))
+    await waitFor(() => expect(wallet.vote).toHaveBeenCalledWith({accountName: 'fixture-curator', provider: 'keychain', permlink: 'first-post', author: 'visible-author', weight: 4200}))
   })
 
   test('retries preview stats after keychain vote until the vote appears', async () => {
@@ -1446,7 +1459,7 @@ describe('App', () => {
     chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 0}
     fireEvent.click(screen.getByText('Votes: 2'))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '42'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
     act(() => vi.advanceTimersByTime(2500))
     await act(async () => {
@@ -1470,18 +1483,21 @@ describe('App', () => {
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
-  test('casts hivesigner downvotes in a signing modal', async () => {
+  test('offers hivesigner downvote approval in a new tab without embedding the signing page', async () => {
     hivesignerAvailable = true
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '17'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
     const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
     const expectedUrl = 'https://hivesigner.com/sign/vote?authority=post&voter=fixture-curator&author=visible-author&permlink=first-post&weight=-1700'
-    expect(within(dialog).getByTitle('Hivesigner vote')).toHaveAttribute('src', expectedUrl)
-    expect(within(dialog).getByRole('link', {name: /Open/})).toHaveAttribute('href', expectedUrl)
+    expect(dialog.querySelector('iframe')).toBeNull()
+    const link = within(dialog).getByRole('link', {name: 'Open HiveSigner'})
+    expect(link).toHaveAttribute('href', expectedUrl)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(window.open).not.toHaveBeenCalled()
   })
 
@@ -1491,7 +1507,7 @@ describe('App', () => {
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     fireEvent.click(screen.getByRole('button', {name: 'Close Hivesigner vote'}))
 
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
@@ -1504,18 +1520,36 @@ describe('App', () => {
     vi.useRealTimers()
   })
 
+  test('checks the observed vote after returning from HiveSigner', async () => {
+    hivesignerAvailable = true
+    await renderApp()
+    vi.useFakeTimers()
+
+    fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
+    fireEvent.click(screen.getByRole('link', {name: 'Open HiveSigner'}))
+    chainStatsPayload = {status: 'ready', votes: 3, replies: 2, payout: '1.234 HBD', current_vote: -10000}
+    fireEvent(window, new Event('focus'))
+
+    expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(3000) })
+    vi.useRealTimers()
+    expect(screen.getByText('Votes: 3')).toBeInTheDocument()
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post&refresh=true', expect.anything())
+  })
+
   test('dismisses the hivesigner vote modal with Escape and click-away', async () => {
     hivesignerAvailable = true
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     expect(screen.getByRole('dialog', {name: 'Hivesigner vote'})).toBeInTheDocument()
     fireEvent.keyDown(document, {key: 'Escape'})
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
     fireEvent.click(dialog)
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
@@ -1787,6 +1821,45 @@ describe('App', () => {
     fireEvent.click(viewMode.getByRole('button', {name: /Ignored/}))
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('only_ignored=true'), expect.any(Object)))
     expect(global.fetch).toHaveBeenLastCalledWith(expect.not.stringContaining('only_read=true'), expect.any(Object))
+  })
+
+  test('switches to signal filtering with counts and restores other tab queries', async () => {
+    currentPosts = [
+      {...posts[0], tags_count: 8},
+      {...posts[1], tags_count: 1},
+      {...posts[2], tags_count: 1}
+    ]
+
+    await renderApp()
+
+    fireEvent.change(screen.getByPlaceholderText('photography @author app:peakd -contests'), {target: {value: 'curation'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    fireEvent.change(screen.getByPlaceholderText('Search title or body keywords'), {target: {value: 'first'}})
+    fireEvent.click(screen.getByRole('button', {name: 'Search'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Signals'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=high_prolific_author'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=most_prolific'), expect.any(Object))
+    expect(screen.getByLabelText('Signal filter')).toHaveTextContent('Prolific authors · 7+ posts (1)')
+
+    fireEvent.change(screen.getByLabelText('Signal filter'), {target: {value: 'high_tag_utilization'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=high_tag_utilization'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=most_tags'), expect.any(Object))
+
+    fireEvent.change(screen.getByLabelText('Signal filter'), {target: {value: 'poisoned_pills'}})
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('signal=poisoned_pills'), expect.any(Object)))
+    expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('sort=latest'), expect.any(Object))
+    expect(screen.getByLabelText('Signal filter')).toHaveTextContent('Poisoned Pills · poisoned authors (0)')
+
+    fireEvent.click(screen.getByRole('button', {name: 'Filters'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('tag=curation'), expect.any(Object)))
+
+    fireEvent.click(screen.getByRole('button', {name: 'Keywords'}))
+    await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('query=first'), expect.any(Object)))
   })
 
   test('shows mode counts on desktop mode selector', async () => {
@@ -2449,14 +2522,18 @@ describe('App', () => {
     detail.resolve({
       id: 1,
       title: 'First Post',
-      body_markdown: '# Real Heading\n\n#c-c-c #hivegc',
+      body_markdown: '# Real Heading\n\n#c-c-c #hivegc\n\n[Jump to heading](#real-heading)',
       body_html: '<h1 id="c-c-c-hivegc">c-c-c #hivegc</h1>',
       urls: {}
     })
 
     await renderApp({waitForPreview: false})
 
-    expect(await screen.findByRole('heading', {name: 'Real Heading'})).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', {name: 'Real Heading'})
+    expect(heading).toHaveAttribute('id', 'user-content-real-heading')
+    heading.scrollIntoView = vi.fn()
+    fireEvent.click(screen.getByRole('link', {name: 'Jump to heading'}))
+    expect(heading.scrollIntoView).toHaveBeenCalledWith({block: 'start'})
     expect(screen.getByRole('link', {name: '#c-c-c'})).toBeInTheDocument()
     expect(screen.getByRole('link', {name: '#hivegc'})).toBeInTheDocument()
     expect(screen.queryByRole('heading', {name: 'c-c-c #hivegc'})).not.toBeInTheDocument()

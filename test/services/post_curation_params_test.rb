@@ -11,6 +11,17 @@ class PostCurationParamsTest < ActiveSupport::TestCase
     assert_equal account.minimum_reputation, parsed.query_state.fetch(:minimum_reputation)
   end
 
+  test 'normalizes signal filter into query state' do
+    account = accounts(:curated)
+    parsed = PostCurationParams.new(params: {signal: 'high_prolific_author'}, account: account, session: {}).call
+    unknown = PostCurationParams.new(params: {signal: 'surprise'}, account: account, session: {}).call
+
+    assert_equal 'high_prolific_author', parsed.signal
+    assert_equal 'high_prolific_author', parsed.query_state.fetch(:signal)
+    assert_equal '', unknown.signal
+    assert_equal '', unknown.query_state.fetch(:signal)
+  end
+
   test 'parses tag patterns with author app other and excluded tags' do
     account = accounts(:curated)
     parsed = PostCurationParams.new(params: {tag: 'hive+curation+-spam', app: 'peakd'}, account: account, session: {}).call

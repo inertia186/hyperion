@@ -19,7 +19,7 @@ class Api::V1::AgentAuthChallengesController < Api::V1::BaseController
   end
 
   def hivesigner_callback
-    challenge = AgentAuthChallenge.find_available!(params[:id])
+    challenge = AgentAuthChallenge.find_available!(params[:state])
 
     if challenge.redeemed_at.present?
       render html: hivesigner_redeemed_html(challenge).html_safe
@@ -133,8 +133,9 @@ private
   def hivesigner_authorize_params(challenge)
     {
       client_id: 'hyperion.zone',
-      redirect_uri: hivesigner_callback_api_v1_agent_auth_challenge_url(challenge.token),
-      scope: 'login'
+      redirect_uri: hivesigner_callback_api_v1_agent_auth_challenges_url,
+      scope: 'login',
+      state: challenge.token
     }
   end
 

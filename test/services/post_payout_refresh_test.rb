@@ -31,6 +31,8 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
   end
 
   test 'counts unavailable comments without failing' do
+    # Fixture timestamps have one-second precision, so do not rely on ties to pick this post.
+    Post.where.not(id: posts(:allowed_unread).id).update_all(created_at: 10.days.ago)
     api = PayoutApi.new(cashout_infos: {})
 
     result = PostPayoutRefresh.new(window: 7.days, limit: 1, api: api).call

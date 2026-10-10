@@ -3,7 +3,7 @@ class PostCurationQuery
     :posts, :post_ids, :read_post_ids, :post_tags, :post_communities,
     :post_bodies, :related_tags, :related_authors, :related_communities, :past_tags,
     :favorite_tag_set, :mode_counts, :muted_posts_count, :total_count, :page, :limit,
-    :keyword_suggestion
+    :keyword_suggestion, :signal_counts
 
   def initialize(account:, params:, session:, track_past_tags: true)
     @account = account
@@ -56,6 +56,7 @@ private
     @query = curation_params.query
     @author = curation_params.author
     @app = curation_params.app
+    @signal = curation_params.signal
     @only_ignored = curation_params.only_ignored
     @only_read = curation_params.only_read
     @only_keyword = curation_params.only_keyword
@@ -69,7 +70,8 @@ private
   def build_relation
     @mode_counts = build_mode_counts
     @muted_posts_count = build_muted_posts_count
-    @all_posts = relation_for_mode(selected_mode)
+    @signal_counts = build_signal_counts
+    @all_posts = apply_signal(relation_for_mode(selected_mode))
     @relation = apply_sort(@all_posts.select(Post::LIST_COLUMNS))
   end
 
@@ -94,6 +96,12 @@ private
       count
   end
 
+  def build_signal_counts
+    PostCurationSignal::SIGNALS.index_with do |signal|
+      PostCurationSignal.apply(signal_count_relation(signal), signal: signal, tag: @tag, account: account).count
+    end
+  end
+
   def selected_mode
     return :read if @only_read
     return :keyword if @only_keyword
@@ -104,7 +112,7 @@ private
     :unread
   end
 
-  def relation_for_mode(mode)
+  def relation_for_mode(mode, include_poisoned_authors: @signal == PostCurationSignal::POISONED_PILLS)
     relation = base_filter_relation(apply_keyword_filter: mode != :keyword)
 
     case mode
@@ -122,10 +130,21 @@ private
     when :blacklisted
       with_blacklist_sources(relation.active)
     else
-      without_low_reputation(without_blacklist_sources(relation.active)).
-        unread(by: account, include_muted: true).
-        where.not(author: account.poisoned_authors)
+      unread_relation = without_low_reputation(without_blacklist_sources(relation.active)).
+        unread(by: account, include_muted: true)
+      include_poisoned_authors ? unread_relation : unread_relation.where.not(author: account.poisoned_authors)
     end
+  end
+
+  def apply_signal(relation)
+    PostCurationSignal.apply(relation, signal: @signal, tag: @tag, account: account)
+  end
+
+  def signal_count_relation(signal)
+    relation_for_mode(
+      selected_mode,
+      include_poisoned_authors: selected_mode == :unread && signal == PostCurationSignal::POISONED_PILLS
+    )
   end
 
   def low_reputation(relation)

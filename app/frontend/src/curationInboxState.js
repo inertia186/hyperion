@@ -161,7 +161,7 @@ export function selectionAfterAllMatching(posts) {
 }
 
 export function postsResultCountLabel(query, totalPosts, loadedPostsCount, hasMorePosts) {
-  const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : 'unread posts'
+  const noun = query.only_read ? 'read posts' : query.only_keyword ? 'keyword matches' : query.only_ignored ? 'ignored posts' : query.only_deleted ? 'deleted posts' : query.only_blacklisted ? 'blacklisted posts' : query.signal ? 'signal matches' : 'unread posts'
   const loadedSuffix = hasMorePosts ? ` · ${loadedPostsCount} loaded` : ''
 
   return `${totalPosts} ${noun}${loadedSuffix}`

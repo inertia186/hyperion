@@ -14,10 +14,10 @@ Rails.application.routes.draw do
         collection do
           get '/', action: :create
           get :start
+          get :hivesigner_callback
         end
 
         member do
-          get :hivesigner_callback
           post :redeem
           get :redeem
           post :keychain
@@ -74,6 +74,7 @@ Rails.application.routes.draw do
   resources :sessions, only: %i(new create destroy) do
     collection do
       get :authorized # hivesigner
+      post :complete
     end
     
     member do

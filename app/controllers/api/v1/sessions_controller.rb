@@ -11,6 +11,7 @@ class Api::V1::SessionsController < Api::V1::BaseController
 
     render json: {
       authenticated: true,
+      wallet: {provider: session[:wallet_provider]},
       account: {
         id: current_account.id,
         name: current_account.name,
@@ -22,7 +23,7 @@ class Api::V1::SessionsController < Api::V1::BaseController
         theme: current_account.theme,
         minimum_reputation: current_account.minimum_reputation,
         hivewatchers_blacklist_enabled: current_account.hivewatchers_blacklist_enabled?,
-        hivesigner_available: session[:hivesigner_access_token].present?
+        hivesigner_available: session[:wallet_provider] == 'hivesigner'
       },
       blacklist_sources: current_account.blacklist_source_catalog,
       offchain_blacklist_sources: current_account.offchain_blacklist_source_catalog,

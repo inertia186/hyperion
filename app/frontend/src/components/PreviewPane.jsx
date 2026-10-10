@@ -20,7 +20,7 @@ export default function PreviewPane({
   previewActive,
   previewScrollRef,
   accountName,
-  hivesignerAvailable,
+  walletProvider,
   onClose,
   onPrevious,
   onNext,
@@ -75,7 +75,7 @@ export default function PreviewPane({
     hivesignerModal,
     closeHivesignerModal,
     castVote
-  } = usePreviewVoteActions({displayPost, accountName, hivesignerAvailable, refreshStatsAfterVote})
+  } = usePreviewVoteActions({displayPost, accountName, walletProvider, refreshStatsAfterVote})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)
@@ -179,7 +179,7 @@ export default function PreviewPane({
       </div>
       <div ref={previewScrollRef} className="safe-area-bottom touch-scroll min-h-0 flex-1 overflow-auto p-4" tabIndex={-1}>
         {previewReady ? (
-          <article className="post-body text-sm" dangerouslySetInnerHTML={previewHtmlMarkup} />
+          <article className="post-body text-sm" onClick={(event) => window.HyperionPostHeadings.followFragment(event, event.currentTarget)} dangerouslySetInnerHTML={previewHtmlMarkup} />
         ) : previewState.status === 'error' && previewState.postId === post.id ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">Preview failed to load.</div>
         ) : (

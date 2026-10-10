@@ -92,14 +92,23 @@ class PostTest < ActiveSupport::TestCase
     assert_equal 'https://img.youtube.com/vi/video-id/0.jpg', post.post_image_url('https://youtu.be/video-id')
   end
 
-  test 'orders by tag count without raw SQL' do
-    low = create_post(author: 'alice', permlink: 'low-tags', tags_count: 1)
-    high = create_post(author: 'alice', permlink: 'high-tags', tags_count: 3)
+  test 'orders by actual tag row count' do
+    low = create_post(author: 'alice', permlink: 'low-tags', tags: %w(ruby))
+    high = create_post(author: 'alice', permlink: 'high-tags', tags: %w(ruby rails hive))
 
     posts = Post.where(permlink: %w(low-tags high-tags))
 
     assert_equal [high, low], posts.order_by_tag_count(:desc).to_a
     assert_equal [low, high], posts.order_by_tag_count(:asc).to_a
+  end
+
+  test 'orders by actual tag row count when cached tags count is stale' do
+    low = create_post(author: 'alice', permlink: 'stale-low-tags', tags_count: 20, tags: %w(ruby))
+    high = create_post(author: 'alice', permlink: 'stale-high-tags', tags_count: 0, tags: %w(ruby rails hive curation))
+
+    posts = Post.where(permlink: %w(stale-low-tags stale-high-tags))
+
+    assert_equal [high, low], posts.order_by_tag_count(:desc).to_a
   end
 
   test 'tagged all matches posts with every requested tag' do

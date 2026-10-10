@@ -1,5 +1,6 @@
 import { DefaultRenderer } from '@hive/hive-content-renderer'
 import { imageProxy } from './format'
+import '../../assets/javascripts/post-heading-anchors'
 
 const POST_BODY_IMAGE_SIZE = '1280x0'
 const BBS_POST_BODY_IMAGE_SIZE = '160x0'
@@ -28,6 +29,7 @@ function hardenRenderedEmbeds(html) {
   if (typeof window === 'undefined' || !window.DOMParser) return html
 
   const doc = new window.DOMParser().parseFromString(html, 'text/html')
+  window.HyperionPostHeadings.addIds(doc.body)
 
   doc.querySelectorAll('iframe').forEach((iframe) => {
     const src = iframe.getAttribute('src') || ''
