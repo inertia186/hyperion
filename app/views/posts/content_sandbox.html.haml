@@ -1,10 +1,12 @@
 !!!
 %html{class: @theme == 'dark' ? 'theme-dark' : nil}
   %head
-    %base{href: 'https://hive.blog/'}
-    %base{target: '_new'}
     %meta{content: "text/html; charset=UTF-8", "http-equiv" => "Content-Type"}
     %meta{charset: "UTF-8"}
+    -# URLs parsed before <base> resolve against this page, so local scripts stay here.
+    = javascript_include_tag 'hive-content-renderer', 'post-heading-anchors'
+    %base{href: 'https://hive.blog/'}
+    %base{target: '_new'}
     %meta{content: 'width=device-width, initial-scale=0.80, maximum-scale=1.0, user-scalable=no', name: 'viewport'}
     %title #{@post.title}
     :css
@@ -77,8 +79,6 @@
   %body{onkeydown: "keyPressed(event)"}
     %header
       %script{crossorigin: "anonymous", integrity: "sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=", src: "https://code.jquery.com/jquery-3.5.1.slim.min.js"}
-      -# The <base href> points at hive.blog, so local asset URLs must be absolute.
-      = javascript_include_tag 'hive-content-renderer', 'post-heading-anchors', host: request.base_url
 
     %div{style: 'max-width: 80%; display: flex; margin-left: auto; margin-right: auto;'}
       #source{style: 'display: none;'}

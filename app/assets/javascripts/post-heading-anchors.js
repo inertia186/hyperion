@@ -30,8 +30,9 @@ window.HyperionPostHeadings = (() => {
       return false
     }
     if (!id) return false
-    const target = id.startsWith(prefix) ? id : prefix + id
-    const heading = Array.from(root.querySelectorAll(headingSelector)).find((node) => node.id === target)
+    // Prefer the bare slug a post links to; fall back to an already-prefixed ID.
+    const headings = Array.from(root.querySelectorAll(headingSelector))
+    const heading = headings.find((node) => node.id === prefix + id) || headings.find((node) => node.id === id)
     if (!heading) return false
     heading.scrollIntoView({block: 'start'})
     return true

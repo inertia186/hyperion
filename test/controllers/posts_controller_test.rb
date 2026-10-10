@@ -48,8 +48,11 @@ class PostsControllerTest < ActionController::TestCase
     assert_response :success
     assert_includes response.body, 'class="theme-dark"'
     assert_includes response.body, 'background: #0f172a'
-    assert_select 'script[src^="http://test.host/assets/hive-content-renderer"]'
-    assert_select 'script[src^="http://test.host/assets/post-heading-anchors"]'
+    # Scripts must precede <base href="https://hive.blog/"> to load from this host.
+    head = Nokogiri::HTML(response.body).at('head')
+    scripts_before_base = head.css('script[src], base').take_while { |node| node.name == 'script' }.map { |node| node['src'] }
+    assert scripts_before_base.any? { |src| src.start_with?('/assets/hive-content-renderer') }, scripts_before_base.inspect
+    assert scripts_before_base.any? { |src| src.start_with?('/assets/post-heading-anchors') }, scripts_before_base.inspect
     assert_includes response.body, 'HiveContentRenderer.DefaultRenderer'
     assert_not_includes response.body, 'unpkg.com'
     assert_not_includes response.body, 'steem-content-renderer'

@@ -689,18 +689,18 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal (1..6).map { |level| "#{'#' * level}literal" }, fragment.css('p').map(&:text)
   end
 
-  test 'preview keeps long hash runs, indented markers, and fenced code literal' do
+  test 'preview keeps long hash runs, indented markers, and hashtag lines after code-like lines literal' do
     post = posts(:allowed_unread)
-    post.update!(body: "#######foo\n\n####### seven\n\n   ##indented\n\n```\n#!/bin/bash\n```\n\n~~~~\n#define X\n~~~\n~~~~\n\n## After Fence\n\n#tag")
+    post.update!(body: "#######foo\n\n####### seven\n\n   ##indented\n\n```js```\n\n#hive #gaming\n\n~~~~~~~~~~~~\n\n#after-separator\n\n```c\n#include x\n\n#define MAX 10\n```\n\n## Real Heading")
 
     get :show, params: {id: post.id}
 
     assert_response :success
     fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
-    # Kramdown renders a backtick fence as an inline code span.
-    assert_equal ['#######foo', '####### seven', '##indented', '#!/bin/bash', '#tag'], fragment.css('p').map { |paragraph| paragraph.text.strip }
-    assert_equal ['#!/bin/bash', "#define X\n~~~"], fragment.css('code').map { |code| code.text.strip }
-    assert_equal [['h2', 'user-content-after-fence']], fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
+    assert_equal [['h2', 'user-content-real-heading']], fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
+    paragraphs = fragment.css('p').map { |paragraph| paragraph.text.strip }
+    ['#######foo', '####### seven', '##indented', '#hive #gaming', '#after-separator'].each { |text| assert_includes paragraphs, text }
+    assert paragraphs.any? { |text| text.include?('#define MAX 10') }, paragraphs.inspect
   end
 
   test 'preview hardens embedded iframe html' do

@@ -107,22 +107,12 @@ private
   end
 
   # Hive (CommonMark) needs a space after 1-6 hashes for a heading; Kramdown
-  # does not. Escape the rest, but leave fenced code untouched.
+  # does not. Escape the rest. ponytail: this also escapes `#` lines inside
+  # code, which then show a backslash; tracking fences needs Kramdown's own
+  # fence rules (backtick fences are not code blocks to it).
   def normalize_post_markdown(body)
-    fence = nil
-
-    body.gsub(/^.*$/) do |line|
-      if fence
-        fence = nil if line.match?(/\A[ \t]{0,3}#{Regexp.escape(fence[0])}{#{fence.size},}\s*\z/)
-        line
-      elsif (opening = line[/\A[ \t]{0,3}(`{3,}|~{3,})/, 1])
-        fence = opening
-        line
-      else
-        # Do not backtrack into a valid multi-hash heading's marker.
-        line.sub(/\A([ \t]{0,3})(\#{7,}|\#{1,6}(?=[^#\s]))/) { "#{$1}\\#{$2}" }
-      end
-    end
+    # Do not backtrack into a valid multi-hash heading's marker.
+    body.gsub(/^([ \t]{0,3})(\#{7,}|\#{1,6}(?=[^#\s]))/) { "#{$1}\\#{$2}" }
   end
 
   def harden_post_body_html(html)

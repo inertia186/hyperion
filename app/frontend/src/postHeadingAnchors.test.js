@@ -63,6 +63,17 @@ describe('generated heading anchors', () => {
     expect(scrollToFragment(root, '#%invalid')).toBe(false)
   })
 
+  test('a bare slug that starts with the prefix still reaches its own heading', () => {
+    const root = rootFor('<h1>Policy</h1><h2>User Content Policy</h2>')
+    addIds(root)
+    const [policy, userContentPolicy] = root.querySelectorAll('h1, h2')
+    policy.scrollIntoView = vi.fn()
+    userContentPolicy.scrollIntoView = vi.fn()
+    expect(scrollToFragment(root, '#user-content-policy')).toBe(true)
+    expect(userContentPolicy.scrollIntoView).toHaveBeenCalledOnce()
+    expect(policy.scrollIntoView).not.toHaveBeenCalled()
+  })
+
   test('leaves modified and external link clicks alone', () => {
     const root = rootFor('<a href="#real-heading">Jump</a><h1>Real Heading</h1>')
     addIds(root)
