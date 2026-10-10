@@ -43,9 +43,18 @@ class PostChainPayload
         requests = batch.map { |identity| client.put(:condenser_api, :get_active_votes, identity).first }
         identities_by_id = requests.to_h { |request| [request.fetch(:id), request.fetch(:params)] }
 
-        client.rpc_batch_execute(api_name: :condenser_api, request_object: requests) do |result, error, id|
+        vote_batch_responses(client, requests).each do |id, responses|
           identity = identities_by_id[id]
-          next unless identity && error.blank? && result.is_a?(Array)
+          next unless identity && responses.one?
+
+          response = responses.first
+          result = response['result']
+          next if response.key?('error') || !result.is_a?(Array)
+          next unless result.all? do |vote|
+            vote.is_a?(Hash) &&
+              vote['voter'].is_a?(String) && !vote['voter'].empty? &&
+              vote['percent'].is_a?(Integer) && vote['percent'].between?(-10_000, 10_000)
+          end
 
           percent = vote_percent(result)
           # A capped list can prove a vote exists, but cannot prove its absence.
@@ -87,6 +96,18 @@ private
   def vote_percent(votes)
     vote = Array(votes).find { |candidate| chain_value(candidate, :voter) == account.name }
     chain_value(vote, :percent)
+  end
+
+  def vote_batch_responses(client, requests)
+    # hive-ruby 1.0.6 validates batch IDs by position; JSON-RPC permits any order.
+    request = client.http_post(:condenser_api)
+    request.body = (requests.one? ? requests.first : requests).to_json
+    response = client.http_request(request)
+    raise Hive::UnknownError, "Vote batch returned HTTP #{response.code}" unless response.code == '200'
+
+    results = JSON.parse(response.body)
+    results = [results] unless results.is_a?(Array)
+    results.grep(Hash).group_by { |result| result['id'] }
   end
 
   def cached_chain_stats_payload(author, permlink, refresh:)
