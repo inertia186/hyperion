@@ -4,14 +4,17 @@ window.HyperionPostHeadings = (() => {
 
   function addIds(root) {
     const used = new Set()
+    const lastSuffixes = new Map()
     root.querySelectorAll(headingSelector).forEach((heading) => {
       // Keep this convention in sync with PostHeadingAnchors (shared fixtures).
-      const base = heading.textContent.trim().replace(/^[^a-zA-Z]+/, '')
+      // Match Ruby String#strip rather than JavaScript's Unicode whitespace trim.
+      const base = heading.textContent.replace(/^[\0\t\n\v\f\r ]+|[\0\t\n\v\f\r ]+$/g, '').replace(/^[^a-zA-Z]+/, '')
         .replace(/[^a-zA-Z0-9 -]/g, '').replace(/ /g, '-').toLowerCase() || 'section'
       let id = base
-      let suffix = 0
+      let suffix = lastSuffixes.get(base) || 0
       while (used.has(id)) id = `${base}-${++suffix}`
       used.add(id)
+      lastSuffixes.set(base, suffix)
       heading.id = id
     })
   }

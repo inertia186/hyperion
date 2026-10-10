@@ -16,6 +16,15 @@ afterEach(() => {
 })
 
 describe('generated heading anchors', () => {
+  test('repeated headings stay within the render budget', () => {
+    const headings = Array.from({length: 25000}, () => ({textContent: 'a'}))
+    const started = performance.now()
+    addIds({querySelectorAll: () => headings})
+
+    expect(performance.now() - started).toBeLessThan(5000)
+    expect(headings.at(-1).id).toBe('a-24999')
+  })
+
   test.each(cases)('matches server IDs for $html', ({html, ids}) => {
     const root = rootFor(html)
     addIds(root)
