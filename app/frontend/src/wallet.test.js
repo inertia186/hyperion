@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { webcrypto } from 'node:crypto'
 import { Aioha } from '@aioha/aioha'
+import HaWrapper from '@aioha/aioha/build/lib/hiveauth-wrapper.js'
 import { createWallet } from '../../javascript/wallet'
 
 const accountName = 'fixture-curator'
@@ -14,6 +15,7 @@ function setup({provider = 'keychain', timeoutMs = 120000} = {}) {
     on: vi.fn(), off: vi.fn(), loadAuth: vi.fn(), logoutAll: vi.fn().mockResolvedValue(),
     isProviderEnabled: vi.fn(() => true),
     getCurrentUser: vi.fn(() => accountName), getCurrentProvider: vi.fn(() => provider),
+    getCurrentProviderInstance: vi.fn(() => ({loadAuth: vi.fn(() => true)})),
     login: vi.fn().mockResolvedValue({success: true, username: accountName, provider, result: 'signature'}),
     vote: vi.fn().mockResolvedValue({success: true, result: 'transaction-id'})
   }
@@ -36,7 +38,7 @@ beforeEach(() => {
     finally { locked = false }
   }}})
 })
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain; delete window.peakvault })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); delete window.hive_keychain; delete window.peakvault })
 
 describe('wallet adapter', () => {
   test('explains a non-JSON server error without opening the wallet', async () => {
@@ -231,6 +233,43 @@ describe('wallet adapter', () => {
     expect(localStorage.getItem('aiohaProvider')).toBe('keychain')
     window.hive_keychain.requestVote.mockImplementation((_account, _permlink, _author, _weight, callback) => callback({success: true, result: {id: 'next-vote'}}))
     await expect(adapter.vote(voteArgs)).resolves.toEqual({status: 'submitted', transactionId: 'next-vote'})
+  })
+
+  test('the real Aioha HiveAuth provider uses credentials renewed in another tab', async () => {
+    vi.useFakeTimers()
+    localStorage.setItem('aiohaUsername', accountName)
+    localStorage.setItem('aiohaProvider', 'hiveauth')
+    const expiresAt = Date.now() + 60000
+    const persistCredentials = (token, key, expiry) => {
+      localStorage.setItem('hiveauthToken', token)
+      localStorage.setItem('hiveauthKey', key)
+      localStorage.setItem('hiveauthExp', String(expiry))
+    }
+    persistCredentials('old-token', 'old-key', expiresAt)
+    const requests = []
+    vi.spyOn(HaWrapper, 'signTx').mockImplementation(async (auth) => {
+      requests.push({token: auth.token, key: auth.key, expiresAt: auth.expire})
+      return {data: 'transaction-id'}
+    })
+    const fetcher = vi.fn().mockResolvedValue(response({authenticated: true, account: {name: accountName}, wallet: {provider: 'hiveauth'}}))
+    const adapter = createWallet({fetcher})
+    await adapter.vote({...voteArgs, provider: 'hiveauth'})
+
+    vi.setSystemTime(expiresAt + 1)
+    const renewedExpiry = Date.now() + 60000
+    persistCredentials('renewed-token', 'renewed-key', renewedExpiry)
+    await expect(adapter.vote({...voteArgs, provider: 'hiveauth'})).resolves.toEqual({status: 'submitted', transactionId: 'transaction-id'})
+
+    expect(requests).toEqual([
+      {token: 'old-token', key: 'old-key', expiresAt},
+      {token: 'renewed-token', key: 'renewed-key', expiresAt: renewedExpiry}
+    ])
+    expect(localStorage.getItem('hiveauthToken')).toBe('renewed-token')
+    expect(localStorage.getItem('hiveauthKey')).toBe('renewed-key')
+
+    vi.setSystemTime(renewedExpiry + 1)
+    await expect(adapter.vote({...voteArgs, provider: 'hiveauth'})).rejects.toThrow('Reconnect your wallet')
+    expect(HaWrapper.signTx).toHaveBeenCalledTimes(2)
   })
 
   test.each(['timeout', 'disconnect'])('%s blocks login retries until the real Aioha login and stale-auth cleanup settle', async (stop) => {

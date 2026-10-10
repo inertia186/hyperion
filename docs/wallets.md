@@ -83,12 +83,17 @@ in OAuth `state`. Rails requires the same browser binding and the account
 returned by `/api/me` to match the challenge. Redemption is locked, checked
 again for expiry after verification, and followed by session rotation. Login
 POSTs require CSRF tokens. Legacy client-supplied digest login is rejected.
+The binding uses the loaded Rails session ID, so simultaneous challenge requests
+from one browser share the same binding. Loading the stored session first also
+prevents a saved, deleted session cookie from redeeming a challenge after logout.
 
 Aioha's restored browser state alone never authenticates a Rails session.
 Every vote first checks the live Rails account and provider; signed-provider
 votes also require matching Aioha state and persisted account/provider. A
 mismatch asks the user to sign in again before invoking a wallet. Existing
 browser sessions without a provider require one fresh login before voting.
+HiveAuth credentials are reloaded under the browser lock before voting, so a tab
+uses the token, key, and expiry renewed by another tab for the same account.
 Agent bearer-token issuance and transaction-signing authority are unchanged.
 
 The header's wallet link opens the login form for reconnecting or changing
@@ -102,6 +107,8 @@ a reload instruction. CSRF protection stays enabled.
 Logout clears the Rails session and cancels this tab's
 pending adapter request. Aioha state is cleared when the browser lock is
 available; a pending operation in another tab blocks that cleanup.
+The legacy frontend waits for the cleanup attempt before submitting Rails logout,
+and still submits if cleanup fails.
 Some extensions cannot dismiss an outstanding native prompt.
 An origin-wide browser lock keeps other Hyperion tabs from changing Aioha state
 while a wallet request is pending. After cancellation or timeout, another request
@@ -124,6 +131,9 @@ Open HiveSigner link that opens a new tab. Returning to Hyperion refreshes the
 observed vote state; Check vote does the same if the browser does not report the
 return. Closing the dialog also refreshes without assuming approval. The legacy
 frontend already uses an external signing link.
+Its signing link and return listener are removed when the weight changes, the
+dialog closes, or the post is removed. A late response cannot restore a canceled
+link, and each new approval gets its own return listener.
 
 ## Verification record (2026-10-09)
 
@@ -136,6 +146,15 @@ clicks, and dismissing HiveSigner without false success. The real Aioha Keychain
 bridge is exercised with a simulated extension, including reload, logout, a late
 rejected vote, and blocked login retries through stale authentication cleanup.
 Both the legacy esbuild bundle and React/Vite build are checked.
+
+The latest sub-agent review found and fixed four regressions: stale legacy
+HiveSigner links, legacy logout skipping wallet cleanup, simultaneous initial
+challenges receiving different browser bindings, and HiveAuth tabs retaining
+credentials renewed elsewhere. Tests reproduce each failure. Independent
+re-review of the fixes found no remaining blockers. The legacy regressions run
+the complete application bundle with real Rails UJS, Stimulus, Bootstrap, and
+jQuery; the HiveAuth regression uses the real Aioha provider with only its
+signing transport simulated.
 
 The user confirmed local Keychain login, an accepted vote, and logout. After
 registering the localhost callback, the user also confirmed HiveSigner login as
@@ -166,8 +185,8 @@ browser options. The user confirmed
 that Hyperion successfully invoked the installed Peak Vault extension in Brave.
 No account had been imported, so signed login and voting remain unverified.
 Local login, voting, and logout are confirmed for the default providers. The
-two-tab overlapping-login retest clears the remaining draft blocker. The table
-below records additional browser/mobile and edge-case coverage that remains unverified.
+two-tab overlapping-login retest passed. The table below records additional
+browser/mobile and edge-case coverage that remains unverified.
 Simulated extension tests do not establish real-wallet compatibility; keep
 HiveAuth and Peak Vault disabled in production until their rows pass too.
 

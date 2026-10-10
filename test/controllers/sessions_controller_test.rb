@@ -42,16 +42,17 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
     assert_response :created
     challenge = WalletLoginChallenge.find_by!(token: response.parsed_body.fetch('token'))
+    previous_session_id = session.id.private_id
 
     get new_session_path
-    assert challenge.available_for?(session[:wallet_login_binding])
+    assert challenge.available_for?(session.id.private_id)
     WalletSignatureAuthenticator.stub(:valid?, true) do
       post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
     end
 
     assert_response :success
     assert_equal 'fixture-curator', session[:current_account].name
-    assert_nil session[:wallet_login_binding]
+    refute_equal previous_session_id, session.id.private_id
   ensure
     SessionsController.allow_forgery_protection = previous
   end
@@ -75,7 +76,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_includes challenge.message, challenge.token
     assert_includes challenge.message, 'http://www.example.com'
     assert_includes challenge.message, '@fixture-curator'
-    assert challenge.available_for?(session[:wallet_login_binding])
+    assert challenge.available_for?(session.id.private_id)
     assert_nil session[:current_account]
   end
 
@@ -89,6 +90,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
 
   test 'signed login verifies the server message and rotates the session without issuing an agent token' do
     challenge = start_login
+    previous_session_id = session.id.private_id
     verifier = ->(account_name:, message:, signature:) do
       assert_equal 'fixture-curator', account_name
       assert_equal challenge.message, message
@@ -104,7 +106,7 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 'fixture-curator', session[:current_account].name
     assert_equal 'keychain', session[:wallet_provider]
-    assert_nil session[:wallet_login_binding]
+    refute_equal previous_session_id, session.id.private_id
     assert challenge.reload.consumed_at
   end
 

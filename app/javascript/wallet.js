@@ -196,8 +196,10 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
     requireAvailable(provider)
     return withWalletLock(async () => {
       const aioha = getCore()
+      // Core loadAuth skips logged-in users; refresh HiveAuth credentials after identity checks.
       if (aioha.getCurrentUser() !== accountName || aioha.getCurrentProvider() !== provider ||
-          localStorage.getItem('aiohaUsername') !== accountName || localStorage.getItem('aiohaProvider') !== provider) {
+          localStorage.getItem('aiohaUsername') !== accountName || localStorage.getItem('aiohaProvider') !== provider ||
+          (provider === 'hiveauth' && !aioha.getCurrentProviderInstance().loadAuth(accountName))) {
         throw new Error('Reconnect your wallet by signing in again before voting.')
       }
       const result = await walletRequest((client) => client.vote(author, permlink, weight))

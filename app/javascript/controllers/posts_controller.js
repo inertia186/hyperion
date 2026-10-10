@@ -44,6 +44,7 @@ export default class extends Controller {
   }
   
   disconnect() {
+    this.clearVoteApproval?.()
     if ( !!firstLink ) {
       firstLink.blur();
       firstLink = null;
@@ -334,6 +335,24 @@ export default class extends Controller {
     const button = event.currentTarget
     const modal = document.getElementById(`${action}-${this.idValue}`)
     const account = document.getElementById('current-account').dataset
+    this.clearVoteApproval?.()
+    let active = true
+    let signingLink
+    const checkVote = () => {
+      this.refreshPostDetails()
+      $(modal).modal('hide')
+    }
+    const clearApproval = () => {
+      active = false
+      signingLink?.remove()
+      window.removeEventListener('focus', checkVote)
+      modal.removeEventListener('input', clearApproval)
+      $(modal).off('hide.bs.modal', clearApproval)
+      if (this.clearVoteApproval === clearApproval) this.clearVoteApproval = undefined
+    }
+    this.clearVoteApproval = clearApproval
+    modal.addEventListener('input', clearApproval)
+    $(modal).one('hide.bs.modal', clearApproval)
     button.disabled = true
     button.textContent = 'Waiting for wallet…'
     try {
@@ -342,9 +361,9 @@ export default class extends Controller {
         author: this.authorValue, permlink: this.permlinkValue,
         weight: Number(modal.querySelector('input').value) * 100 * direction
       })
+      if (!active) return
       if (result.status === 'approval_required') {
-        modal.querySelector('[data-wallet-signing-link]')?.remove()
-        const link = document.createElement('a')
+        const link = signingLink = document.createElement('a')
         link.dataset.walletSigningLink = 'true'
         link.href = result.url
         link.target = '_blank'
@@ -352,17 +371,15 @@ export default class extends Controller {
         link.textContent = 'Approve in HiveSigner'
         link.className = 'btn btn-primary ml-2'
         button.after(link)
-        link.addEventListener('click', () => window.addEventListener('focus', () => {
-          this.refreshPostDetails()
-          $(modal).modal('hide')
-        }, {once: true}), {once: true})
+        link.addEventListener('click', () => window.addEventListener('focus', checkVote, {once: true}), {once: true})
       } else if (result.status === 'submitted') {
         this.refreshPostDetails()
         $(modal).modal('hide')
       }
     } catch (error) {
-      window.alert(error.message || 'The wallet did not approve the vote.')
+      if (active) window.alert(error.message || 'The wallet did not approve the vote.')
     } finally {
+      if (!signingLink) clearApproval()
       button.disabled = false
       button.textContent = 'Vote'
     }

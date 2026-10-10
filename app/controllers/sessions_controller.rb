@@ -10,10 +10,9 @@ class SessionsController < ApplicationController
   end
 
   def create
-    binding = session[:wallet_login_binding] ||= SecureRandom.hex(32)
     challenge = WalletLoginChallenge.issue!(
       account_name: params[:account_name].to_s.strip.downcase.delete_prefix('@'),
-      provider: params[:provider].to_s, binding: binding, origin: request.base_url
+      provider: params[:provider].to_s, binding: wallet_login_binding, origin: request.base_url
     )
     payload = {token: challenge.token, account_name: challenge.account_name, provider: challenge.provider, message: challenge.message, expires_at: challenge.expires_at}
     if challenge.provider == 'hivesigner'
@@ -29,7 +28,7 @@ class SessionsController < ApplicationController
     challenge = WalletLoginChallenge.find_by!(token: params[:token])
     raise ArgumentError, 'Use the HiveSigner callback to complete login.' if challenge.provider == 'hivesigner'
 
-    account = challenge.consume!(session[:wallet_login_binding]) do
+    account = challenge.consume!(wallet_login_binding) do
       if WalletSignatureAuthenticator.valid?(account_name: challenge.account_name, message: challenge.message, signature: params[:signature])
         Account.find_or_create_by!(name: challenge.account_name)
       end
@@ -42,7 +41,7 @@ class SessionsController < ApplicationController
     challenge = WalletLoginChallenge.find_by!(token: params[:state])
     raise ArgumentError, 'Invalid wallet callback.' unless challenge.provider == 'hivesigner'
 
-    account = challenge.consume!(session[:wallet_login_binding]) do
+    account = challenge.consume!(wallet_login_binding) do
       Timeout.timeout(5) { HivesignerAuthenticator.new(params[:access_token]).account }
     end
     establish_session(account, 'hivesigner')
@@ -57,6 +56,12 @@ class SessionsController < ApplicationController
   end
 
 private
+  def wallet_login_binding
+    # Load the stored session so deleted cookies rotate before binding a challenge.
+    session.update({})
+    session.id.private_id
+  end
+
   def prevent_caching
     response.headers['Cache-Control'] = 'no-store'
     response.headers['Referrer-Policy'] = 'no-referrer'
