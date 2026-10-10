@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Hyperion · Five login directions</title>
+  <link rel="icon" href="assets/hyperion.svg" type="image/svg+xml">
+  <script src="preview.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="preview-bar">
+    <div class="preview-heading">
+      <div><strong>HYPERION</strong><span class="preview-slash">/</span><span>Login studies</span></div>
+      <div class="theme-controls">
+        <span id="system-status" class="system-status" aria-live="polite"></span>
+        <label for="theme">Appearance</label>
+        <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+      </div>
+    </div>
+    <nav class="layout-picker" aria-label="Choose a login layout">
+      <button type="button" data-layout="edition"><span>01</span> Edition</button>
+      <button type="button" data-layout="orbit"><span>02</span> Orbit</button>
+      <button type="button" data-layout="workbench"><span>03</span> Workbench</button>
+      <button type="button" data-layout="commonroom"><span>04</span> Commonroom</button>
+      <button type="button" data-layout="signal"><span>05</span> Signal</button>
+    </nav>
+    <div class="preview-caption"><span id="design-description"></span><span>Visual previews · no wallet requests</span></div>
+  </header>
+
+  <main>
+    <section class="concept edition" id="edition" aria-label="Edition login design" hidden>
+      <div class="edition-wrap">
+        <header class="edition-masthead"><a class="brand" href="?layout=edition"><span class="brand-mark" aria-hidden="true"></span>Hyperion</a><span class="eyebrow">THE HIVE READER</span><span class="edition-date">A little less noise.</span></header>
+        <div class="edition-content">
+          <div class="edition-story">
+            <span class="eyebrow accent">YOUR DAILY POINT OF VIEW</span>
+            <h1>Good stories.<br> Great company.<br> <em>Your call.</em></h1>
+            <p class="lede">A considered way to read Hive.<br> Follow your interests. Find your people.<br> Give good work the attention it deserves.</p>
+            <div class="edition-bottom"><span class="edition-sun" aria-hidden="true">✳</span><p>Curiosity, rewarded.<br> <span>A reader for people with something to read.</span></p></div>
+          </div>
+          <div class="edition-login">
+            <span class="eyebrow">YOUR NEXT CHAPTER</span>
+            <h2>Make yourself<br> at home.</h2>
+            <p class="form-intro">Sign in with your Hive account.</p>
+            <div class="form-mount" data-form="edition"></div>
+          </div>
+        </div>
+        <footer class="edition-footer"><span>READ WITH INTENTION.</span><span>Built for Hive. Made for you.</span><span>EST. ON CHAIN ↗</span></footer>
+      </div>
+    </section>
+
+    <section class="concept orbit" id="orbit" aria-label="Orbit login design" hidden>
+      <div class="orbit-stars" aria-hidden="true"></div>
+      <header class="orbit-header"><a class="brand" href="?layout=orbit"><span class="brand-mark" aria-hidden="true"></span>Hyperion</a><span class="orbit-label"><i aria-hidden="true"></i> A clearer view of Hive</span></header>
+      <div class="orbit-content">
+        <div class="orbit-story">
+          <div class="orbit-scene" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-planet"></div><span class="orbit-satellite satellite-one"></span><span class="orbit-satellite satellite-two"></span><span class="orbit-coordinate">H / 01</span></div>
+          <span class="eyebrow">FIND YOUR ORBIT</span>
+          <h1>A universe of ideas.<br> <span>Your own space.</span></h1>
+          <p class="lede">Follow what moves you. Discover a new perspective.<br> Your corner of Hive is waiting.</p>
+        </div>
+        <div class="orbit-card">
+          <span class="orbit-card-spark" aria-hidden="true">✧</span><span class="eyebrow">WELCOME TO HYPERION</span>
+          <h2>Come on in.</h2>
+          <p class="form-intro">Your Hive account is all you need.</p>
+          <div class="form-mount" data-form="orbit"></div>
+        </div>
+      </div>
+      <footer class="orbit-footer"><span>Ideas travel. Good ones find you.</span><span>READ · DISCOVER · CURATE</span></footer>
+    </section>
+
+    <section class="concept workbench" id="workbench" aria-label="Workbench login design" hidden>
+      <aside class="workbench-rail">
+        <a class="brand" href="?layout=workbench"><span class="brand-mark" aria-hidden="true"></span>Hyperion</a>
+        <div class="rail-middle"><span class="eyebrow">A PLACE TO FOCUS</span><h1>Your interests.<br> Your pace.</h1><p>A clean workspace for everything you follow on Hive.</p>
+          <div class="rail-steps"><div><span>01</span><p><strong>Read</strong>Catch up on your terms.</p></div><div><span>02</span><p><strong>Discover</strong>Find your next favorite.</p></div><div><span>03</span><p><strong>Curate</strong>Support work that matters.</p></div></div>
+        </div>
+        <div class="rail-foot"><span class="rail-seal" aria-hidden="true">H.</span><span>Small details.<br> Better reading.</span></div>
+      </aside>
+      <div class="workbench-main">
+        <div class="workbench-top"><span>YOUR READING WORKSPACE</span><span class="workbench-shortcut" aria-hidden="true">↗</span></div>
+        <div class="workbench-login"><span class="workbench-tag"><i aria-hidden="true"></i> Ready when you are</span><h2>Pick up where<br> curiosity takes you.</h2><p class="form-intro">Connect your wallet to open Hyperion.</p><div class="form-mount" data-form="workbench"></div></div>
+        <footer class="workbench-footer"><span>Less scrolling. More finding.</span><span>POWERED BY HIVE</span></footer>
+      </div>
+    </section>
+
+    <section class="concept commonroom" id="commonroom" aria-label="Commonroom login design" hidden>
+      <header class="commonroom-header"><a class="brand" href="?layout=commonroom"><span class="brand-mark" aria-hidden="true"></span>Hyperion</a><span class="commonroom-pill">A good place to spend a little time.</span></header>
+      <div class="commonroom-content">
+        <div class="commonroom-story"><span class="eyebrow">PULL UP A CHAIR</span><h1>There’s a story<br> here <em>for you.</em></h1><p class="lede">Big ideas, small discoveries, and people<br> worth coming back for. Welcome to Hive,<br> through a more thoughtful lens.</p>
+          <div class="reading-stack" aria-hidden="true"><div class="reading-card card-back"><span>AN OPEN WINDOW</span><div class="card-landscape"><i></i><b></b></div><p>Somewhere new.</p></div><div class="reading-card card-front"><span>WORTH YOUR TIME</span><p>The things<br> we notice.</p><div class="card-lines"><i></i><i></i><i></i></div><span class="reading-star">✳</span></div></div>
+        </div>
+        <div class="commonroom-card"><span class="commonroom-welcome">Your seat is saved.</span><h2>Welcome in.</h2><p class="form-intro">Bring your Hive account. We’ll take it from here.</p><div class="form-mount" data-form="commonroom"></div><div class="commonroom-note"><span aria-hidden="true">✳</span> Good reading starts with a little curiosity.</div></div>
+      </div>
+      <footer class="commonroom-footer"><span>MADE FOR THE CURIOUS</span><span>A world of voices. A place to listen.</span></footer>
+    </section>
+
+    <section class="concept signal" id="signal" aria-label="Signal login design" hidden>
+      <div class="signal-wrap">
+        <header class="signal-header"><a class="brand" href="?layout=signal"><span class="brand-mark" aria-hidden="true"></span>Hyperion</a><span class="eyebrow">TURN TOWARD THE INTERESTING ↗</span></header>
+        <div class="signal-title"><span class="signal-index">H / 05</span><h1>MORE SIGNAL.<br> <span>LESS NOISE.</span></h1><div class="signal-asterisk" aria-hidden="true">✳</div></div>
+        <div class="signal-grid">
+          <div class="signal-manifesto"><span class="eyebrow">A DIFFERENT KIND OF FEED.</span><h2>Not everything.<br> The good stuff.</h2><p>Read what you love. Discover what’s next.<br> Put your vote behind it.</p><div class="signal-chips"><span>READ</span><span>DISCOVER</span><span>CURATE</span></div><span class="signal-arrow" aria-hidden="true">↗</span></div>
+          <div class="signal-login"><div class="signal-login-heading"><h2>You’re up.</h2><span>CONNECT TO HIVE ↘</span></div><div class="form-mount" data-form="signal"></div></div>
+        </div>
+        <footer class="signal-footer"><span>YOUR ATTENTION IS WORTH SOMETHING.</span><span>Spend it well.</span></footer>
+      </div>
+    </section>
+  </main>
+
+  <template id="login-form-template">
+    <form class="login-form">
+      <label class="account-label">Hive account name</label>
+      <div class="account-input"><span aria-hidden="true">@</span><input type="text" name="account_name" placeholder="your-hive-name" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+      <div class="wallet-label"><span>Continue with a wallet</span><span aria-hidden="true">↘</span></div>
+      <div class="wallet-grid">
+        <button class="wallet-button wallet-keychain" type="submit" name="provider" value="keychain"><img src="assets/keychain.svg" width="30" height="30" alt=""><span>Hive Keychain</span><span class="wallet-arrow" aria-hidden="true">↗</span></button>
+        <button class="wallet-button wallet-hivesigner" type="submit" name="provider" value="hivesigner"><img src="assets/hivesigner.png" width="30" height="30" alt=""><span>HiveSigner</span><span class="wallet-arrow" aria-hidden="true">↗</span></button>
+        <button class="wallet-button wallet-hiveauth" type="submit" name="provider" value="hiveauth"><img src="assets/hiveauth.svg" width="30" height="30" alt=""><span>HiveAuth</span><span class="wallet-arrow" aria-hidden="true">↗</span></button>
+        <button class="wallet-button wallet-peakvault" type="submit" name="provider" value="peakvault"><img src="assets/peakvault.svg" width="30" height="30" alt=""><span>Peak Vault</span><span class="wallet-arrow" aria-hidden="true">↗</span></button>
+      </div>
+      <p class="wallet-assurance"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2 4 4.5v5c0 4 6 7 6 7s6-3 6-7v-5L10 2Z" stroke="currentColor" stroke-width="1.3"/><path d="m7 9 2 2 4-4" stroke="currentColor" stroke-width="1.3"/></svg>Your keys stay in your wallet.</p>
+      <p class="preview-feedback" role="status" hidden></p>
+    </form>
+    <a class="agent-link" href="http://localhost:3000/.well-known/hyperion-agent.json" target="_blank" rel="noopener">Building an agent? Explore the API <span aria-hidden="true">↗</span></a>
+  </template>
+  <noscript><p class="noscript">Enable JavaScript to compare the five designs and follow your system appearance.</p></noscript>
+</body>
+</html>
