@@ -151,8 +151,8 @@ refresh exposed a login-page session reset that invalidated tab A's CSRF token.
 Regression tests reproduce the error and verify that repeated login-page loads
 preserve earlier forms and challenges, while logout still invalidates both.
 Frontend tests cover preserving wallet state on form load and handling non-JSON
-server failures with a reload instruction. A live retest of overlapping wallet
-prompts is still pending.
+server failures with a reload instruction. After the fix, the user confirmed
+that overlapping login requests across the two tabs worked as expected.
 
 The desktop login page has been visually checked with all four providers.
 On `http://localhost:3000`, a real HiveAuth request reached the QR approval
@@ -165,9 +165,11 @@ correctly reported a missing extension in Safari, and now explains the supported
 browser options. The user confirmed
 that Hyperion successfully invoked the installed Peak Vault extension in Brave.
 No account had been imported, so signed login and voting remain unverified.
-Simulated extension tests are not evidence of
-real-wallet compatibility. Keep the PR in draft until the default providers pass
-the following checks; keep HiveAuth and Peak Vault disabled until their rows pass too.
+Local login, voting, and logout are confirmed for the default providers. The
+two-tab overlapping-login retest clears the remaining draft blocker. The table
+below records additional browser/mobile and edge-case coverage that remains unverified.
+Simulated extension tests do not establish real-wallet compatibility; keep
+HiveAuth and Peak Vault disabled in production until their rows pass too.
 
 | Provider | Desktop | Mobile / return flow |
 | --- | --- | --- |
