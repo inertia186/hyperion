@@ -97,7 +97,7 @@ private
           summary: 'Return curated unread posts for agent summarization.',
           description: 'Each post includes current_vote in Hive weight units (10000 = 100%, negative = downvote, 0 = removed vote). When current_vote_status is ready, null means no vote was found. When unavailable, vote data could not be confirmed; do not treat null as an unvoted post.',
           parameters: [
-            query_parameter('limit', 'integer', "Maximum posts to return. Defaults to #{HyperionAgent::DEFAULT_DIGEST_LIMIT}, at most #{HyperionAgent::MAX_DIGEST_LIMIT}."),
+            query_parameter('limit', 'integer', "Maximum posts to return. Defaults to #{HyperionAgent::DEFAULT_DIGEST_LIMIT}, at most #{HyperionAgent::MAX_DIGEST_LIMIT}.").deep_merge(schema: {minimum: 1, maximum: HyperionAgent::MAX_DIGEST_LIMIT}),
             query_parameter('tag', 'string', 'Optional tag/category filter.'),
             query_parameter('author', 'string', 'Optional author filter.'),
             query_parameter('query', 'string', 'Optional keyword search filter.')

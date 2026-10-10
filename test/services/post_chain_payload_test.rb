@@ -83,27 +83,48 @@ class PostChainPayloadTest < ActiveSupport::TestCase
     end
   end
 
-  test 'deduplicates identities and splits requests at the client batch limit' do
-    identities = 51.times.map { |index| ['author', "post-#{index}"] }
+  test 'deduplicates identities and splits requests into small batches' do
+    identities = (PostChainPayload::VOTE_BATCH_SIZE + 1).times.map { |index| ['author', "post-#{index}"] }
     api = VoteApi.new
 
     votes = PostChainPayload.new(account: accounts(:curated), api: api).current_votes(identities + identities)
 
-    assert_equal [50, 1], api.batches.map(&:size)
+    assert_equal [PostChainPayload::VOTE_BATCH_SIZE, 1], api.batches.map(&:size)
     assert_equal identities, votes.keys.sort_by { |identity| identity.last.delete_prefix('post-').to_i }
     assert_equal identities, api.batches.flatten.map { |request| request.dig(:params, :start).first(2) }
   end
 
   test 'bounds the entire lookup and preserves completed batches on timeout' do
-    identities = 51.times.map { |index| ['author', "post-#{index}"] }
+    identities = (PostChainPayload::VOTE_BATCH_SIZE + 1).times.map { |index| ['author', "post-#{index}"] }
     api = VoteApi.new do
       sleep 2 if api.batches.size == 2
     end
 
     votes = PostChainPayload.new(account: accounts(:curated), api: api, timeout: 0.5).current_votes(identities)
 
-    assert_equal 50, votes.size
+    assert_equal PostChainPayload::VOTE_BATCH_SIZE, votes.size
     assert_not votes.key?(identities.last)
+  end
+
+  test 'logs expected failures at debug and warns only when no post resolves' do
+    logged = []
+    logger = Object.new
+    %i[debug warn].each { |level| logger.define_singleton_method(level) { |message| logged << [level, message] } }
+    lookup = ->(api, identity) { PostChainPayload.new(account: accounts(:curated), api: api).current_votes([identity]) }
+    missing_post = VoteApi.new
+    missing_response = lambda do |request|
+      VoteApi::Response.new('200', JSON.parse(request.body).map { |entry| {id: entry['id'], error: {message: 'Post does not exist'}} }.to_json)
+    end
+
+    Rails.stub(:logger, logger) do
+      lookup.(VoteApi.new, ['author', 'unvoted'])
+      lookup.(VoteApi.new { raise Timeout::Error }, ['author', 'slow'])
+      missing_post.stub(:http_request, missing_response) { lookup.(missing_post, ['author', 'deleted']) }
+    end
+
+    assert_equal [:debug, :warn], logged.map(&:first)
+    assert_match 'Timeout::Error', logged.first.last
+    assert_match 'left 1 of 1 posts unavailable', logged.last.last
   end
 
   test 'returns unknown votes on an RPC failure and does not call Hive for an empty digest' do

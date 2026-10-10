@@ -3,6 +3,7 @@ require 'timeout'
 class PostChainPayload
   CACHE_TTL = 2.minutes
   TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
+  VOTE_BATCH_SIZE = Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM
 
   def initialize(account:, api: nil, cache: Rails.cache, timeout: TIMEOUT)
     @account = account
@@ -38,7 +39,7 @@ class PostChainPayload
     return votes if identities.empty?
 
     Timeout.timeout(timeout) do
-      identities.each_slice(Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM) do |batch|
+      identities.each_slice(VOTE_BATCH_SIZE) do |batch|
         responses = vote_batch_responses(batch)
 
         batch.each_with_index do |identity, id|
@@ -59,11 +60,16 @@ class PostChainPayload
       end
     end
 
+    # Single posts fail routinely (e.g. deleted on chain); warn only when none resolved.
     unresolved = identities.size - votes.size
-    Rails.logger.warn "Digest vote lookup left #{unresolved} of #{identities.size} posts unavailable" if unresolved.positive?
+    if unresolved.positive?
+      Rails.logger.public_send(votes.empty? ? :warn : :debug, "Digest vote lookup left #{unresolved} of #{identities.size} posts unavailable")
+    end
     votes
   rescue StandardError => e
-    Rails.logger.warn "Unable to fetch digest votes: #{e.class}: #{e.message}"
+    # Same policy as Api::V1::PostsController#expected_chain_fetch_error?.
+    expected = e.is_a?(Timeout::Error) || e.is_a?(Hive::ArgumentError)
+    Rails.logger.public_send(expected ? :debug : :warn, "Unable to fetch digest votes: #{e.class}: #{e.message}")
     votes
   end
 
