@@ -5,7 +5,6 @@ import { wallet } from '../wallet'
 export default class extends Controller {
   connect() {
     this.element.querySelector('input[name="account_name"]')?.focus()
-    wallet.disconnect().catch(() => {})
   }
 
   async beginLogin(event) {

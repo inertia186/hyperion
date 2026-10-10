@@ -39,6 +39,14 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain; delete window.peakvault })
 
 describe('wallet adapter', () => {
+  test('explains a non-JSON server error without opening the wallet', async () => {
+    const {adapter, core, fetcher} = setup()
+    fetcher.mockResolvedValueOnce({ok: false, json: async () => { throw new SyntaxError('Unexpected token A') }})
+
+    await expect(adapter.connect({accountName, provider: 'keychain'})).rejects.toThrow('Reload this page')
+    expect(core.login).not.toHaveBeenCalled()
+  })
+
   test('requires browser coordination for signed wallets but leaves HiveSigner usable without Aioha mutations', async () => {
     vi.stubGlobal('navigator', {})
     const {adapter, core, fetcher} = setup()

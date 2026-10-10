@@ -62,7 +62,9 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
       headers: {Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || ''},
       ...(body ? {body: JSON.stringify(body)} : {})
     })
-    const payload = await response.json()
+    const payload = await response.json().catch(() => {
+      throw new Error('The server returned an unexpected response. Reload this page and try again.')
+    })
     if (!response.ok) throw new Error(payload.error || 'Your session expired. Please sign in again.')
     return payload
   }

@@ -20,6 +20,53 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test 'opening another login page preserves the earlier forms CSRF token' do
+    previous = SessionsController.allow_forgery_protection
+    SessionsController.allow_forgery_protection = true
+    get new_session_path
+    tab_a_token = css_select('meta[name="csrf-token"]').first['content']
+
+    get new_session_path
+    post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
+
+    assert_response :created
+  ensure
+    SessionsController.allow_forgery_protection = previous
+  end
+
+  test 'opening another login page preserves a pending challenge and its CSRF token' do
+    previous = SessionsController.allow_forgery_protection
+    SessionsController.allow_forgery_protection = true
+    get new_session_path
+    tab_a_token = css_select('meta[name="csrf-token"]').first['content']
+    post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
+    assert_response :created
+    challenge = WalletLoginChallenge.find_by!(token: response.parsed_body.fetch('token'))
+
+    get new_session_path
+    assert challenge.available_for?(session[:wallet_login_binding])
+    WalletSignatureAuthenticator.stub(:valid?, true) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
+    end
+
+    assert_response :success
+    assert_equal 'fixture-curator', session[:current_account].name
+    assert_nil session[:wallet_login_binding]
+  ensure
+    SessionsController.allow_forgery_protection = previous
+  end
+
+  test 'viewing login preserves authentication until explicit logout or a completed replacement login' do
+    challenge = start_login
+    WalletSignatureAuthenticator.stub(:valid?, true) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json
+    end
+    get new_session_path
+
+    assert_equal 'fixture-curator', session[:current_account]&.name
+    assert_equal 'keychain', session[:wallet_provider]
+  end
+
   test 'issues a challenge bound to the normalized account and browser' do
     challenge = start_login(account_name: ' @Fixture-Curator ')
 
@@ -177,7 +224,8 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
       post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json
     end
     assert_response :unprocessable_entity
-    assert_includes response.body, 'InvalidAuthenticityToken'
+    assert_equal 'Your login page is out of date. Reload this page and try again.', response.parsed_body.fetch('error')
+    assert_equal 'no-store', response.headers['Cache-Control']
     get new_session_path
     token = css_select('meta[name="csrf-token"]').first['content']
     post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => token}
@@ -187,7 +235,39 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
       post complete_sessions_path, params: {token: response.parsed_body.fetch('token'), signature: 'proof'}, as: :json
     end
     assert_response :unprocessable_entity
-    assert_includes response.body, 'InvalidAuthenticityToken'
+    assert_equal 'Your login page is out of date. Reload this page and try again.', response.parsed_body.fetch('error')
+  ensure
+    SessionsController.allow_forgery_protection = previous
+  end
+
+  test 'logout still invalidates old forms and challenges and a fresh form recovers' do
+    previous = SessionsController.allow_forgery_protection
+    SessionsController.allow_forgery_protection = true
+    get new_session_path
+    old_token = css_select('meta[name="csrf-token"]').first['content']
+    post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => old_token}
+    challenge = WalletLoginChallenge.find_by!(token: response.parsed_body.fetch('token'))
+    delete session_path('fixture-curator'), headers: {'X-CSRF-Token' => old_token}
+    assert_redirected_to new_session_url
+    follow_redirect!
+    tab_a_token = css_select('meta[name="csrf-token"]').first['content']
+
+    assert_no_difference('WalletLoginChallenge.count') do
+      post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => old_token}
+    end
+    assert_response :unprocessable_entity
+    assert_match 'Reload this page', response.parsed_body.fetch('error')
+
+    get new_session_path
+    WalletSignatureAuthenticator.stub(:valid?, ->(**) { flunk 'Logout must invalidate the old challenge' }) do
+      post complete_sessions_path, params: {token: challenge.token, signature: 'proof'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
+    end
+    assert_response :unprocessable_entity
+    assert_nil session[:current_account]
+    assert_nil challenge.reload.consumed_at
+
+    post sessions_path, params: {account_name: 'fixture-curator', provider: 'keychain'}, as: :json, headers: {'X-CSRF-Token' => tab_a_token}
+    assert_response :created
   ensure
     SessionsController.allow_forgery_protection = previous
   end

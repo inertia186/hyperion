@@ -1,14 +1,12 @@
 class SessionsController < ApplicationController
   skip_before_action :sign_in
   protect_from_forgery with: :exception
-  before_action :prevent_caching
+  prepend_before_action :prevent_caching
   rescue_from ActiveRecord::RecordNotFound, ArgumentError, ActiveRecord::RecordInvalid, with: :login_failed
+  rescue_from ActionController::InvalidAuthenticityToken, with: :stale_login_form
 
   def new
     @account_name = params[:account_name]
-    alert = flash[:alert]
-    reset_session
-    flash.now[:alert] = alert if alert
   end
 
   def create
@@ -75,6 +73,15 @@ private
       render json: {error: 'Login could not be verified. Please start again.'}, status: :unprocessable_entity
     else
       redirect_to new_session_url, alert: 'Login could not be verified. Please start again.'
+    end
+  end
+
+  def stale_login_form
+    message = 'Your login page is out of date. Reload this page and try again.'
+    if request.format.json?
+      render json: {error: message}, status: :unprocessable_entity
+    else
+      redirect_to new_session_url, alert: message
     end
   end
 end

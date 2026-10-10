@@ -91,8 +91,15 @@ mismatch asks the user to sign in again before invoking a wallet. Existing
 browser sessions without a provider require one fresh login before voting.
 Agent bearer-token issuance and transaction-signing authority are unchanged.
 
-The header's wallet link starts a fresh login for reconnecting or changing
-accounts/providers. Logout clears the Rails session and cancels this tab's
+The header's wallet link opens the login form for reconnecting or changing
+accounts/providers. Viewing the form preserves the shared Rails session, CSRF
+token, pending challenge, and wallet state, so opening it in another tab cannot
+invalidate an existing form or wallet request. Starting a signed login resets
+the wallet under its browser lock; successful login rotates the Rails session.
+A form made stale by explicit logout or a completed login is still rejected with
+a reload instruction. CSRF protection stays enabled.
+
+Logout clears the Rails session and cancels this tab's
 pending adapter request. Aioha state is cleared when the browser lock is
 available; a pending operation in another tab blocks that cleanup.
 Some extensions cannot dismiss an outstanding native prompt.
@@ -136,8 +143,16 @@ registering the localhost callback, the user also confirmed HiveSigner login as
 link. The embedded signing page was blocked by HiveSigner's `X-Frame-Options:
 DENY` and CSP `frame-ancestors 'none'`; it has been replaced by the external-link
 dialog. Automated checks cover returning to refresh the observed vote, manual
-refresh, and removing return listeners on dismissal. The new return behavior
-still needs a real-browser check; no transaction ID was independently verified.
+refresh, and removing return listeners on dismissal. The user confirmed the
+replacement workflow works; no transaction ID was independently verified.
+
+The user confirmed logout in tab A is reflected after refreshing tab B. That
+refresh exposed a login-page session reset that invalidated tab A's CSRF token.
+Regression tests reproduce the error and verify that repeated login-page loads
+preserve earlier forms and challenges, while logout still invalidates both.
+Frontend tests cover preserving wallet state on form load and handling non-JSON
+server failures with a reload instruction. A live retest of overlapping wallet
+prompts is still pending.
 
 The desktop login page has been visually checked with all four providers.
 On `http://localhost:3000`, a real HiveAuth request reached the QR approval
@@ -157,7 +172,7 @@ the following checks; keep HiveAuth and Peak Vault disabled until their rows pas
 | Provider | Desktop | Mobile / return flow |
 | --- | --- | --- |
 | Keychain | User confirmed local login, an accepted vote, and logout. Pending reload, rejection, switch account, and remaining vote weights | Pending in Keychain's supported mobile browser |
-| HiveSigner | User registered localhost callback and confirmed login as inertia, logout, and external-link vote broadcast. Pending new dialog return check, up/down/changed-weight coverage, and close without approval | Pending: mobile OAuth return and signing-page return |
+| HiveSigner | User registered localhost callback and confirmed login as inertia, logout, external-link vote broadcast, and the replacement approval/return workflow. Pending up/down/changed-weight coverage and close without approval | Pending: mobile OAuth return and signing-page return |
 | HiveAuth | QR display/cancellation verified; user confirmed mobile Keychain approval and localhost login after the single-line challenge fix; pending reload, rejection, expiry, vote and logout | QR approval/return confirmed by user; pending deep link, cancel and background/timeout |
 | Peak Vault | User confirmed extension invocation in Brave; no account imported yet. Missing extension handled in Safari. Pending signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 
