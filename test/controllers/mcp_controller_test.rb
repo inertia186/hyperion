@@ -81,7 +81,7 @@ class McpControllerTest < ActionController::TestCase
 
   test 'calls digest tool' do
     posts(:allowed_unread).update!(body: 'Digest body', payout_amount: 4, payout: '4.000 HBD')
-    api = VoteApi.new(['visible-author', 'allowed-unread'] => [{voter: 'fixture-curator', percent: 10000}])
+    api = VoteApi.new(['visible-author', 'allowed-unread', 'fixture-curator'] => 10000)
 
     Account.stub(:api, api) do
       post_json(

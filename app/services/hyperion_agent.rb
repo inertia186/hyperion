@@ -1,5 +1,7 @@
 class HyperionAgent
   DEFAULT_DIGEST_LIMIT = 10
+  # Each digest makes a Hive vote lookup per post inside the request.
+  MAX_DIGEST_LIMIT = 100
   DEFAULT_VOTE_WEIGHT = HyperionAgentPostPresenter::DEFAULT_VOTE_WEIGHT
   MAX_VOTE_WEIGHT = 10_000
 
@@ -216,7 +218,7 @@ private
   def normalize_query_params(params)
     values = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : params.to_h
     values = values.symbolize_keys
-    values[:limit] = [(values[:limit].presence || DEFAULT_DIGEST_LIMIT).to_i, 1].max
+    values[:limit] = (values[:limit].presence || DEFAULT_DIGEST_LIMIT).to_i.clamp(1, MAX_DIGEST_LIMIT)
     values
   rescue NoMethodError
     {limit: DEFAULT_DIGEST_LIMIT}

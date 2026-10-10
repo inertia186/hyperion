@@ -3,7 +3,6 @@ require 'timeout'
 class PostChainPayload
   CACHE_TTL = 2.minutes
   TIMEOUT = ENV.fetch('CHAIN_STATS_TIMEOUT', 3).to_f
-  ACTIVE_VOTES_LIMIT = 1_000
 
   def initialize(account:, api: nil, cache: Rails.cache, timeout: TIMEOUT)
     @account = account
@@ -35,36 +34,33 @@ class PostChainPayload
 
   def current_votes(identities)
     votes = {}
+    identities = identities.uniq
     return votes if identities.empty?
 
     Timeout.timeout(timeout) do
-      client = api.rpc_client
-      identities.uniq.each_slice(Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM) do |batch|
-        requests = batch.map { |identity| client.put(:condenser_api, :get_active_votes, identity).first }
-        identities_by_id = requests.to_h { |request| [request.fetch(:id), request.fetch(:params)] }
+      identities.each_slice(Hive::RPC::HttpClient::JSON_RPC_BATCH_SIZE_MAXIMUM) do |batch|
+        responses = vote_batch_responses(batch)
 
-        vote_batch_responses(client, requests).each do |id, responses|
-          identity = identities_by_id[id]
-          next unless identity && responses.one?
+        batch.each_with_index do |identity, id|
+          entries = responses[id]
+          next unless entries&.one? && !entries.first.key?('error')
 
-          response = responses.first
-          result = response['result']
-          next if response.key?('error') || !result.is_a?(Array)
-          next unless result.all? do |vote|
-            vote.is_a?(Hash) &&
-              vote['voter'].is_a?(String) && !vote['voter'].empty? &&
-              vote['percent'].is_a?(Integer) && vote['percent'].between?(-10_000, 10_000)
+          result = entries.first['result']
+          next unless result.is_a?(Hash) && result['votes'].is_a?(Array)
+
+          # by_comment_voter returns the next vote in index order when this voter has none.
+          vote = result['votes'].first
+          if result['votes'].empty? || (vote.is_a?(Hash) && vote.values_at('author', 'permlink', 'voter') != [*identity, account.name])
+            votes[identity] = nil
+          elsif vote.is_a?(Hash) && vote['vote_percent'].is_a?(Integer)
+            votes[identity] = vote['vote_percent']
           end
-
-          percent = vote_percent(result)
-          # A capped list can prove a vote exists, but cannot prove its absence.
-          next if percent.nil? && result.size >= ACTIVE_VOTES_LIMIT
-
-          votes[identity] = percent
         end
       end
     end
 
+    unresolved = identities.size - votes.size
+    Rails.logger.warn "Digest vote lookup left #{unresolved} of #{identities.size} posts unavailable" if unresolved.positive?
     votes
   rescue StandardError => e
     Rails.logger.warn "Unable to fetch digest votes: #{e.class}: #{e.message}"
@@ -89,8 +85,9 @@ class PostChainPayload
 private
   attr_reader :account, :cache, :timeout
 
+  # Not memoized: Account resets its client when failover moves to another node.
   def api
-    @api ||= Account.api
+    @api || Account.api
   end
 
   def vote_percent(votes)
@@ -98,15 +95,27 @@ private
     chain_value(vote, :percent)
   end
 
-  def vote_batch_responses(client, requests)
+  # Returns batch responses grouped by request id (the identity's index in batch).
+  def vote_batch_responses(batch)
+    requests = batch.each_with_index.map do |(author, permlink), id|
+      {jsonrpc: '2.0', id: id, method: 'database_api.list_votes', params: {start: [author, permlink, account.name], limit: 1, order: 'by_comment_voter'}}
+    end
+    return post_vote_batch(@api.rpc_client, requests) if @api
+
+    Account.with_simple_failover { post_vote_batch(Account.api.rpc_client, requests) }
+  end
+
+  def post_vote_batch(client, requests)
     # hive-ruby 1.0.6 validates batch IDs by position; JSON-RPC permits any order.
-    request = client.http_post(:condenser_api)
-    request.body = (requests.one? ? requests.first : requests).to_json
+    request = client.http_post(:database_api)
+    request.body = requests.to_json
     response = client.http_request(request)
     raise Hive::UnknownError, "Vote batch returned HTTP #{response.code}" unless response.code == '200'
 
     results = JSON.parse(response.body)
-    results = [results] unless results.is_a?(Array)
+    # A whole-batch failure is a single error object; raise so failover tries another node.
+    raise Hive::UnknownError, "Vote batch failed: #{response.body.truncate(200)}" unless results.is_a?(Array)
+
     results.grep(Hash).group_by { |result| result['id'] }
   end
 

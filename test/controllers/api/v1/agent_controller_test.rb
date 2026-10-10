@@ -78,10 +78,8 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
   test 'digest returns the authenticated account vote from Hive' do
     Post.update_all(body: 'Digest body')
     api = VoteApi.new(
-      ['visible-author', 'allowed-unread'] => [
-        {'voter' => 'another-account', 'percent' => -2500},
-        {'voter' => 'fixture-curator', 'percent' => 10000}
-      ]
+      ['visible-author', 'allowed-unread', 'another-account'] => -2500,
+      ['visible-author', 'allowed-unread', 'fixture-curator'] => 10000
     )
 
     Account.stub(:api, api) do
@@ -95,12 +93,26 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_equal 1, api.batches.size
   end
 
+  test 'digest caps the requested limit' do
+    Post.update_all(body: 'Digest body')
+
+    Account.stub(:api, VoteApi.new) do
+      get :digest, params: {limit: 2000}
+    end
+
+    assert_response :success
+    assert_equal HyperionAgent::MAX_DIGEST_LIMIT, response_json.dig('pagination', 'limit')
+  end
+
   test 'digest keeps posts available when vote lookup fails' do
     Post.update_all(body: 'Digest body')
     api = VoteApi.new { raise Hive::UnknownError, 'node unavailable' }
 
-    Account.stub(:api, api) do
-      get :digest, params: {limit: 10}
+    # Skip failover retries; PostChainPayloadTest covers them.
+    Account.stub(:with_simple_failover, ->(&block) { block.call }) do
+      Account.stub(:api, api) do
+        get :digest, params: {limit: 10}
+      end
     end
 
     assert_response :success
@@ -119,7 +131,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
       metadata: {tags: ['cross-post']},
       payout_amount: 100
     )
-    api = VoteApi.new([original.author, original.permlink] => [{voter: 'fixture-curator', percent: 4200}])
+    api = VoteApi.new([original.author, original.permlink, 'fixture-curator'] => 4200)
 
     Account.stub(:api, api) do
       get :digest, params: {limit: 1}
@@ -130,7 +142,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_equal posts(:allowed_unread).id, entry.fetch('id')
     assert_equal original.permlink, entry.fetch('permlink')
     assert_equal 4200, entry.fetch('current_vote')
-    assert_equal [[original.author, original.permlink]], api.batches.flatten.map { |request| request.fetch(:params) }
+    assert_equal [[original.author, original.permlink]], api.batches.flatten.map { |request| request.dig(:params, :start).first(2) }
   end
 
   test 'vote link validates weight and encodes signer parameters' do

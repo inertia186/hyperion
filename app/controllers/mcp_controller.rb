@@ -68,7 +68,7 @@ private
       tools: [
         tool_schema('hyperion_get_session', 'Return the current Hyperion session and account state.', {}),
         tool_schema('hyperion_get_digest', 'Return curated unread posts for agent summarization. current_vote uses Hive weight units (10000 = 100%, negative = downvote, 0 = removed vote). A null vote means no vote found only when current_vote_status is ready; unavailable means unknown.', {
-          limit: integer_schema('Maximum posts to return. Defaults to 10.'),
+          limit: integer_schema("Maximum posts to return. Defaults to #{HyperionAgent::DEFAULT_DIGEST_LIMIT}, at most #{HyperionAgent::MAX_DIGEST_LIMIT}."),
           tag: string_schema('Optional tag/category filter.'),
           author: string_schema('Optional author filter.'),
           query: string_schema('Optional keyword search filter.')
