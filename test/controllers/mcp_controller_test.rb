@@ -1,4 +1,5 @@
 require 'test_helper'
+require_relative '../support/vote_api'
 
 class McpControllerTest < ActionController::TestCase
   tests McpController
@@ -80,21 +81,26 @@ class McpControllerTest < ActionController::TestCase
 
   test 'calls digest tool' do
     posts(:allowed_unread).update!(body: 'Digest body', payout_amount: 4, payout: '4.000 HBD')
+    api = VoteApi.new(['visible-author', 'allowed-unread', 'fixture-curator'] => 10000)
 
-    post_json(
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'tools/call',
-      params: {
-        name: 'hyperion_get_digest',
-        arguments: {limit: 1}
-      }
-    )
+    Account.stub(:api, api) do
+      post_json(
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'hyperion_get_digest',
+          arguments: {limit: 1}
+        }
+      )
+    end
 
     assert_response :success
     payload = tool_payload
     assert_equal 1, payload.fetch('posts').size
     assert_equal 'Allowed Unread', payload.fetch('posts').first.fetch('title')
+    assert_equal 10000, payload.fetch('posts').first.fetch('current_vote')
+    assert_equal 'ready', payload.fetch('posts').first.fetch('current_vote_status')
     assert payload.fetch('mode_counts').fetch('unread') >= 1
     assert_equal [], payload.fetch('context_matches')
   end

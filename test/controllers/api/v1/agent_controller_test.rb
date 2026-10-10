@@ -1,4 +1,5 @@
 require 'test_helper'
+require_relative '../../../support/vote_api'
 
 class Api::V1::AgentControllerTest < ActionController::TestCase
   tests Api::V1::AgentController
@@ -51,7 +52,9 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
       author_reputation: 25
     )
 
-    get :digest, params: {limit: 10}
+    Account.stub(:api, VoteApi.new) do
+      get :digest, params: {limit: 10}
+    end
 
     assert_response :success
     titles = response_json.fetch('posts').map { |post| post.fetch('title') }
@@ -65,10 +68,81 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_includes post.fetch('excerpt'), 'Useful post body'
     assert_equal false, post.fetch('read')
     assert_nil post.fetch('current_vote')
+    assert_equal 'ready', post.fetch('current_vote_status')
     assert_includes post.fetch('interest_reasons'), 'unread'
     assert_includes post.fetch('interest_reasons'), 'known_payout'
     assert_equal 'https://hivesigner.com/sign/vote?authority=post&voter=fixture-curator&author=visible-author&permlink=allowed-unread&weight=10000', post.dig('vote_links', 'upvote')
     assert_equal 'https://hivesigner.com/sign/vote?authority=post&voter=fixture-curator&author=visible-author&permlink=allowed-unread&weight=-10000', post.dig('vote_links', 'downvote')
+  end
+
+  test 'digest returns the authenticated account vote from Hive' do
+    Post.update_all(body: 'Digest body')
+    api = VoteApi.new(
+      ['visible-author', 'allowed-unread', 'another-account'] => -2500,
+      ['visible-author', 'allowed-unread', 'fixture-curator'] => 10000
+    )
+
+    Account.stub(:api, api) do
+      get :digest, params: {limit: 50, tag: 'haf'}
+    end
+
+    assert_response :success
+    digest_post = response_json.fetch('posts').find { |entry| entry.fetch('id') == posts(:allowed_unread).id }
+    assert_equal 10000, digest_post.fetch('current_vote')
+    assert_equal 'ready', digest_post.fetch('current_vote_status')
+    assert_equal 1, api.batches.size
+  end
+
+  test 'digest caps the requested limit' do
+    Post.update_all(body: 'Digest body')
+
+    Account.stub(:api, VoteApi.new) do
+      get :digest, params: {limit: 2000}
+    end
+
+    assert_response :success
+    assert_equal HyperionAgent::MAX_DIGEST_LIMIT, response_json.dig('pagination', 'limit')
+  end
+
+  test 'digest keeps posts available when vote lookup fails' do
+    Post.update_all(body: 'Digest body')
+    api = VoteApi.new { raise Hive::UnknownError, 'node unavailable' }
+
+    # Skip failover retries; PostChainPayloadTest covers them.
+    Account.stub(:with_simple_failover, ->(&block) { block.call }) do
+      Account.stub(:api, api) do
+        get :digest, params: {limit: 10}
+      end
+    end
+
+    assert_response :success
+    assert_not_empty response_json.fetch('posts')
+    response_json.fetch('posts').each do |entry|
+      assert_nil entry.fetch('current_vote')
+      assert_equal 'unavailable', entry.fetch('current_vote_status')
+    end
+  end
+
+  test 'digest looks up votes for the displayed cross post source' do
+    Post.update_all(body: 'Digest body')
+    original = posts(:read_allowed)
+    posts(:allowed_unread).update!(
+      body: "This is a cross post of [Original](https://hive.blog/@#{original.author}/#{original.permlink}) by @#{original.author}.<br><br>Copied body",
+      metadata: {tags: ['cross-post']},
+      payout_amount: 100
+    )
+    api = VoteApi.new([original.author, original.permlink, 'fixture-curator'] => 4200)
+
+    Account.stub(:api, api) do
+      get :digest, params: {limit: 1}
+    end
+
+    assert_response :success
+    entry = response_json.fetch('posts').first
+    assert_equal posts(:allowed_unread).id, entry.fetch('id')
+    assert_equal original.permlink, entry.fetch('permlink')
+    assert_equal 4200, entry.fetch('current_vote')
+    assert_equal [[original.author, original.permlink]], api.batches.flatten.map { |request| request.dig(:params, :start).first(2) }
   end
 
   test 'vote link validates weight and encodes signer parameters' do
