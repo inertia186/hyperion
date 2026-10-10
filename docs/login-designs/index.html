@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Hyperion · Five login directions</title>
+  <link rel="icon" href="assets/hyperion.svg" type="image/svg+xml">
+  <script src="preview.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="preview-bar">
+    <div class="preview-heading">
+      <div><strong>HYPERION</strong><span class="preview-slash">/</span><span>Login studies</span></div>
+      <div class="theme-controls">
+        <span id="system-status" class="system-status" aria-live="polite"></span>
+        <label for="theme">Appearance</label>
+        <select id="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
+      </div>
+    </div>
+    <nav class="layout-picker" aria-label="Choose a login layout">
+      <button type="button" data-layout="edition"><span>01</span> Edition</button>
+      <button type="button" data-layout="orbit"><span>02</span> Orbit</button>
+      <button type="button" data-layout="workbench"><span>03</span> Workbench</button>
+      <button type="button" data-layout="commonroom"><span>04</span> Commonroom</button>
+      <button type="button" data-layout="signal"><span>05</span> Signal</button>
+    </nav>
+    <div class="preview-caption"><span id="design-description"></span><span>Visual previews · no wallet requests</span></div>
+  </header>
+
+  <main>
+    <section class="concept edition" id="edition" aria-label="Edition login design" hidden>
+      <div class="login-shell"><div class="login-panel"><h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Hyperion</h1><div class="form-mount" data-form="edition"></div></div></div>
+    </section>
+    <section class="concept orbit" id="orbit" aria-label="Orbit login design" hidden>
+      <div class="login-shell"><div class="orbit-scene" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-planet"></div></div><div class="login-panel"><h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Hyperion</h1><div class="form-mount" data-form="orbit"></div></div></div>
+    </section>
+    <section class="concept workbench" id="workbench" aria-label="Workbench login design" hidden>
+      <div class="login-shell"><div class="login-panel"><h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Hyperion</h1><div class="form-mount" data-form="workbench"></div></div></div>
+    </section>
+    <section class="concept commonroom" id="commonroom" aria-label="Commonroom login design" hidden>
+      <div class="login-shell"><div class="login-panel"><h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Hyperion</h1><div class="form-mount" data-form="commonroom"></div></div></div>
+    </section>
+    <section class="concept signal" id="signal" aria-label="Signal login design" hidden>
+      <div class="login-shell"><div class="login-panel"><h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Hyperion</h1><div class="form-mount" data-form="signal"></div></div></div>
+    </section>
+  </main>
+
+  <template id="login-form-template">
+    <form class="login-form">
+      <label class="account-label">Account Name</label>
+      <div class="account-input"><input type="text" name="account_name" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+      <div class="wallet-grid">
+        <button class="wallet-button wallet-keychain" type="submit" name="provider" value="keychain"><img src="assets/keychain.svg" width="30" height="30" alt=""><span>Hive Keychain</span></button>
+        <button class="wallet-button wallet-hivesigner" type="submit" name="provider" value="hivesigner"><img src="assets/hivesigner.png" width="30" height="30" alt=""><span>HiveSigner</span></button>
+        <button class="wallet-button wallet-hiveauth" type="submit" name="provider" value="hiveauth"><img src="assets/hiveauth.svg" width="30" height="30" alt=""><span>HiveAuth</span></button>
+        <button class="wallet-button wallet-peakvault" type="submit" name="provider" value="peakvault"><img src="assets/peakvault.svg" width="30" height="30" alt=""><span>Peak Vault</span></button>
+      </div>
+      <p class="preview-feedback" role="status" hidden></p>
+    </form>
+    <a class="agent-link" href="http://localhost:3000/.well-known/hyperion-agent.json" target="_blank" rel="noopener">Are you a robot? Use the Hyperion Agent API</a>
+  </template>
+  <noscript><p class="noscript">Enable JavaScript to compare the five designs and follow your system appearance.</p></noscript>
+</body>
+</html>

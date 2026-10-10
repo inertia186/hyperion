@@ -80,6 +80,8 @@ yarn-debug.log*
 /public/vite-dev
 /public/vite-test
 /node_modules
+# Local shortcut for the login design gallery in docs/login-designs.
+/public/login-designs
 /yarn-error.log
 yarn-debug.log*
 .yarn-integrity
