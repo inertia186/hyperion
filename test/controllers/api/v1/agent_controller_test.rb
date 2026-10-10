@@ -25,6 +25,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
   end
 
   test 'session returns account and curation state' do
+    @request.session[:wallet_provider] = 'hivesigner'
     get :show_session
 
     assert_response :success
@@ -32,6 +33,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_equal 'fixture-curator', response_json.dig('account', 'name')
     assert_includes response_json.fetch('ignored_tags'), 'spam'
     assert_equal voting_power_api_v1_session_path, response_json.fetch('voting_power_url')
+    assert_equal true, response_json.dig('preferences', 'hivesigner_available')
   end
 
   test 'digest returns interesting unread posts with agent fields and vote links' do

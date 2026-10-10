@@ -15,6 +15,7 @@ import {
 import { adjacentPostActionLink, focusAndClickLink, focusLink, postActionLink } from './posts_navigation'
 import { bindPreviewListeners, clearPreviewIframe, isPreviewBackdropClick, loadPreviewIframe, unbindPreviewListeners } from './posts_preview'
 import { refreshPendingPayout, refreshReplyCount, refreshVoteCount } from './posts_details'
+import { wallet } from '../wallet'
 
 import $ from 'jquery';
 
@@ -43,6 +44,7 @@ export default class extends Controller {
   }
   
   disconnect() {
+    this.clearVoteApproval?.()
     if ( !!firstLink ) {
       firstLink.blur();
       firstLink = null;
@@ -322,59 +324,75 @@ export default class extends Controller {
   }
   
   upvote(e) {
-    var voter = $('#current-account').data('name');
-    var weight = parseInt($(`#upvote-${this.idValue} input`).val()) * 100;
-    var label = $(e.target);
-    
-    label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
-    
-    if ( !!hivesignerAccessToken ) {
-      window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${weight}`)
-      window.addEventListener('focus', () => {
-        this.refreshPostDetails(e, 3000);
-        $(`#upvote-${this.idValue}`).modal('hide');
-        label.html('Vote');
-      });
-    } else {
-      hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, weight, (response) => {
-        this.refreshPostDetails(e, 10000);
-        $(`#upvote-${this.idValue}`).modal('hide');
-        label.html('Vote');
-      });
-    }
+    this.castVote(e, 'upvote', 1)
   }
 
   downvote(e) {
-    var voter = $('#current-account').data('name');
-    var weight = parseInt($(`#downvote-${this.idValue} input`).val()) * 100;
-    var label = $(e.target);
-    
-    label.html('<span class="spinner-border" style="height: 24px; width: 24px" />');
-    
-    if ( !!hivesignerAccessToken ) {
-      window.open(`https://hivesigner.com/sign/vote?authority=post&voter=${voter}&author=${this.authorValue}&permlink=${this.permlinkValue}&weight=${-weight}`)
-      this.refreshPostDetails(e, 3000);
-      $(`#downvote-${this.idValue}`).modal('hide');
-      label.html('Vote');
-    } else {
-      hive_keychain.requestVote(voter, this.permlinkValue, this.authorValue, -weight, (response) => {
-        this.refreshPostDetails(e, 10000);
-        $(`#downvote-${this.idValue}`).modal('hide');
-        label.html('Vote');
-      });
+    this.castVote(e, 'downvote', -1)
+  }
+
+  async castVote(event, action, direction) {
+    const button = event.currentTarget
+    const modal = document.getElementById(`${action}-${this.idValue}`)
+    const account = document.getElementById('current-account').dataset
+    this.clearVoteApproval?.()
+    let active = true
+    let signingLink
+    const checkVote = () => {
+      this.refreshPostDetails()
+      $(modal).modal('hide')
+    }
+    const clearApproval = () => {
+      active = false
+      signingLink?.remove()
+      window.removeEventListener('focus', checkVote)
+      modal.removeEventListener('input', clearApproval)
+      $(modal).off('hide.bs.modal', clearApproval)
+      if (this.clearVoteApproval === clearApproval) this.clearVoteApproval = undefined
+    }
+    this.clearVoteApproval = clearApproval
+    modal.addEventListener('input', clearApproval)
+    $(modal).one('hide.bs.modal', clearApproval)
+    button.disabled = true
+    button.textContent = 'Waiting for wallet…'
+    try {
+      const result = await wallet.vote({
+        accountName: account.name, provider: account.walletProvider,
+        author: this.authorValue, permlink: this.permlinkValue,
+        weight: Number(modal.querySelector('input').value) * 100 * direction
+      })
+      if (!active) return
+      if (result.status === 'approval_required') {
+        const link = signingLink = document.createElement('a')
+        link.dataset.walletSigningLink = 'true'
+        link.href = result.url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        link.textContent = 'Approve in HiveSigner'
+        link.className = 'btn btn-primary ml-2'
+        button.after(link)
+        link.addEventListener('click', () => window.addEventListener('focus', checkVote, {once: true}), {once: true})
+      } else if (result.status === 'submitted') {
+        this.refreshPostDetails()
+        $(modal).modal('hide')
+      }
+    } catch (error) {
+      if (active) window.alert(error.message || 'The wallet did not approve the vote.')
+    } finally {
+      if (!signingLink) clearApproval()
+      button.disabled = false
+      button.textContent = 'Vote'
     }
   }
   
-  refreshPostDetails(e, timeout) {
+  refreshPostDetails() {
     this.previewVoteCountTarget.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">Votes: 0</span>';
     this.previewPendingPayoutTarget.innerHTML = '<span class="spinner-grow spinner-grow-sm align-middle" style="height: 1px; width: 100%" /><span style="opacity: 0;">00.000 HBD</span>';
     
-    window.addEventListener('focus', () => {
-      setTimeout(() => {
-        this.refrestVoteCount();
-        this.refreshPendingPayout(this.pendingPayoutTarget);
-        this.refreshPendingPayout(this.previewPendingPayoutTarget);
-      }, timeout);
-    });
+    setTimeout(() => {
+      this.refrestVoteCount();
+      this.refreshPendingPayout(this.pendingPayoutTarget);
+      this.refreshPendingPayout(this.previewPendingPayoutTarget);
+    }, 3000);
   }
 }

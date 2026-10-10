@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { wallet } from '../../javascript/wallet'
 import { CalendarDays, CircleHelp, Code2, Laptop, LogOut, Menu, Monitor, Moon, PanelsTopLeft, Settings, Sun, Tags, Terminal } from 'lucide-react'
 import CurationInbox from './CurationInbox'
 import FullPageState from './components/FullPageState'
@@ -46,6 +47,7 @@ export default function App() {
             <img className="hidden h-8 w-8 rounded-full min-[420px]:block" src={imageProxy(session.account.avatar_url, '0x64')} alt="" />
             <VotingPowerBadge votingPower={votingPower} />
             <span className="hidden truncate text-sm font-medium sm:inline">{session.account.name}</span>
+            <a className="text-xs underline" href="/sessions/new" title="Change account or wallet">{session.wallet?.provider || 'Connect wallet'}</a>
             <div className="hidden items-center gap-3 min-[560px]:flex">
               <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
               <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
@@ -216,7 +218,11 @@ function HeaderMenu({accountName, theme, themeSaving, onThemeChange, onOpenSetti
 
 function LogoutForm({accountName, className = 'inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}) {
   return (
-    <form action={`/sessions/${accountName}`} method="post">
+    <form action={`/sessions/${accountName}`} method="post" onSubmit={(event) => {
+      event.preventDefault()
+      const form = event.currentTarget
+      wallet.disconnect().catch(() => {}).finally(() => form.submit())
+    }}>
       <input type="hidden" name="_method" value="delete" />
       <input type="hidden" name="authenticity_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
       <button className={className} type="submit">
