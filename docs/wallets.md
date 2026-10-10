@@ -112,6 +112,12 @@ Closing HiveSigner approval only refreshes the actual vote state. Rejection,
 cancellation, timeout, and switching the selected post clear the pending UI
 without announcing a successful vote.
 
+HiveSigner signing pages prohibit iframe embedding. The inbox instead shows an
+Open HiveSigner link that opens a new tab. Returning to Hyperion refreshes the
+observed vote state; Check vote does the same if the browser does not report the
+return. Closing the dialog also refreshes without assuming approval. The legacy
+frontend already uses an external signing link.
+
 ## Verification record (2026-10-09)
 
 Automated coverage includes Rails expiry/replay/browser binding, account
@@ -124,15 +130,24 @@ bridge is exercised with a simulated extension, including reload, logout, a late
 rejected vote, and blocked login retries through stale authentication cleanup.
 Both the legacy esbuild bundle and React/Vite build are checked.
 
+The user confirmed local Keychain login, an accepted vote, and logout. After
+registering the localhost callback, the user also confirmed HiveSigner login as
+`inertia`, logout, and a successful vote broadcast through the external Open
+link. The embedded signing page was blocked by HiveSigner's `X-Frame-Options:
+DENY` and CSP `frame-ancestors 'none'`; it has been replaced by the external-link
+dialog. Automated checks cover returning to refresh the observed vote, manual
+refresh, and removing return listeners on dismissal. The new return behavior
+still needs a real-browser check; no transaction ID was independently verified.
+
 The desktop login page has been visually checked with all four providers.
 On `http://localhost:3000`, a real HiveAuth request reached the QR approval
 dialog; cancellation removed the dialog and restored the login buttons.
 On the HTTP LAN hostname, the capability check displayed the HTTPS/localhost
 guidance before opening a request. After the single-line challenge fix, the user
 confirmed a successful HiveAuth login using mobile Keychain and localhost.
-HiveAuth voting, rejection, expiry, and logout checks remain pending; no live
-transaction has been verified. Peak Vault correctly reported a missing extension
-in Safari, and now explains the supported browser options. The user confirmed
+HiveAuth voting, rejection, expiry, and logout checks remain pending. Peak Vault
+correctly reported a missing extension in Safari, and now explains the supported
+browser options. The user confirmed
 that Hyperion successfully invoked the installed Peak Vault extension in Brave.
 No account had been imported, so signed login and voting remain unverified.
 Simulated extension tests are not evidence of
@@ -141,8 +156,8 @@ the following checks; keep HiveAuth and Peak Vault disabled until their rows pas
 
 | Provider | Desktop | Mobile / return flow |
 | --- | --- | --- |
-| Keychain | Pending: installed and missing extension, login, reload, vote, rejection, switch account, logout | Pending in Keychain's supported mobile browser |
-| HiveSigner | Pending: registered callback, login-only scope, explicit up/down/changed-weight approvals, close without approval | Pending: OAuth return and signing-page return |
+| Keychain | User confirmed local login, an accepted vote, and logout. Pending reload, rejection, switch account, and remaining vote weights | Pending in Keychain's supported mobile browser |
+| HiveSigner | User registered localhost callback and confirmed login as inertia, logout, and external-link vote broadcast. Pending new dialog return check, up/down/changed-weight coverage, and close without approval | Pending: mobile OAuth return and signing-page return |
 | HiveAuth | QR display/cancellation verified; user confirmed mobile Keychain approval and localhost login after the single-line challenge fix; pending reload, rejection, expiry, vote and logout | QR approval/return confirmed by user; pending deep link, cancel and background/timeout |
 | Peak Vault | User confirmed extension invocation in Brave; no account imported yet. Missing extension handled in Safari. Pending signed login, reload, vote and rejection | Not enabled; verify a supported mobile environment before offering it there |
 

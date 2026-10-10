@@ -1483,7 +1483,7 @@ describe('App', () => {
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
-  test('casts hivesigner downvotes in a signing modal', async () => {
+  test('offers hivesigner downvote approval in a new tab without embedding the signing page', async () => {
     hivesignerAvailable = true
     await renderApp()
 
@@ -1493,8 +1493,11 @@ describe('App', () => {
 
     const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
     const expectedUrl = 'https://hivesigner.com/sign/vote?authority=post&voter=fixture-curator&author=visible-author&permlink=first-post&weight=-1700'
-    expect(within(dialog).getByTitle('Hivesigner vote')).toHaveAttribute('src', expectedUrl)
-    expect(within(dialog).getByRole('link', {name: /Open/})).toHaveAttribute('href', expectedUrl)
+    expect(dialog.querySelector('iframe')).toBeNull()
+    const link = within(dialog).getByRole('link', {name: 'Open HiveSigner'})
+    expect(link).toHaveAttribute('href', expectedUrl)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(window.open).not.toHaveBeenCalled()
   })
 
@@ -1515,6 +1518,24 @@ describe('App', () => {
     })
     expect(global.fetch.mock.calls.filter(([url]) => url.toString().startsWith('/api/v1/posts/1/chain_stats')).length).toBeGreaterThanOrEqual(2)
     vi.useRealTimers()
+  })
+
+  test('checks the observed vote after returning from HiveSigner', async () => {
+    hivesignerAvailable = true
+    await renderApp()
+    vi.useFakeTimers()
+
+    fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
+    fireEvent.click(screen.getByRole('link', {name: 'Open HiveSigner'}))
+    chainStatsPayload = {status: 'ready', votes: 3, replies: 2, payout: '1.234 HBD', current_vote: -10000}
+    fireEvent(window, new Event('focus'))
+
+    expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(3000) })
+    vi.useRealTimers()
+    expect(screen.getByText('Votes: 3')).toBeInTheDocument()
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post&refresh=true', expect.anything())
   })
 
   test('dismisses the hivesigner vote modal with Escape and click-away', async () => {
