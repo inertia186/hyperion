@@ -40,6 +40,12 @@ computer; plain HTTP on a LAN hostname or IP will not work. On the computer
 running Rails, `http://localhost:3000` is also a secure context. Hyperion checks
 these capabilities before starting HiveAuth and explains how to proceed.
 
+All signed wallets (Keychain, HiveAuth, and Peak Vault) also require the browser's
+Web Locks API to coordinate authentication changes across Hyperion tabs. Use an
+updated browser over HTTPS or localhost; plain HTTP on a LAN hostname does not
+provide this API. HiveSigner remains available without it and does not modify
+Aioha state on that path.
+
 Peak Vault requires its extension in the browser running Hyperion. Its
 [official releases](https://vault.peakd.com/peakvault/releases) list Chrome and
 Firefox builds, with no Safari build. Install or enable the extension for the
@@ -86,12 +92,19 @@ browser sessions without a provider require one fresh login before voting.
 Agent bearer-token issuance and transaction-signing authority are unchanged.
 
 The header's wallet link starts a fresh login for reconnecting or changing
-accounts/providers. Logout clears Rails and Aioha state and cancels the pending
-adapter request. A late extension callback is discarded. Some extensions
-cannot dismiss an outstanding native prompt; after timeout, check the wallet
-before retrying. Requests time out after two minutes; Rails HTTP requests after
-15 seconds. HiveAuth users can scan the QR on another device or open the deep
-link, approve there, and return to the still-pending browser page.
+accounts/providers. Logout clears the Rails session and cancels this tab's
+pending adapter request. Aioha state is cleared when the browser lock is
+available; a pending operation in another tab blocks that cleanup.
+Some extensions cannot dismiss an outstanding native prompt.
+An origin-wide browser lock keeps other Hyperion tabs from changing Aioha state
+while a wallet request is pending. After cancellation or timeout, another request
+stays blocked until the original wallet operation finishes and any late login
+state is cleared. Finish or dismiss the prompt in the wallet, or reload its
+Hyperion tab before retrying. Late vote
+callbacks do not disconnect a valid login. Requests time out after two minutes;
+Rails HTTP requests after 15 seconds. HiveAuth users can scan the QR on another
+device or open the deep link, approve there, and return to the still-pending
+browser page.
 
 Hive weights are signed integers from -10000 through 10000. A wallet's explicit
 success starts vote-state polling; it does not claim chain confirmation.
@@ -107,7 +120,8 @@ signature recovery, and unchanged agent authentication. Frontend coverage
 includes all four adapter routes, signed weights, local/server account changes,
 missing extensions, cancellation, timeout, logout, late callbacks, duplicate
 clicks, and dismissing HiveSigner without false success. The real Aioha Keychain
-bridge is exercised with a simulated extension, including reload and logout.
+bridge is exercised with a simulated extension, including reload, logout, a late
+rejected vote, and blocked login retries through stale authentication cleanup.
 Both the legacy esbuild bundle and React/Vite build are checked.
 
 The desktop login page has been visually checked with all four providers.

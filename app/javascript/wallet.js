@@ -12,14 +12,48 @@ function createCore() {
   core.registerKeychain()
   core.registerHiveAuth({name: 'Hyperion', description: 'Read and curate Hive posts'})
   core.registerPeakVault()
-  core.loadAuth()
   return core
 }
 
 export function createWallet({coreFactory = createCore, fetcher = (...args) => fetch(...args), timeoutMs = 120000, onRequest = showWalletRequest} = {}) {
   let core
   let cancelPending
+  let operationPending = false
+  let operationSettlement
+  let ownsLock = false
+  let disconnectVersion = 0
   const getCore = () => (core ||= coreFactory())
+  const hasWalletLocks = () => typeof navigator.locks?.request === 'function'
+  const pendingMessage = 'A wallet request is already pending. Finish it in your wallet or reload its Hyperion tab before trying again.'
+  const lockMessage = 'This wallet needs browser coordination support. Open Hyperion over HTTPS or localhost in an updated browser, or use HiveSigner.'
+
+  function requireIdle() {
+    if (cancelPending || operationPending) throw new Error(pendingMessage)
+  }
+
+  function withWalletLock(action) {
+    if (!hasWalletLocks()) return Promise.reject(new Error(lockMessage))
+    const version = disconnectVersion
+    return new Promise((resolve, reject) => {
+      navigator.locks.request('hyperion-wallet', {ifAvailable: true}, async (lock) => {
+        if (!lock) throw new Error(pendingMessage)
+        ownsLock = true
+        try {
+          if (version !== disconnectVersion) throw new Error('Wallet request cancelled.')
+          getCore().loadAuth()
+          return await action()
+        } catch (error) {
+          // Let the UI cancel now, but retain the origin lock until the SDK stops writing auth.
+          if (operationPending) reject(error)
+          throw error
+        } finally {
+          await operationSettlement?.catch(() => {})
+          operationSettlement = undefined
+          ownsLock = false
+        }
+      }).then(resolve, reject)
+    })
+  }
 
   async function request(path, body) {
     const response = await fetcher(path, {
@@ -33,8 +67,8 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
     return payload
   }
 
-  async function walletRequest(action) {
-    if (cancelPending) throw new Error('A wallet request is already pending. Finish or cancel it first.')
+  async function walletRequest(action, authenticating = false) {
+    requireIdle()
     const aioha = getCore()
     let close = () => {}
     let cancel = () => {}
@@ -58,11 +92,20 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
       rejectRequest(new Error('Wallet request timed out. Check your wallet before trying again.'))
     }, timeoutMs)
     try {
-      const operation = Promise.resolve(action(aioha)).then(async (result) => {
-        // Extensions cannot always dismiss a prompt; discard auth restored by a late callback.
-        if (finished) await aioha.logoutAll()
-        return result
-      })
+      operationPending = true
+      const operation = (async () => {
+        try {
+          return await action(aioha)
+        } finally {
+          try {
+            // Aioha persists login before returning. Keep retries blocked through stale-auth cleanup.
+            if (finished && authenticating) await aioha.logoutAll()
+          } finally {
+            operationPending = false
+          }
+        }
+      })()
+      operationSettlement = operation
       const result = await Promise.race([operation, cancelled])
       if (result?.success !== true) throw new Error(result?.error || 'The wallet did not approve the request.')
       return result
@@ -81,8 +124,9 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
       if (window.isSecureContext === false) unavailableReason = 'HiveAuth needs a secure connection. Open Hyperion over HTTPS, or use localhost on the computer running it.'
       else if (typeof window.crypto?.randomUUID !== 'function' || !window.crypto?.subtle) unavailableReason = 'HiveAuth needs browser encryption support. Please update your browser and open Hyperion over HTTPS.'
     }
+    if (provider !== 'hivesigner' && !unavailableReason && !hasWalletLocks()) unavailableReason = lockMessage
     const available = !unavailableReason && (provider === 'hivesigner' || (!!names[provider] && getCore().isProviderEnabled(provider)))
-    if (!available && provider === 'peakvault') unavailableReason = 'Peak Vault extension was not detected. Use Chrome or Firefox with Peak Vault installed and enabled for this site, then reload. In Safari, use HiveAuth or HiveSigner.'
+    if (!available && !unavailableReason && provider === 'peakvault') unavailableReason = 'Peak Vault extension was not detected. Use Chrome or Firefox with Peak Vault installed and enabled for this site, then reload. In Safari, use HiveAuth or HiveSigner.'
     return {
       name: names[provider],
       available,
@@ -98,33 +142,44 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
   }
 
   async function disconnect() {
+    disconnectVersion += 1
     cancelPending?.()
-    await getCore().logoutAll()
+    if (!hasWalletLocks()) return
+    if (ownsLock) await getCore().logoutAll()
+    else await withWalletLock(() => getCore().logoutAll())
   }
 
-  async function signChallenge(challenge) {
+  async function signLoginChallenge(challenge) {
     const {provider, account_name: accountName, message} = challenge
     if (!capabilities(provider).signChallenge) throw new Error('This wallet cannot sign a login challenge.')
     requireAvailable(provider)
-    const result = await walletRequest((aioha) => aioha.login(provider, accountName, {msg: message, keyType: KeyTypes.Posting}))
+    const result = await walletRequest((aioha) => aioha.login(provider, accountName, {msg: message, keyType: KeyTypes.Posting}), true)
     if (result.username !== accountName || result.provider !== provider) throw new Error('The wallet account changed. Please sign in again.')
     return result.result
   }
 
   async function connect({accountName, provider}) {
+    requireIdle()
     if (!names[provider]) throw new Error('Choose a supported wallet.')
     requireAvailable(provider)
-    await disconnect()
-    const challenge = await request('/sessions', {account_name: accountName, provider})
-    if (provider === 'hivesigner') return {redirect_url: challenge.redirect_url}
-
-    try {
-      const signature = await signChallenge(challenge)
-      return await request('/sessions/complete', {token: challenge.token, signature})
-    } catch (error) {
-      await disconnect()
-      throw error
+    if (provider === 'hivesigner') {
+      const challenge = await request('/sessions', {account_name: accountName, provider})
+      return {redirect_url: challenge.redirect_url}
     }
+    return withWalletLock(async () => {
+      const version = disconnectVersion
+      await getCore().logoutAll()
+      try {
+        const challenge = await request('/sessions', {account_name: accountName, provider})
+        if (version !== disconnectVersion) throw new Error('Wallet request cancelled.')
+        const signature = await signLoginChallenge(challenge)
+        if (version !== disconnectVersion) throw new Error('Wallet request cancelled.')
+        return await request('/sessions/complete', {token: challenge.token, signature})
+      } catch (error) {
+        await getCore().logoutAll()
+        throw error
+      }
+    })
   }
 
   async function vote({accountName, provider, author, permlink, weight}) {
@@ -136,17 +191,19 @@ export function createWallet({coreFactory = createCore, fetcher = (...args) => f
     // Keep HiveSigner login-only: every vote requires its own signing approval.
     if (provider === 'hivesigner') return {status: 'approval_required', url: hivesignerVoteUrl({accountName, author, permlink, weight})}
 
-    const aioha = getCore()
-    if (aioha.getCurrentUser() !== accountName || aioha.getCurrentProvider() !== provider ||
-        localStorage.getItem('aiohaUsername') !== accountName || localStorage.getItem('aiohaProvider') !== provider) {
-      throw new Error('Reconnect your wallet by signing in again before voting.')
-    }
     requireAvailable(provider)
-    const result = await walletRequest((client) => client.vote(author, permlink, weight))
-    return {status: 'submitted', transactionId: result.result}
+    return withWalletLock(async () => {
+      const aioha = getCore()
+      if (aioha.getCurrentUser() !== accountName || aioha.getCurrentProvider() !== provider ||
+          localStorage.getItem('aiohaUsername') !== accountName || localStorage.getItem('aiohaProvider') !== provider) {
+        throw new Error('Reconnect your wallet by signing in again before voting.')
+      }
+      const result = await walletRequest((client) => client.vote(author, permlink, weight))
+      return {status: 'submitted', transactionId: result.result}
+    })
   }
 
-  return {connect, signChallenge, vote, disconnect, capabilities}
+  return {connect, signChallenge: (challenge) => withWalletLock(() => signLoginChallenge(challenge)), vote, disconnect, capabilities}
 }
 
 export const wallet = createWallet()

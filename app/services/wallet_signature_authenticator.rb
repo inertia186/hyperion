@@ -13,20 +13,26 @@ class WalletSignatureAuthenticator
     recovered_key = proof.recover_public_key(Digest::SHA256.digest(message)).compressed
 
     Timeout.timeout(5) do
-      Account.database_api.find_accounts(accounts: [account_name]) do |result|
-        chain_account = result.accounts.find { |account| account.name == account_name }
-        return false unless chain_account
+      Account.with_simple_failover do
+        Account.database_api.find_accounts(accounts: [account_name]) do |result|
+          chain_account = result.accounts.find { |account| account.name == account_name }
+          return false unless chain_account
 
-        authority = chain_account.posting
-        # Browser login accepts one direct posting key that meets the threshold.
-        return authority.key_auths.any? do |key, weight|
-          weight >= authority.weight_threshold &&
-            [Bitcoin.decode_base58(key[3..])[0, 66]].pack('H*') == recovered_key
+          authority = chain_account.posting
+          # Browser login accepts one direct posting key that meets the threshold.
+          return authority.key_auths.any? do |key, weight|
+            weight >= authority.weight_threshold &&
+              [Bitcoin.decode_base58(key[3..])[0, 66]].pack('H*') == recovered_key
+          end
         end
       end
     end
     false
   rescue StandardError => error
+    if error.is_a?(Timeout::Error) && Account.hive_client_urls.any?
+      Account.record_hive_node_failure
+      Account.api_reset
+    end
     Rails.logger.warn "Unable to verify wallet login: #{error.class}"
     false
   end

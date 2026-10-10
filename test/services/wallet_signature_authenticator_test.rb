@@ -24,10 +24,41 @@ class WalletSignatureAuthenticatorTest < ActiveSupport::TestCase
     with_authority(threshold: 2) { assert_not valid_signature? }
   end
 
-  test 'rejects malformed signatures and failed account lookups' do
+  test 'rejects malformed signatures' do
     %w[not-hex 00].each { |signature| assert_not valid_signature?(signature: signature) }
-    Account.stub(:database_api, -> { raise Hive::UnknownError, 'unavailable' }) do
+  end
+
+  test 'replaces a failed cached RPC client and verifies with the next node' do
+    calls = []
+    with_nodes(calls) do
+      Account.database_api
+      assert valid_signature?
+      assert_equal %w[https://failed.example https://healthy.example], calls
+      assert_includes Account.failed_hive_node_urls, 'https://failed.example'
+    end
+  end
+
+  test 'rejects the signature when every RPC node fails' do
+    calls = []
+    with_nodes(calls, fail_all: true) do
       assert_not valid_signature?
+      assert_operator calls.size, :>, 1
+      assert_includes calls, 'https://healthy.example'
+    end
+  end
+
+  test 'a hung node respects the overall deadline and is replaced on the next login' do
+    calls = []
+    timeout = Timeout.method(:timeout)
+    deadline = ->(seconds, &block) do
+      assert_equal 5, seconds
+      timeout.call(0.05, &block)
+    end
+    with_nodes(calls, hang_first: true) do
+      Timeout.stub(:timeout, deadline) { assert_not valid_signature? }
+      assert_equal ['https://failed.example'], calls
+      assert valid_signature?
+      assert_equal %w[https://failed.example https://healthy.example], calls
     end
   end
 
@@ -41,5 +72,31 @@ private
     api = Object.new
     api.define_singleton_method(:find_accounts) { |accounts:, &block| block.call(result) }
     Account.stub(:database_api, api) { yield }
+  end
+
+  def with_nodes(calls, fail_all: false, hang_first: false)
+    Account.api_reset
+    Account.failed_hive_node_urls.clear
+    result = Hashie::Mash.new(accounts: [{name: 'fixture-curator', posting: {key_auths: [[@public_key, 1]], weight_threshold: 1}}])
+    selector = ->(excluded_urls: []) { excluded_urls.include?('https://failed.example') ? 'https://healthy.example' : 'https://failed.example' }
+    client = lambda do |url:|
+      api = Object.new
+      api.define_singleton_method(:find_accounts) do |accounts:, &block|
+        calls << url
+        sleep 60 if hang_first && url == 'https://failed.example'
+        raise Hive::UnknownError, 'unavailable' if fail_all || url == 'https://failed.example'
+
+        block.call(result)
+      end
+      api
+    end
+    HiveNodeSelector.stub(:next_url, selector) do
+      Hive::DatabaseApi.stub(:new, client) do
+        Account.stub(:sleep, nil) { yield }
+      end
+    end
+  ensure
+    Account.api_reset
+    Account.failed_hive_node_urls.clear
   end
 end

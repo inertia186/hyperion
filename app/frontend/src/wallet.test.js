@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { webcrypto } from 'node:crypto'
+import { Aioha } from '@aioha/aioha'
 import { createWallet } from '../../javascript/wallet'
 
 const accountName = 'fixture-curator'
@@ -10,7 +11,7 @@ function setup({provider = 'keychain', timeoutMs = 120000} = {}) {
   localStorage.setItem('aiohaUsername', accountName)
   localStorage.setItem('aiohaProvider', provider)
   const core = {
-    on: vi.fn(), off: vi.fn(), logoutAll: vi.fn().mockResolvedValue(),
+    on: vi.fn(), off: vi.fn(), loadAuth: vi.fn(), logoutAll: vi.fn().mockResolvedValue(),
     isProviderEnabled: vi.fn(() => true),
     getCurrentUser: vi.fn(() => accountName), getCurrentProvider: vi.fn(() => provider),
     login: vi.fn().mockResolvedValue({success: true, username: accountName, provider, result: 'signature'}),
@@ -27,10 +28,33 @@ beforeEach(() => {
   localStorage.clear()
   vi.stubGlobal('isSecureContext', true)
   vi.stubGlobal('crypto', webcrypto)
+  let locked = false
+  vi.stubGlobal('navigator', {locks: {request: async (_name, _options, callback) => {
+    if (locked) return callback(null)
+    locked = true
+    try { return await callback({name: 'hyperion-wallet'}) }
+    finally { locked = false }
+  }}})
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); delete window.hive_keychain; delete window.peakvault })
 
 describe('wallet adapter', () => {
+  test('requires browser coordination for signed wallets but leaves HiveSigner usable without Aioha mutations', async () => {
+    vi.stubGlobal('navigator', {})
+    const {adapter, core, fetcher} = setup()
+    for (const provider of ['keychain', 'hiveauth', 'peakvault']) {
+      expect(adapter.capabilities(provider).available).toBe(false)
+      await expect(adapter.connect({accountName, provider})).rejects.toThrow('HTTPS or localhost')
+    }
+    expect(fetcher).not.toHaveBeenCalled()
+    fetcher.mockResolvedValueOnce(response({redirect_url: 'https://hivesigner.com/oauth2/authorize?scope=login'}))
+    await expect(adapter.connect({accountName, provider: 'hivesigner'})).resolves.toHaveProperty('redirect_url')
+    await adapter.disconnect()
+    expect(core.loadAuth).not.toHaveBeenCalled()
+    expect(core.logoutAll).not.toHaveBeenCalled()
+    expect(core.login).not.toHaveBeenCalled()
+  })
+
   test('missing Peak Vault explains browser requirements without starting login, and detects it after installation', async () => {
     delete window.peakvault
     const fetcher = vi.fn()
@@ -149,6 +173,18 @@ describe('wallet adapter', () => {
     expect(core.off).toHaveBeenCalledTimes(3)
   })
 
+  test('disconnect while the server challenge is pending prevents a later wallet prompt', async () => {
+    const {adapter, core, fetcher} = setup()
+    let finishChallenge
+    fetcher.mockImplementation(() => new Promise((resolve) => { finishChallenge = resolve }))
+    const pending = expect(adapter.connect({accountName, provider: 'keychain'})).rejects.toThrow('cancelled')
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce())
+    await adapter.disconnect()
+    finishChallenge(response({token: 'token', account_name: accountName, provider: 'keychain', message: 'challenge'}))
+    await pending
+    expect(core.login).not.toHaveBeenCalled()
+  })
+
   test.each([-10001, 10001, 1.5, NaN])('rejects invalid vote weight %s before contacting a wallet', async (weight) => {
     const {adapter, core, fetcher} = setup()
     await expect(adapter.vote({...voteArgs, weight})).rejects.toThrow('Vote weight')
@@ -165,6 +201,81 @@ describe('wallet adapter', () => {
     await pending
     resolveLogin({success: true, provider: 'keychain', username: accountName, result: 'signature'})
     await vi.waitFor(() => expect(core.logoutAll).toHaveBeenCalledTimes(2))
+  })
+
+  test('a late rejected Keychain vote preserves the real Aioha login', async () => {
+    vi.useFakeTimers()
+    localStorage.setItem('aiohaUsername', accountName)
+    localStorage.setItem('aiohaProvider', 'keychain')
+    let finishVote
+    window.hive_keychain = {requestVote: vi.fn((_account, _permlink, _author, _weight, callback) => { finishVote = callback })}
+    const fetcher = vi.fn().mockResolvedValue(response({authenticated: true, account: {name: accountName}, wallet: {provider: 'keychain'}}))
+    const adapter = createWallet({fetcher, timeoutMs: 20})
+    const expired = expect(adapter.vote(voteArgs)).rejects.toThrow('timed out')
+    await vi.advanceTimersByTimeAsync(20)
+    await expired
+    await expect(adapter.vote(voteArgs)).rejects.toThrow('already pending')
+    expect(window.hive_keychain.requestVote).toHaveBeenCalledOnce()
+
+    finishVote({success: false, error: 'user_cancel', message: 'Cancelled by user'})
+    await vi.advanceTimersByTimeAsync(0)
+    expect(localStorage.getItem('aiohaUsername')).toBe(accountName)
+    expect(localStorage.getItem('aiohaProvider')).toBe('keychain')
+    window.hive_keychain.requestVote.mockImplementation((_account, _permlink, _author, _weight, callback) => callback({success: true, result: {id: 'next-vote'}}))
+    await expect(adapter.vote(voteArgs)).resolves.toEqual({status: 'submitted', transactionId: 'next-vote'})
+  })
+
+  test.each(['timeout', 'disconnect'])('%s blocks login retries until the real Aioha login and stale-auth cleanup settle', async (stop) => {
+    vi.useFakeTimers()
+    const callbacks = []
+    window.hive_keychain = {requestSignBuffer: vi.fn((_account, _message, _role, callback) => callbacks.push(callback))}
+    const fetcher = vi.fn(async (path, options) => {
+      const body = JSON.parse(options.body)
+      return response(path === '/sessions'
+        ? {token: body.account_name, account_name: body.account_name, provider: 'keychain', message: 'server challenge'}
+        : {authenticated: true, redirect_url: '/'})
+    })
+    const core = new Aioha()
+    core.registerKeychain()
+    const adapter = createWallet({coreFactory: () => core, fetcher, timeoutMs: 20})
+    const expired = expect(adapter.connect({accountName, provider: 'keychain'})).rejects.toThrow(stop === 'timeout' ? 'timed out' : 'cancelled')
+    await vi.advanceTimersByTimeAsync(0)
+    if (stop === 'disconnect') await adapter.disconnect()
+    else await vi.advanceTimersByTimeAsync(20)
+    await expired
+
+    const retry = adapter.connect({accountName: 'new-account', provider: 'keychain'}).catch((error) => error)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect((await retry).message).toContain('already pending')
+    expect(window.hive_keychain.requestSignBuffer).toHaveBeenCalledOnce()
+    const otherTab = createWallet({fetcher, timeoutMs: 20})
+    await expect(otherTab.connect({accountName: 'new-account', provider: 'keychain'})).rejects.toThrow('already pending')
+    await expect(otherTab.disconnect()).rejects.toThrow('already pending')
+    expect(fetcher).toHaveBeenCalledOnce()
+
+    let finishCleanup
+    const logoutAll = core.logoutAll.bind(core)
+    vi.spyOn(core, 'logoutAll').mockImplementationOnce(async () => {
+      await new Promise((resolve) => { finishCleanup = resolve })
+      await logoutAll()
+    })
+    callbacks[0]({success: true, result: 'expired-signature'})
+    await vi.advanceTimersByTimeAsync(0)
+    await expect(adapter.connect({accountName: 'new-account', provider: 'keychain'})).rejects.toThrow('already pending')
+    await expect(otherTab.connect({accountName: 'new-account', provider: 'keychain'})).rejects.toThrow('already pending')
+    expect(fetcher).toHaveBeenCalledOnce()
+    finishCleanup()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(localStorage.getItem('aiohaUsername')).toBeNull()
+    expect(fetcher).toHaveBeenCalledOnce()
+
+    const next = otherTab.connect({accountName: 'new-account', provider: 'keychain'})
+    await vi.advanceTimersByTimeAsync(0)
+    callbacks[1]({success: true, result: 'new-signature'})
+    await expect(next).resolves.toEqual({authenticated: true, redirect_url: '/'})
+    expect(localStorage.getItem('aiohaUsername')).toBe('new-account')
+    expect(fetcher).toHaveBeenLastCalledWith('/sessions/complete', expect.objectContaining({body: JSON.stringify({token: 'new-account', signature: 'new-signature'})}))
   })
 
   test('shows HiveAuth request data locally and cancellation clears the request UI', async () => {
