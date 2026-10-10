@@ -1,7 +1,9 @@
 # Login design studies
 
 Five visual directions for the next Hyperion login screen: Edition, Orbit,
-Workbench, Commonroom, and Signal. Each keeps the four branded wallet buttons.
+Workbench, Commonroom, and Signal. Each keeps the original login copy, Work Sans font, and four branded wallet
+buttons. The alternatives vary layout, spacing, color, and surfaces without
+additional headlines or marketing copy.
 These are visual previews; submitting a form only displays a preview notice.
 
 To serve through the local Rails app:
@@ -28,5 +30,5 @@ Verification: all five designs checked in light and dark; no horizontal page,
 heading, input, or button overflow at 320, 390, 768, 1024, and 1440 pixels.
 System preference detection, simulated live preference changes, and manual
 overrides passed in the browser. Wallet actions remain inert in this gallery.
-Primary text and wallet-label contrast is at least 5.88:1 in light mode and
-8.83:1 in dark mode. Mobile text spacing and unique form labels were also checked.
+All five use identical login text. Unique form labels and inert submissions
+were checked after simplifying the designs.

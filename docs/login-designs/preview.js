@@ -1,9 +1,9 @@
 const descriptions = {
-  edition: 'An editorial front page. Warm paper, sharp type, a little red ink.',
-  orbit: 'A quiet observatory. Soft atmosphere and a floating sign-in card.',
-  workbench: 'A focused workspace. Clear steps and a compact, practical login.',
-  commonroom: 'A welcoming reading room. Warm colors and a touch of print.',
-  signal: 'A bold graphic statement. Big type, bright accents, direct action.'
+  edition: 'An open form with warm paper tones and simple rules.',
+  orbit: 'A floating card beside a quiet orbital illustration.',
+  workbench: 'A compact form with a single column of wallet buttons.',
+  commonroom: 'A rounded, centered card with warm colors and a soft shadow.',
+  signal: 'A split panel with a bright accent and square edges.'
 };
 const parameters = new URLSearchParams(location.search);
 const initialLayout = Object.hasOwn(descriptions, parameters.get('layout')) ? parameters.get('layout') : 'edition';
