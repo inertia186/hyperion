@@ -1,8 +1,11 @@
+- login_page = controller_name == 'sessions' && action_name == 'new'
 !!!
 %html
   %head
     %meta{content: 'text/html; charset=UTF-8', 'http-equiv' => 'Content-Type'}
-    %meta{content: 'width=device-width, initial-scale=0.80, maximum-scale=1.0, user-scalable=no', name: 'viewport'}
+    %meta{content: (login_page ? 'width=device-width, initial-scale=1' : 'width=device-width, initial-scale=0.80, maximum-scale=1.0, user-scalable=no'), name: 'viewport'}
+    - if login_page
+      %meta{content: 'light dark', name: 'color-scheme'}
     = favicon_link_tag 'favicon.svg', rel: 'shortcut icon', type: 'image/svg'
     = favicon_link_tag 'favicon.svg', rel: 'apple-touch-icon', type: 'image/svg'
     %title= best_title
@@ -15,7 +18,7 @@
     -# %script{src: "https://cdn.jsdelivr.net/npm/hivesigner"}
     = stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload'
     = javascript_include_tag 'application', 'data-turbolinks-track': 'reload', defer: true
-  %body.disabled-overlay{data: {controller: 'hyperion'}}
+  %body.disabled-overlay{class: ('login-page' if login_page), data: {controller: 'hyperion'}}
     .container-fluid
       .row
         - if !!current_account && controller_name == 'posts'

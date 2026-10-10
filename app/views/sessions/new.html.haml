@@ -1,24 +1,18 @@
-.row
-  .col-12
-    .jumbotron
-      %h1.display-4 Hyperion
-.row
-  .col-12.col-md-6.offset-md-3
-    .text-center.mb-3
-      = link_to 'Are you a robot? Use the Hyperion Agent API', hyperion_agent_discovery_path, class: 'btn btn-outline-secondary btn-block', data: {agent_discovery: true}
+%main.login-edition
+  .login-edition__content
+    %h1.login-edition__brand
+      %span.login-edition__mark{style: "--login-mark: url(#{asset_path('favicon.svg')})", aria: {hidden: true}}
+      Hyperion
     = form_tag sessions_path, 'data-controller' => 'sessions', 'data-action' => 'submit->sessions#beginLogin' do
-      .form-group
-        .form-row
-          .col-12
-            = label_tag :account_name, 'Account Name', class: 'col-form-label mb-2'
-            = text_field_tag :account_name, @account_name, class: 'form-control mb-2', required: true, autocomplete: 'username', autocapitalize: 'none'
-      .form-group
-        .wallet-buttons
-          - {'keychain' => ['Hive Keychain', 'keychain.svg'], 'hivesigner' => ['HiveSigner', 'hivesigner.png'], 'hiveauth' => ['HiveAuth', 'hiveauth.svg'], 'peakvault' => ['Peak Vault', 'peakvault.svg']}.each do |provider, (name, logo)|
-            - if WalletLoginChallenge.enabled_providers.include?(provider)
-              = button_tag name: 'provider', value: provider, class: "btn wallet-button wallet-button--#{provider}" do
-                = image_tag "wallets/#{logo}", alt: '', width: 36, height: 36, class: 'wallet-button__logo'
-                %span= name
-    
-    #success-alert.alert.alert-primary{hidden: true, role: 'status'}
-    #error-alert.alert.alert-danger{hidden: flash[:alert].blank?, role: 'alert'}= flash[:alert]
+      = label_tag :account_name, 'Account Name', class: 'login-edition__label'
+      = text_field_tag :account_name, @account_name, class: 'login-edition__input', required: true, autocomplete: 'username', autocapitalize: 'none', spellcheck: false
+      .wallet-buttons
+        - {'keychain' => ['Hive Keychain', 'keychain.svg'], 'hivesigner' => ['HiveSigner', 'hivesigner.png'], 'hiveauth' => ['HiveAuth', 'hiveauth.svg'], 'peakvault' => ['Peak Vault', 'peakvault.svg']}.each do |provider, (name, logo)|
+          - if WalletLoginChallenge.enabled_providers.include?(provider)
+            = button_tag name: 'provider', value: provider, class: "wallet-button wallet-button--#{provider}" do
+              = image_tag "wallets/#{logo}", alt: '', width: 28, height: 28, class: 'wallet-button__logo'
+              %span= name
+
+    #success-alert.login-edition__message{hidden: true, role: 'status'}
+    #error-alert.login-edition__message.login-edition__message--error{hidden: flash[:alert].blank?, role: 'alert'}= flash[:alert]
+    = link_to 'Are you a robot? Use the Hyperion Agent API', hyperion_agent_discovery_path, class: 'login-edition__agent', data: {agent_discovery: true}

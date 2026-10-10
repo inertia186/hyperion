@@ -4,6 +4,11 @@ Five visual directions for the next Hyperion login screen: Edition, Orbit,
 Workbench, Commonroom, and Signal. Each keeps the original login copy, Work Sans font, and four branded wallet
 buttons. The alternatives vary layout, spacing, color, and surfaces without
 additional headlines or marketing copy.
+
+Edition is the selected layout, now applied to `/sessions/new` with a
+`whitesmoke` (#f5f5f5) background and a charcoal (#1c1e21) dark counterpart.
+The working login follows system appearance through a CSS media query.
+
 These are visual previews; submitting a form only displays a preview notice.
 
 To serve through the local Rails app:

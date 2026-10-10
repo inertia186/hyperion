@@ -13,6 +13,11 @@ and [Peak Vault](https://vault.peakd.com/peakvault.svg). The decorative images h
 empty alt text so screen readers announce each wallet name once. The buttons
 include keyboard focus indicators and stack on small screens.
 
+The Edition login layout keeps the original text and Work Sans font. Its
+background is `whitesmoke` (#f5f5f5), with a charcoal (#1c1e21) dark palette
+selected automatically by `prefers-color-scheme`. Input, message, and wallet
+colors follow the same preference, including changes while the page is open.
+
 ## Providers and rollout
 
 | Provider | Rails login proof | Voting | Availability |

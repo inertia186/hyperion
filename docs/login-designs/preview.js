@@ -1,5 +1,5 @@
 const descriptions = {
-  edition: 'An open form with warm paper tones and simple rules.',
+  edition: 'An open form in whitesmoke or charcoal, with simple rules.',
   orbit: 'A floating card beside a quiet orbital illustration.',
   workbench: 'A compact form with a single column of wallet buttons.',
   commonroom: 'A rounded, centered card with warm colors and a soft shadow.',
