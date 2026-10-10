@@ -106,9 +106,23 @@ private
     html_body.html_safe
   end
 
+  # Hive (CommonMark) needs a space after 1-6 hashes for a heading; Kramdown
+  # does not. Escape the rest, but leave fenced code untouched.
   def normalize_post_markdown(body)
-    # Do not backtrack into a valid multi-hash heading's marker.
-    body.gsub(/^([ \t]{0,3}\#{1,6})(?=[^#\s])/) { "\\#{$1}" }
+    fence = nil
+
+    body.gsub(/^.*$/) do |line|
+      if fence
+        fence = nil if line.match?(/\A[ \t]{0,3}#{Regexp.escape(fence[0])}{#{fence.size},}\s*\z/)
+        line
+      elsif (opening = line[/\A[ \t]{0,3}(`{3,}|~{3,})/, 1])
+        fence = opening
+        line
+      else
+        # Do not backtrack into a valid multi-hash heading's marker.
+        line.sub(/\A([ \t]{0,3})(\#{7,}|\#{1,6}(?=[^#\s]))/) { "#{$1}\\#{$2}" }
+      end
+    end
   end
 
   def harden_post_body_html(html)

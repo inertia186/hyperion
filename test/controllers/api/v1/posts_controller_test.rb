@@ -672,7 +672,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
-    assert_equal ['real-heading', 'real-heading-1', 'custom'], fragment.css('h1, h2').map { |heading| heading['id'] }
+    assert_equal ['user-content-real-heading', 'user-content-real-heading-1', 'user-content-custom'], fragment.css('h1, h2').map { |heading| heading['id'] }
     assert_equal '#real-heading', fragment.at_css('a')['href']
     assert_empty fragment.css('#supplied, #supplied-heading, div[id], a[href^="javascript:"]')
   end
@@ -685,8 +685,22 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
-    assert_equal (1..6).map { |level| ["h#{level}", "level-#{level}"] }, fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
+    assert_equal (1..6).map { |level| ["h#{level}", "user-content-level-#{level}"] }, fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
     assert_equal (1..6).map { |level| "#{'#' * level}literal" }, fragment.css('p').map(&:text)
+  end
+
+  test 'preview keeps long hash runs, indented markers, and fenced code literal' do
+    post = posts(:allowed_unread)
+    post.update!(body: "#######foo\n\n####### seven\n\n   ##indented\n\n```\n#!/bin/bash\n```\n\n~~~~\n#define X\n~~~\n~~~~\n\n## After Fence\n\n#tag")
+
+    get :show, params: {id: post.id}
+
+    assert_response :success
+    fragment = Nokogiri::HTML::DocumentFragment.parse(response_json.fetch('body_html'))
+    # Kramdown renders a backtick fence as an inline code span.
+    assert_equal ['#######foo', '####### seven', '##indented', '#!/bin/bash', '#tag'], fragment.css('p').map { |paragraph| paragraph.text.strip }
+    assert_equal ['#!/bin/bash', "#define X\n~~~"], fragment.css('code').map { |code| code.text.strip }
+    assert_equal [['h2', 'user-content-after-fence']], fragment.css('h1, h2, h3, h4, h5, h6').map { |heading| [heading.name, heading['id']] }
   end
 
   test 'preview hardens embedded iframe html' do

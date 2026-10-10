@@ -1,10 +1,10 @@
 [
-  {"html":"<h1>Real Heading</h1>","ids":["real-heading"]},
-  {"html":"<h1>Same</h1><h2>Same-1</h2><h3>Same</h3>","ids":["same","same-1","same-2"]},
-  {"html":"<h1>Same</h1><h2>Same</h2><h3>Same-1</h3>","ids":["same","same-1","same-1-1"]},
-  {"html":"<h1>Same</h1><h2>Same</h2><h3>Same-1</h3><h4>Same</h4><h5>Same-1</h5><h6>Same-2</h6>","ids":["same","same-1","same-1-1","same-2","same-1-2","same-2-1"]},
-  {"html":"<h4>123 Go!</h4><h5>你好</h5><h6>!!!</h6>","ids":["go","section","section-1"]},
-  {"html":"<h1>Alpha &#160;</h1><h2>Bravo &#x202f;</h2><h3>Charlie&#160; </h3><h4>\t\n Delta \r\n</h4><h5>Echo &#xfeff;</h5>","ids":["alpha-","bravo-","charlie","delta","echo-"]},
-  {"html":"<h2> A <em>bold</em> &amp; <a href=\"https://example.com\">linked</a> title! </h2>","ids":["a-bold--linked-title"]},
-  {"html":"<h1 id=\"supplied\">Generated</h1><p>Paragraph</p>","ids":["generated"]}
+  {"html":"<h1>Real Heading</h1>","ids":["user-content-real-heading"]},
+  {"html":"<h1>Same</h1><h2>Same-1</h2><h3>Same</h3>","ids":["user-content-same","user-content-same-1","user-content-same-2"]},
+  {"html":"<h1>Same</h1><h2>Same</h2><h3>Same-1</h3>","ids":["user-content-same","user-content-same-1","user-content-same-1-1"]},
+  {"html":"<h1>Same</h1><h2>Same</h2><h3>Same-1</h3><h4>Same</h4><h5>Same-1</h5><h6>Same-2</h6>","ids":["user-content-same","user-content-same-1","user-content-same-1-1","user-content-same-2","user-content-same-1-2","user-content-same-2-1"]},
+  {"html":"<h4>123 Go!</h4><h5>你好</h5><h6>!!!</h6>","ids":["user-content-go","user-content-section","user-content-section-1"]},
+  {"html":"<h1>Alpha &#160;</h1><h2>Bravo &#x202f;</h2><h3>Charlie&#160; </h3><h4>\t\n Delta \r\n</h4><h5>Echo &#xfeff;</h5>","ids":["user-content-alpha-","user-content-bravo-","user-content-charlie","user-content-delta","user-content-echo-"]},
+  {"html":"<h2> A <em>bold</em> &amp; <a href=\"https://example.com\">linked</a> title! </h2>","ids":["user-content-a-bold--linked-title"]},
+  {"html":"<h1 id=\"supplied\">Generated</h1><p>Paragraph</p>","ids":["user-content-generated"]}
 ]

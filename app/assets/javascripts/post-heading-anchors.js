@@ -1,6 +1,8 @@
 // Shared by the React preview and the legacy sandbox. Call only on sanitized HTML.
 window.HyperionPostHeadings = (() => {
   const headingSelector = 'h1, h2, h3, h4, h5, h6'
+  // Same prefix as PostHeadingAnchors::PREFIX; links still use the bare slug.
+  const prefix = 'user-content-'
 
   function addIds(root) {
     const used = new Set()
@@ -15,7 +17,7 @@ window.HyperionPostHeadings = (() => {
       while (used.has(id)) id = `${base}-${++suffix}`
       used.add(id)
       lastSuffixes.set(base, suffix)
-      heading.id = id
+      heading.id = prefix + id
     })
   }
 
@@ -28,7 +30,8 @@ window.HyperionPostHeadings = (() => {
       return false
     }
     if (!id) return false
-    const heading = Array.from(root.querySelectorAll(headingSelector)).find((node) => node.id === id)
+    const target = id.startsWith(prefix) ? id : prefix + id
+    const heading = Array.from(root.querySelectorAll(headingSelector)).find((node) => node.id === target)
     if (!heading) return false
     heading.scrollIntoView({block: 'start'})
     return true

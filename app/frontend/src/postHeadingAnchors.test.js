@@ -22,7 +22,7 @@ describe('generated heading anchors', () => {
     addIds({querySelectorAll: () => headings})
 
     expect(performance.now() - started).toBeLessThan(5000)
-    expect(headings.at(-1).id).toBe('a-24999')
+    expect(headings.at(-1).id).toBe('user-content-a-24999')
   })
 
   test.each(cases)('matches server IDs for $html', ({html, ids}) => {
@@ -35,7 +35,7 @@ describe('generated heading anchors', () => {
 
   test('adds IDs after the real renderer sanitizes HTML and preserves local links', () => {
     const root = rootFor(renderPostBody('# Real Heading\n\n[Jump](#real-heading)\n\n## Real Heading\n\n<div id="supplied">Plain</div>\n\n<h3 id="supplied-heading">Custom</h3>'))
-    expect(Array.from(root.querySelectorAll('h1, h2, h3'), (heading) => heading.id)).toEqual(['real-heading', 'real-heading-1', 'custom'])
+    expect(Array.from(root.querySelectorAll('h1, h2, h3'), (heading) => heading.id)).toEqual(['user-content-real-heading', 'user-content-real-heading-1', 'user-content-custom'])
     expect(root.querySelector('a').getAttribute('href')).toBe('#real-heading')
     expect(root.querySelector('#supplied, #supplied-heading, div[id]')).toBeNull()
   })
@@ -57,6 +57,7 @@ describe('generated heading anchors', () => {
     addIds(root)
     root.querySelector('h1').scrollIntoView = vi.fn()
     expect(scrollToFragment(root, '#real-heading')).toBe(true)
+    expect(scrollToFragment(root, '#user-content-real-heading')).toBe(true)
     expect(scrollToFragment(root, '#missing')).toBe(false)
     expect(scrollToFragment(root, '#')).toBe(false)
     expect(scrollToFragment(root, '#%invalid')).toBe(false)

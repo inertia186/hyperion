@@ -77,8 +77,8 @@
   %body{onkeydown: "keyPressed(event)"}
     %header
       %script{crossorigin: "anonymous", integrity: "sha256-4+XzXVhsDmqanXGHaHvgh1gMQKX40OUvDEBTu8JcmNs=", src: "https://code.jquery.com/jquery-3.5.1.slim.min.js"}
-      = javascript_include_tag 'hive-content-renderer'
-      = javascript_include_tag 'post-heading-anchors'
+      -# The <base href> points at hive.blog, so local asset URLs must be absolute.
+      = javascript_include_tag 'hive-content-renderer', 'post-heading-anchors', host: request.base_url
 
     %div{style: 'max-width: 80%; display: flex; margin-left: auto; margin-right: auto;'}
       #source{style: 'display: none;'}

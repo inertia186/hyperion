@@ -8,7 +8,7 @@ class PostHeadingAnchorsTest < ActiveSupport::TestCase
     headings = Nokogiri::HTML::DocumentFragment.parse(output).css('h1')
 
     assert_equal 12_000, headings.size
-    assert_equal 'a-11999', headings.last['id']
+    assert_equal 'user-content-a-11999', headings.last['id']
   end
 
   test 'generates consistent unique heading anchors shared with the browser renderer' do

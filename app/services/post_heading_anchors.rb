@@ -1,4 +1,8 @@
 class PostHeadingAnchors
+  # Authors control heading text, so namespace the IDs to keep them from
+  # colliding with page IDs or clobbering window globals (e.g. window.peakvault).
+  PREFIX = 'user-content-'
+
   # Run after sanitization: only generated heading IDs are added back.
   def self.call(html)
     fragment = Nokogiri::HTML::DocumentFragment.parse(html)
@@ -17,7 +21,7 @@ class PostHeadingAnchors
       end
       used_ids[id] = true
       last_suffixes[base] = suffix
-      heading['id'] = id
+      heading['id'] = PREFIX + id
     end
 
     fragment.to_html

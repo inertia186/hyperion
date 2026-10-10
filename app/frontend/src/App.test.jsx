@@ -2530,7 +2530,7 @@ describe('App', () => {
     await renderApp({waitForPreview: false})
 
     const heading = await screen.findByRole('heading', {name: 'Real Heading'})
-    expect(heading).toHaveAttribute('id', 'real-heading')
+    expect(heading).toHaveAttribute('id', 'user-content-real-heading')
     heading.scrollIntoView = vi.fn()
     fireEvent.click(screen.getByRole('link', {name: 'Jump to heading'}))
     expect(heading.scrollIntoView).toHaveBeenCalledWith({block: 'start'})
