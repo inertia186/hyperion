@@ -324,7 +324,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
           desktopPreviewScrollRef={desktopPreviewScrollRef}
           mobilePreviewScrollRef={mobilePreviewScrollRef}
           accountName={session.account.name}
-          hivesignerAvailable={session.preferences.hivesigner_available}
+          walletProvider={session.wallet?.provider}
           theme={theme}
           onClosePreview={closePreview}
           onPrevious={() => moveSelection(-1)}

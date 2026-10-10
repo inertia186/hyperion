@@ -1,21 +1,29 @@
-import { useCallback, useState } from 'react'
-
-export function hivesignerVoteUrl({accountName, author, permlink, weight}) {
-  return `https://hivesigner.com/sign/vote?authority=post&voter=${encodeURIComponent(accountName)}&author=${encodeURIComponent(author)}&permlink=${encodeURIComponent(permlink)}&weight=${weight}`
-}
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { wallet } from '../../javascript/wallet'
+export { hivesignerVoteUrl } from '../../javascript/wallet'
 
 export function usePreviewVoteActions({
   displayPost,
   accountName,
-  hivesignerAvailable,
+  walletProvider,
   refreshStatsAfterVote,
-  requestVote,
+  vote = wallet.vote,
   alertUser = (message) => window.alert(message)
 }) {
   const [votePanel, setVotePanel] = useState(null)
   const [voteWeight, setVoteWeight] = useState(100)
   const [voteBusy, setVoteBusy] = useState(false)
   const [hivesignerModal, setHivesignerModal] = useState(null)
+  const activeRequest = useRef(0)
+  const busy = useRef(false)
+
+  useEffect(() => {
+    activeRequest.current += 1
+    busy.current = false
+    setVoteBusy(false)
+    setHivesignerModal(null)
+    return () => { activeRequest.current += 1 }
+  }, [accountName, walletProvider, displayPost?.author, displayPost?.permlink])
 
   const closeHivesignerModal = useCallback(({refresh = true} = {}) => {
     setHivesignerModal(null)
@@ -23,33 +31,28 @@ export function usePreviewVoteActions({
     if (refresh) refreshStatsAfterVote()
   }, [refreshStatsAfterVote])
 
-  const castVote = useCallback((direction) => {
-    if (!displayPost || !accountName) return
+  const castVote = useCallback(async (direction) => {
+    if (!displayPost || !accountName || busy.current || hivesignerModal) return
 
     const weight = voteWeight * 100 * direction
-    const keychainRequestVote = requestVote || (window.hive_keychain?.requestVote ? (...args) => window.hive_keychain.requestVote(...args) : null)
+    const requestId = ++activeRequest.current
+    busy.current = true
     setVoteBusy(true)
-
-    if (hivesignerAvailable) {
-      setHivesignerModal({
-        url: hivesignerVoteUrl({accountName, author: displayPost.author, permlink: displayPost.permlink, weight})
-      })
+    try {
+      const result = await vote({accountName, provider: walletProvider, author: displayPost.author, permlink: displayPost.permlink, weight})
+      if (activeRequest.current !== requestId) return
       setVotePanel(null)
-      return
-    }
-
-    if (keychainRequestVote) {
-      keychainRequestVote(accountName, displayPost.permlink, displayPost.author, weight, (response) => {
-        setVotePanel(null)
+      if (result.status === 'approval_required') setHivesignerModal({url: result.url})
+      else if (result.status === 'submitted') refreshStatsAfterVote({expectedVote: weight})
+    } catch (error) {
+      if (activeRequest.current === requestId) alertUser(error.message || 'The wallet did not approve the vote.')
+    } finally {
+      if (activeRequest.current === requestId) {
+        busy.current = false
         setVoteBusy(false)
-        if (response?.success !== false) refreshStatsAfterVote({expectedVote: weight})
-      })
-      return
+      }
     }
-
-    setVoteBusy(false)
-    alertUser('Hive Keychain is not available.')
-  }, [accountName, alertUser, displayPost, hivesignerAvailable, refreshStatsAfterVote, requestVote, voteWeight])
+  }, [accountName, alertUser, displayPost, walletProvider, refreshStatsAfterVote, vote, voteWeight, hivesignerModal])
 
   return {
     votePanel,

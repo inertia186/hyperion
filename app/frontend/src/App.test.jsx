@@ -1,6 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import App from './App'
+import { wallet, hivesignerVoteUrl } from '../../javascript/wallet'
+
+vi.mock('../../javascript/wallet', async (importOriginal) => ({
+  ...await importOriginal(),
+  wallet: {vote: vi.fn(), disconnect: vi.fn().mockResolvedValue()}
+}))
 import { imageProxy } from './format'
 import { PROFESSIONAL_THEMES, THEME_OPTIONS, THEMES } from './theme'
 
@@ -367,7 +373,9 @@ describe('App', () => {
     installLocalStorage()
     systemDarkMatches = false
     setMobileLayout(false)
-    window.hive_keychain = {requestVote: vi.fn((_voter, _permlink, _author, _weight, callback) => callback({success: true}))}
+    wallet.vote.mockImplementation(async (args) => args.provider === 'hivesigner'
+      ? {status: 'approval_required', url: hivesignerVoteUrl(args)}
+      : {status: 'submitted', transactionId: 'tx'})
     window.hive = {
       api: {
         getActiveVotes: vi.fn((_author, _permlink, callback) => callback(null, [{voter: 'fixture-curator', percent: 10000}, {voter: 'other-curator', percent: 5000}])),
@@ -380,6 +388,7 @@ describe('App', () => {
       if (url === '/api/v1/session') {
         return jsonResponse({
           authenticated: true,
+          wallet: {provider: hivesignerAvailable ? 'hivesigner' : 'keychain'},
           account: {name: 'fixture-curator', avatar_url: 'avatar.png'},
           preferences: {muted_authors_enabled: false, only_favorite_tags: onlyFavoriteTagsEnabled, theme: sessionTheme, minimum_reputation: minimumReputation, hivewatchers_blacklist_enabled: hivewatchersBlacklistEnabled, hivesigner_available: hivesignerAvailable},
           blacklist_sources: [
@@ -1437,9 +1446,9 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByText('Votes: 2'))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '42'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
-    expect(window.hive_keychain.requestVote).toHaveBeenCalledWith('fixture-curator', 'first-post', 'visible-author', 4200, expect.any(Function))
+    await waitFor(() => expect(wallet.vote).toHaveBeenCalledWith({accountName: 'fixture-curator', provider: 'keychain', permlink: 'first-post', author: 'visible-author', weight: 4200}))
   })
 
   test('retries preview stats after keychain vote until the vote appears', async () => {
@@ -1450,7 +1459,7 @@ describe('App', () => {
     chainStatsPayload = {status: 'ready', votes: 2, replies: 2, payout: '1.234 HBD', current_vote: 0}
     fireEvent.click(screen.getByText('Votes: 2'))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '42'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
     act(() => vi.advanceTimersByTime(2500))
     await act(async () => {
@@ -1474,18 +1483,21 @@ describe('App', () => {
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
   })
 
-  test('casts hivesigner downvotes in a signing modal', async () => {
+  test('offers hivesigner downvote approval in a new tab without embedding the signing page', async () => {
     hivesignerAvailable = true
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
     fireEvent.change(screen.getByRole('slider'), {target: {value: '17'}})
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
 
     const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
     const expectedUrl = 'https://hivesigner.com/sign/vote?authority=post&voter=fixture-curator&author=visible-author&permlink=first-post&weight=-1700'
-    expect(within(dialog).getByTitle('Hivesigner vote')).toHaveAttribute('src', expectedUrl)
-    expect(within(dialog).getByRole('link', {name: /Open/})).toHaveAttribute('href', expectedUrl)
+    expect(dialog.querySelector('iframe')).toBeNull()
+    const link = within(dialog).getByRole('link', {name: 'Open HiveSigner'})
+    expect(link).toHaveAttribute('href', expectedUrl)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(window.open).not.toHaveBeenCalled()
   })
 
@@ -1495,7 +1507,7 @@ describe('App', () => {
     vi.useFakeTimers()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     fireEvent.click(screen.getByRole('button', {name: 'Close Hivesigner vote'}))
 
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
@@ -1508,18 +1520,36 @@ describe('App', () => {
     vi.useRealTimers()
   })
 
+  test('checks the observed vote after returning from HiveSigner', async () => {
+    hivesignerAvailable = true
+    await renderApp()
+    vi.useFakeTimers()
+
+    fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
+    fireEvent.click(screen.getByRole('link', {name: 'Open HiveSigner'}))
+    chainStatsPayload = {status: 'ready', votes: 3, replies: 2, payout: '1.234 HBD', current_vote: -10000}
+    fireEvent(window, new Event('focus'))
+
+    expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
+    await act(async () => { vi.advanceTimersByTime(3000) })
+    vi.useRealTimers()
+    expect(screen.getByText('Votes: 3')).toBeInTheDocument()
+    expect(global.fetch).toHaveBeenCalledWith('/api/v1/posts/1/chain_stats?author=visible-author&permlink=first-post&refresh=true', expect.anything())
+  })
+
   test('dismisses the hivesigner vote modal with Escape and click-away', async () => {
     hivesignerAvailable = true
     await renderApp()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     expect(screen.getByRole('dialog', {name: 'Hivesigner vote'})).toBeInTheDocument()
     fireEvent.keyDown(document, {key: 'Escape'})
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', {name: /Downvote/}))
-    fireEvent.click(screen.getByRole('button', {name: 'Vote'}))
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Vote'})) })
     const dialog = screen.getByRole('dialog', {name: 'Hivesigner vote'})
     fireEvent.click(dialog)
     expect(screen.queryByRole('dialog', {name: 'Hivesigner vote'})).not.toBeInTheDocument()

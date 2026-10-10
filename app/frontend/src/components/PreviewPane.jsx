@@ -20,7 +20,7 @@ export default function PreviewPane({
   previewActive,
   previewScrollRef,
   accountName,
-  hivesignerAvailable,
+  walletProvider,
   onClose,
   onPrevious,
   onNext,
@@ -75,7 +75,7 @@ export default function PreviewPane({
     hivesignerModal,
     closeHivesignerModal,
     castVote
-  } = usePreviewVoteActions({displayPost, accountName, hivesignerAvailable, refreshStatsAfterVote})
+  } = usePreviewVoteActions({displayPost, accountName, walletProvider, refreshStatsAfterVote})
 
   useEffect(() => {
     setPreviewTagsExpanded(false)

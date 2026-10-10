@@ -1,4 +1,15 @@
 const Rails = require("@rails/ujs")
+const { wallet } = require('./wallet')
+
+// Register before Rails, whose handler stops logout clicks at document.
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a[data-method="delete"][href^="/sessions/"]')
+  if (!link) return
+
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  wallet.disconnect().catch(() => {}).finally(() => Rails.handleMethod.call(link, event))
+})
 Rails.start()
 
 require("turbolinks").start()

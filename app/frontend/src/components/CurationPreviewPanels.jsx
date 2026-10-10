@@ -9,7 +9,7 @@ export default function CurationPreviewPanels({
   desktopPreviewScrollRef,
   mobilePreviewScrollRef,
   accountName,
-  hivesignerAvailable,
+  walletProvider,
   theme,
   onClosePreview,
   onPrevious,
@@ -32,7 +32,7 @@ export default function CurationPreviewPanels({
             previewActive={previewActive}
             previewScrollRef={desktopPreviewScrollRef}
             accountName={accountName}
-            hivesignerAvailable={hivesignerAvailable}
+            walletProvider={walletProvider}
             theme={theme}
             onPrevious={onPrevious}
             onNext={onNext}
@@ -54,7 +54,7 @@ export default function CurationPreviewPanels({
         previewActive={previewActive}
         previewScrollRef={mobilePreviewScrollRef}
         accountName={accountName}
-        hivesignerAvailable={hivesignerAvailable}
+        walletProvider={walletProvider}
         theme={theme}
         onClose={onClosePreview}
         onPrevious={onPrevious}

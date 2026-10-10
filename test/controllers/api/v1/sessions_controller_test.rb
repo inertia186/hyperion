@@ -46,6 +46,20 @@ class Api::V1::SessionsControllerTest < ActionController::TestCase
     assert_equal 'dark', response_json.dig('preferences', 'theme')
   end
 
+  test 'reports the explicitly authenticated wallet instead of a stale HiveSigner token' do
+    @request.session[:current_account] = accounts(:curated)
+    @request.session[:hivesigner_access_token] = 'stale-token'
+    @request.session[:wallet_provider] = 'keychain'
+    get :show
+    assert_equal 'keychain', response_json.dig('wallet', 'provider')
+    assert_equal false, response_json.dig('preferences', 'hivesigner_available')
+
+    @request.session[:wallet_provider] = 'hivesigner'
+    get :show
+    assert_equal 'hivesigner', response_json.dig('wallet', 'provider')
+    assert_equal true, response_json.dig('preferences', 'hivesigner_available')
+  end
+
   test 'returns regenerated current voting power' do
     account = accounts(:curated)
     @request.session[:current_account] = account

@@ -136,7 +136,7 @@ private
       only_favorite_tags: !!session[:only_favorite_tags],
       theme: account.theme,
       minimum_reputation: account.minimum_reputation,
-      hivesigner_available: session[:hivesigner_access_token].present?
+      hivesigner_available: session[:wallet_provider] == 'hivesigner'
     }
   end
 
