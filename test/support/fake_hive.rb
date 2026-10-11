@@ -1,5 +1,5 @@
-# Keeps the app server off Hive services while system tests run: hive-ruby
-# JSON-RPC calls are answered in-process, and HafSQL and HAFBE are disabled.
+# Keeps tests off Hive nodes: hive-ruby JSON-RPC calls are answered in-process
+# and Beacon reports no node scores. System tests also disable HafSQL and HAFBE.
 module FakeHive
   Response = Struct.new(:code, :body)
 
@@ -12,20 +12,33 @@ module FakeHive
   class << self
     def start
       @unhandled = []
-      @hafbe_base_url = ENV['HAFBE_BASE_URL']
-      ENV['HAFBE_BASE_URL'] = ''
+      @saved_env = {}
+      # With no scores HiveNodeSelector keeps the configured order. Tests that
+      # clear this cache reach a closed local port instead of Beacon.
+      HiveNodeSelector.instance_variable_set(:@beacon_cache, {scores: {}, expires_at: 1.hour.from_now})
+      swap_env('HIVE_BEACON_NODES_URL' => 'http://127.0.0.1:9/')
       @active = true
+    end
+
+    def disable_hafsql_and_hafbe
+      swap_env('HAFBE_BASE_URL' => '')
+      @hafsql_disabled = true
     end
 
     # Returns the RPC methods the fake could not answer.
     def stop
-      @active = false
-      @hafbe_base_url.nil? ? ENV.delete('HAFBE_BASE_URL') : ENV['HAFBE_BASE_URL'] = @hafbe_base_url
+      @active = @hafsql_disabled = false
+      HiveNodeSelector.clear_cache!
+      @saved_env.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
       @unhandled
     end
 
     def active?
       @active
+    end
+
+    def hafsql_disabled?
+      @hafsql_disabled
     end
 
     def respond(request)
@@ -35,6 +48,13 @@ module FakeHive
     end
 
   private
+    def swap_env(values)
+      values.each do |key, value|
+        @saved_env[key] = ENV[key] unless @saved_env.key?(key)
+        ENV[key] = value
+      end
+    end
+
     def answer(entry)
       method = entry['method']
       result = case method
@@ -62,19 +82,12 @@ module FakeHive
     end
   end
 
-  module Beacon
-    def beacon_scores
-      FakeHive.active? ? {} : super
-    end
-  end
-
   module Hafsql
     def configured?
-      FakeHive.active? ? false : super
+      FakeHive.hafsql_disabled? ? false : super
     end
   end
 end
 
 Hive::RPC::HttpClient.prepend(FakeHive::Transport)
-HiveNodeSelector.singleton_class.prepend(FakeHive::Beacon)
 HafsqlRecord.singleton_class.prepend(FakeHive::Hafsql)
