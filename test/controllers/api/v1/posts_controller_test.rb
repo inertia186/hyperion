@@ -910,8 +910,9 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal 'unavailable', response_json.fetch('status')
+    error = Hive::ArgumentError.new('{"error":"Invalid parameters"}')
     assert_equal [
-      ['DEBUG', "Unable to fetch chain stats for post #{posts(:allowed_unread).id}: Hive::ArgumentError: {\"error\":\"Invalid parameters\"}"]
+      ['DEBUG', "Unable to fetch chain stats for post #{posts(:allowed_unread).id}: Hive::ArgumentError: #{error.message}"]
     ], logged.select { |_, message| message.to_s.start_with?('Unable to fetch ') }
     assert_empty logged.select { |severity, _| severity == 'WARN' }
   end
