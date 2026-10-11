@@ -21,7 +21,7 @@ check.
 **Runtime/test environment notes (durable):**
 - Backend tests: `RBENV_VERSION=3.3.11 rbenv exec bundle exec rails test ...`
   (or `bin/rails test`).
-- Frontend tests: Node 24, e.g. `source ~/.nvm/nvm.sh && nvm use 24 && yarn test:frontend`.
+- Frontend tests: Node 26, e.g. `source ~/.nvm/nvm.sh && nvm use && yarn test:frontend`.
 - Asset builds: `yarn build` (legacy esbuild/sass) and `yarn vite:build` (SPA).
 - Live smoke check used during the refactor: `http://127.0.0.1:3000/sessions/new`
   returns `200` and renders login HTML.
@@ -193,7 +193,7 @@ check.
   shrank substantially (chain stats, vote actions, image sources, revision diff,
   and leaf modals extracted) and `TimelineModal` now delegates to `useTimelineData`
   + `timelineChart`. Re-review both for any remaining mixed concerns.
-- [ ] **[L] Vite `hmr: false`.** HMR is disabled in `vite.config.js`; confirm this
+- [ ] **[L] Vite `hmr: false`.** HMR is disabled in `vite.config.mjs`; confirm this
   is intentional or re-enable for local development.
 
 ## 7. Configuration & Ops
@@ -207,7 +207,7 @@ check.
 - [ ] **[L] `stackprof`/profiling gems in default group.** Confirm intended, or
   move dev/profiling-only gems into the `:development` group.
 - [ ] **[L] Pin Ruby/Node consistency.** `Gemfile` pins `ruby '3.3.11'`,
-  `package.json` pins `node 24.x`. Ensure CI and Heroku buildpacks match.
+  `package.json` pins `node 26.x`. Ensure CI and Heroku buildpacks match.
 
 ## 8. Security
 

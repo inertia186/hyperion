@@ -2,7 +2,7 @@
   "name": "hyperion",
   "private": true,
   "engines": {
-    "node": "24.x",
+    "node": "26.x",
     "yarn": ">=1.22 <2"
   },
   "scripts": {
@@ -15,39 +15,39 @@
   },
   "dependencies": {
     "@aioha/aioha": "1.8.5",
+    "@hive/hive-content-renderer": "file:vendor/hive-content-renderer",
     "@hotwired/stimulus": "^3.2.2",
-    "@vitejs/plugin-react": "^5.1.1",
     "@rails/actioncable": "^8.1.0",
     "@rails/activestorage": "^8.1.0",
     "@rails/ujs": "^7.1.3",
+    "@vitejs/plugin-react": "^6.1.2",
     "bootstrap": "^4.6.2",
     "jquery": "^3.7.1",
     "jquery-ui": "^1.14.1",
-    "lucide-react": "^0.468.0",
+    "lucide-react": "^1.55.0",
     "popper.js": "^1.16.1",
     "qrcode": "1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "select2": "4.1.0",
-    "@hive/hive-content-renderer": "file:vendor/hive-content-renderer",
     "turbolinks": "^5.2.0",
-    "vite": "^7.3.5",
-    "vite-plugin-ruby": "^5.2.0"
+    "vite": "^8.3.4",
+    "vite-plugin-ruby": "^5.2.5"
   },
   "version": "2.35.0",
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.1.0",
     "autoprefixer": "^10.4.20",
     "esbuild": "^0.28.1",
-    "jsdom": "^25.0.1",
+    "jsdom": "^30.1.2",
     "postcss": "^8.4.49",
     "sass": "^1.93.0",
     "tailwindcss": "^3.4.17",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   },
   "resolutions": {
-    "vite": "^7.3.5"
+    "vite": "^8.3.4"
   }
 }
