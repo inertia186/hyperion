@@ -2,8 +2,7 @@
   "name": "hyperion",
   "private": true,
   "engines": {
-    "node": "26.x",
-    "yarn": ">=1.22 <2"
+    "node": "26.x"
   },
   "scripts": {
     "build": "esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets",
@@ -47,7 +46,11 @@
     "tailwindcss": "^3.4.17",
     "vitest": "^5.0.3"
   },
-  "resolutions": {
-    "vite": "^8.3.4"
+  "allowScripts": {
+    "@parcel/watcher": false,
+    "core-js": false,
+    "esbuild": false,
+    "secp256k1": false,
+    "fsevents": false
   }
 }
