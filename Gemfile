@@ -61,10 +61,10 @@ group :development do
 end
 
 group :test do
-  # Adds support for Capybara system testing and selenium driver
+  # Capybara system tests run in Chromium through Playwright.
   gem 'capybara', '>= 2.15'
   gem 'minitest-mock'
-  gem 'selenium-webdriver'
+  gem 'capybara-playwright-driver'
 end
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
