@@ -217,4 +217,4 @@ Frontend coverage currently includes:
 - Existing Haml/Bootstrap pages remain available until the SPA is proven stable.
 - React + Vite + Tailwind is the default frontend stack for new SPA work.
 - Local frontend development uses Node 26 from `.nvmrc`; older Node versions
-  are expected to fail the Yarn engine check.
+  are expected to fail the npm engine check.

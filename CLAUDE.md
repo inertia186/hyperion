@@ -21,8 +21,8 @@ check.
 **Runtime/test environment notes (durable):**
 - Backend tests: `RBENV_VERSION=3.3.11 rbenv exec bundle exec rails test ...`
   (or `bin/rails test`).
-- Frontend tests: Node 26, e.g. `source ~/.nvm/nvm.sh && nvm use && yarn test:frontend`.
-- Asset builds: `yarn build` (legacy esbuild/sass) and `yarn vite:build` (SPA).
+- Frontend tests: Node 26, e.g. `source ~/.nvm/nvm.sh && nvm use && npm run test:frontend`.
+- Asset builds: `npm run build` (legacy esbuild/sass) and `npm run vite:build` (SPA).
 - Live smoke check used during the refactor: `http://127.0.0.1:3000/sessions/new`
   returns `200` and renders login HTML.
 
@@ -84,8 +84,8 @@ check.
   in both `PostsController#read_params` and the curation param parser. With
   `PostCurationParams` now extracted, route the legacy controller through it
   instead of keeping a second copy.
-- [ ] **[M] Mixed bundlers.** `jsbundling-rails` + `esbuild` (`yarn build`),
-  `cssbundling-rails` + `sass` (`yarn build:css`), `sprockets-rails`, AND
+- [ ] **[M] Mixed bundlers.** `jsbundling-rails` + `esbuild` (`npm run build`),
+  `cssbundling-rails` + `sass` (`npm run build:css`), `sprockets-rails`, AND
   `vite_rails` are all present. Consolidate on Vite for the SPA and drop the
   redundant esbuild/sprockets pipeline once the legacy views are gone.
 
@@ -199,7 +199,7 @@ check.
 ## 7. Configuration & Ops
 
 - [ ] **[L] `README` setup is stale.** `git clone TODO` placeholder; setup
-  instructions mention `rake db:create`/`db:seed` only — add Node/Yarn, Vite, and
+  instructions mention `rake db:create`/`db:seed` only — add Node/npm, Vite, and
   HafSQL env var setup for a from-scratch run.
 - [ ] **[L] Public HafSQL credentials in `README`.** Default public read-only
   creds are documented; ensure no real secrets land here and that

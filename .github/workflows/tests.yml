@@ -34,10 +34,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - name: Install Yarn Classic
-        run: npm install --global yarn@1.22.22
       - name: Install frontend dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
       - name: Install native gem build dependencies
         run: |
           sudo apt-get update
@@ -51,8 +49,8 @@ jobs:
         run: bundle exec rails db:create db:schema:load
       - name: Build assets used by controller tests
         run: |
-          yarn build
-          yarn build:css
+          npm run build
+          npm run build:css
           bundle exec rails vite:build
       - name: Run Rails tests
         run: bundle exec rails test
@@ -66,9 +64,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - name: Install Yarn Classic
-        run: npm install --global yarn@1.22.22
       - name: Install frontend dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
       - name: Run frontend tests
-        run: yarn test:frontend
+        run: npm run test:frontend
