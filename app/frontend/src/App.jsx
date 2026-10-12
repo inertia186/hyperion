@@ -39,7 +39,7 @@ export default function App() {
     <div className="safe-area-shell min-h-screen bg-[#f6f7f9] text-slate-800 [min-height:100dvh] dark:bg-slate-950 dark:text-slate-200">
       <header className="app-header safe-area-top border-b">
         <div className="mx-auto flex max-w-[1800px] items-center gap-2 px-2 py-2.5 sm:gap-4 sm:px-4 sm:py-3">
-          <button className="inline-flex h-10 min-w-0 shrink items-center gap-2 rounded-md px-1.5 text-lg font-semibold tracking-normal text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-xl dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900" type="button" onClick={() => setResetKey((key) => key + 1)} title="Reset">
+          <button className="inline-flex h-10 min-w-0 shrink items-center gap-2 rounded-md px-1.5 text-lg font-semibold tracking-normal text-slate-900 hover:bg-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:text-xl dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900" type="button" onClick={() => setResetKey((key) => key + 1)} title="Reset">
             <img className="h-7 w-7 object-contain dark:invert" src={hyperionLogo} alt="" />
             <span className="truncate">Hyperion</span>
           </button>

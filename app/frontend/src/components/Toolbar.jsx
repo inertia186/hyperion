@@ -72,7 +72,7 @@ export default function Toolbar({
         {compactSearchForm ? (
           <label className="inline-flex h-10 min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-sm sm:h-9 sm:flex-none">
             <span className="text-xs font-medium text-slate-500">Search</span>
-            <select className="min-w-0 bg-transparent text-base outline-none md:text-sm" value={searchMode} onChange={(event) => setSearchMode(event.target.value)} aria-label="Search form">
+            <select className="min-w-0 bg-transparent text-base outline-hidden md:text-sm" value={searchMode} onChange={(event) => setSearchMode(event.target.value)} aria-label="Search form">
               <option value="filters">Filters</option>
               <option value="keyword">Keywords</option>
               <option value="signals">Signals</option>
@@ -114,7 +114,7 @@ export default function Toolbar({
             <span className="toolbar-search-label mb-1 block text-xs font-medium text-slate-500">Keyword search</span>
             <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Search size={16} className="text-slate-400" />
-              <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Search title or body keywords" />
+              <input className="min-w-0 flex-1 bg-transparent text-base outline-hidden md:text-sm" value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Search title or body keywords" />
             </div>
           </label>
         ) : signalsMode ? (
@@ -122,7 +122,7 @@ export default function Toolbar({
             <span className="toolbar-search-label mb-1 block text-xs font-medium text-slate-500">Signal</span>
             <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Signal size={16} className="text-slate-400" />
-              <select className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={query.signal || SIGNALS[0][0]} onChange={(event) => updateSignal(event.target.value)} aria-label="Signal filter">
+              <select className="min-w-0 flex-1 bg-transparent text-base outline-hidden md:text-sm" value={query.signal || SIGNALS[0][0]} onChange={(event) => updateSignal(event.target.value)} aria-label="Signal filter">
                 {SIGNALS.map(([value, label, threshold]) => <option key={value} value={value}>{signalLabel(label, threshold, payload?.signal_counts?.[value])}</option>)}
               </select>
             </div>
@@ -132,13 +132,13 @@ export default function Toolbar({
             <span className="sr-only">Tag, author, app, excluded tags</span>
             <div className="toolbar-search-control flex h-11 items-center gap-2 rounded-md border border-slate-300 px-2 focus-within:border-blue-500">
               <Search size={16} className="text-slate-400" />
-              <input className="min-w-0 flex-1 bg-transparent text-base outline-none md:text-sm" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
+              <input className="min-w-0 flex-1 bg-transparent text-base outline-hidden md:text-sm" value={draftTag} onChange={(event) => setDraftTag(event.target.value)} placeholder="photography @author app:peakd -contests" />
             </div>
           </label>
         )}
         <label className="inline-flex h-11 w-[8.5rem] flex-none items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2 text-sm sm:w-auto sm:gap-2">
           <span className="hidden text-xs font-medium text-slate-500 sm:inline">Sort</span>
-          <select className="w-full min-w-0 bg-transparent text-base outline-none sm:w-auto md:text-sm" value={query.sort} onChange={(event) => updateQuery({sort: event.target.value})} aria-label="Sort posts">
+          <select className="w-full min-w-0 bg-transparent text-base outline-hidden sm:w-auto md:text-sm" value={query.sort} onChange={(event) => updateQuery({sort: event.target.value})} aria-label="Sort posts">
             {SORTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
