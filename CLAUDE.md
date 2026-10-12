@@ -24,8 +24,9 @@ check.
 - Frontend tests: Node 26, e.g. `source ~/.nvm/nvm.sh && nvm use && npm run test:frontend`.
 - System tests: `bin/rails test:system` drives Chromium through Playwright
   (`npx playwright install chromium` once). They sign in as `social`, whose
-  posting key is public, and `test/support/fake_hive.rb` keeps the app off
-  Hive nodes, HafSQL, and HAFBE.
+  posting key is public. `test/support/fake_hive.rb` answers Hive RPC calls
+  for every test and fails a test that calls an unanswered method; system
+  tests also disable HafSQL and HAFBE.
 - Asset builds: `npm run build` (legacy esbuild/sass) and `npm run vite:build` (SPA).
 - Live smoke check used during the refactor: `http://127.0.0.1:3000/sessions/new`
   returns `200` and renders login HTML.

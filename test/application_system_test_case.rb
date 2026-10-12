@@ -1,5 +1,4 @@
 require "test_helper"
-require_relative "support/fake_hive"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # The posting key published for the `social` demo account.
@@ -21,7 +20,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   driven_by :playwright, screen_size: [1400, 1400]
 
   setup do
-    FakeHive.start
+    FakeHive.disable_hafsql_and_hafbe
     @page_errors = []
     page.driver.with_playwright_page do |browser_page|
       browser_page.on('pageerror', ->(error) { @page_errors << error.message })
@@ -35,9 +34,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   end
 
   teardown do
-    unhandled = FakeHive.stop
     assert_empty @page_errors, 'Uncaught browser errors'
-    assert_empty unhandled, 'Hive calls the fake node did not answer'
   end
 
   def sign_in_as_social
