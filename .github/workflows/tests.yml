@@ -54,6 +54,17 @@ jobs:
           bundle exec rails vite:build
       - name: Run Rails tests
         run: bundle exec rails test
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run system tests
+        run: bundle exec rails test:system
+      - name: Upload system test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: system-test-screenshots
+          path: tmp/screenshots
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend tests

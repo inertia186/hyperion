@@ -22,6 +22,10 @@ check.
 - Backend tests: `RBENV_VERSION=3.3.11 rbenv exec bundle exec rails test ...`
   (or `bin/rails test`).
 - Frontend tests: Node 26, e.g. `source ~/.nvm/nvm.sh && nvm use && npm run test:frontend`.
+- System tests: `bin/rails test:system` drives Chromium through Playwright
+  (`npx playwright install chromium` once). They sign in as `social`, whose
+  posting key is public, and `test/support/fake_hive.rb` keeps the app off
+  Hive nodes, HafSQL, and HAFBE.
 - Asset builds: `npm run build` (legacy esbuild/sass) and `npm run vite:build` (SPA).
 - Live smoke check used during the refactor: `http://127.0.0.1:3000/sessions/new`
   returns `200` and renders login HTML.
