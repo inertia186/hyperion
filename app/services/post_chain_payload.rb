@@ -49,11 +49,20 @@ class PostChainPayload
           result = entries.first['result']
           next unless result.is_a?(Hash) && result['votes'].is_a?(Array)
 
-          # by_comment_voter returns the next vote in index order when this voter has none.
-          vote = result['votes'].first
-          if result['votes'].empty? || (vote.is_a?(Hash) && vote.values_at('author', 'permlink', 'voter') != [*identity, account.name])
+          if result['votes'].empty?
             votes[identity] = nil
-          elsif vote.is_a?(Hash) && vote['vote_percent'].is_a?(Integer)
+            next
+          end
+
+          vote = result['votes'].first
+          next unless vote.is_a?(Hash)
+          vote_identity = vote.values_at('author', 'permlink', 'voter')
+          next unless vote_identity.all? { |value| value.is_a?(String) && value.present? }
+
+          # by_comment_voter returns the next vote in index order when this voter has none.
+          if vote_identity != [*identity, account.name]
+            votes[identity] = nil
+          elsif vote['vote_percent'].is_a?(Integer)
             votes[identity] = vote['vote_percent']
           end
         end
