@@ -83,6 +83,24 @@ class PostChainPayloadTest < ActiveSupport::TestCase
     end
   end
 
+  test 'malformed vote identities do not confirm absent votes' do
+    vote = {author: 'author', permlink: 'post', voter: 'fixture-curator', vote_percent: 10000}
+    malformed_votes = [{}]
+    %i[author permlink voter].each do |field|
+      malformed_votes << vote.except(field)
+      [nil, '', ' ', 7, []].each { |value| malformed_votes << vote.merge(field => value) }
+    end
+    api = VoteApi.new
+    service = PostChainPayload.new(account: accounts(:curated), api: api)
+
+    malformed_votes.each do |malformed_vote|
+      response = VoteApi::Response.new('200', [{id: 0, result: {votes: [malformed_vote]}}].to_json)
+      api.stub(:http_request, response) do
+        assert_equal({}, service.current_votes([['author', 'post']]), malformed_vote.inspect)
+      end
+    end
+  end
+
   test 'deduplicates identities and splits requests into small batches' do
     identities = (PostChainPayload::VOTE_BATCH_SIZE + 1).times.map { |index| ['author', "post-#{index}"] }
     api = VoteApi.new
