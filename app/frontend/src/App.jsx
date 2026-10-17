@@ -48,7 +48,7 @@ export default function App() {
             <VotingPowerBadge votingPower={votingPower} />
             <span className="hidden truncate text-sm font-medium sm:inline">{session.account.name}</span>
             <a className="text-xs underline" href="/sessions/new" title="Change account or wallet">{session.wallet?.provider || 'Connect wallet'}</a>
-            <div className="hidden items-center gap-3 min-[560px]:flex">
+            <div className="hidden items-center gap-3 lg:flex">
               <ThemeSelector theme={theme} onChange={updateTheme} disabled={themeSaving} />
               <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings">
                 <Settings size={16} />
@@ -171,7 +171,7 @@ function HeaderMenu({accountName, theme, themeSaving, onThemeChange, onOpenSetti
   }
 
   return (
-    <div className="relative min-[560px]:hidden">
+    <div className="relative lg:hidden">
       <button
         className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
         type="button"

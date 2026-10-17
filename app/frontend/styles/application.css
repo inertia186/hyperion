@@ -30,6 +30,13 @@ body {
   color: #1f2937;
 }
 
+/* Keep focus visible when a select is transparent or hides its own outline. */
+.app-header label:focus-within,
+.toolbar-shell label:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
 .dark {
   background: #111317;
 }

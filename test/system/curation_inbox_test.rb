@@ -47,6 +47,16 @@ class CurationInboxTest < ApplicationSystemTestCase
     sign_in_as_social
 
     page.driver.with_playwright_page do |browser_page|
+      theme = browser_page.locator('select[aria-label="Theme"]')
+      theme.focus
+      theme.press('Tab')
+      browser_page.keyboard.press('Shift+Tab')
+    end
+    assert_equal 'Theme', page.evaluate_script('document.activeElement.getAttribute("aria-label")')
+    assert_equal 'solid', page.evaluate_script('getComputedStyle(document.activeElement.closest("label")).outlineStyle')
+    assert_operator page.evaluate_script('parseFloat(getComputedStyle(document.activeElement.closest("label")).outlineWidth)'), :>=, 2
+
+    page.driver.with_playwright_page do |browser_page|
       reset = browser_page.locator('button[title="Reset"]')
       reset.focus
       reset.press('Tab')
@@ -56,7 +66,14 @@ class CurationInboxTest < ApplicationSystemTestCase
     assert_not_equal 'none', page.evaluate_script('getComputedStyle(document.activeElement).boxShadow')
 
     page.driver.with_playwright_page do |browser_page|
+      browser_page.locator('select[aria-label="Sort posts"]').focus
+    end
+    assert_equal 'solid', page.evaluate_script('getComputedStyle(document.activeElement.closest("label")).outlineStyle')
+    assert_operator page.evaluate_script('parseFloat(getComputedStyle(document.activeElement.closest("label")).outlineWidth)'), :>=, 2
+
+    page.driver.with_playwright_page do |browser_page|
       browser_page.emulate_media(forcedColors: 'active')
+      browser_page.locator('button[title="Reset"]').focus
     end
     assert page.evaluate_script('matchMedia("(forced-colors: active)").matches')
     assert_equal 'solid', page.evaluate_script('getComputedStyle(document.activeElement).outlineStyle')
@@ -69,7 +86,7 @@ class CurationInboxTest < ApplicationSystemTestCase
     posts(:read_allowed).update!(body: 'Mobile preview')
     sign_in_as_social
 
-    [320, 390, 768, 1400].each do |width|
+    [320, 390, 560, 640, 768, 900, 1024, 1400].each do |width|
       page.driver.with_playwright_page do |browser_page|
         browser_page.viewport_size = {width: width, height: 900}
       end
