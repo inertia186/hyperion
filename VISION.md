@@ -42,10 +42,13 @@ The core loop took shape in the first weeks of development in May and June 2020:
 4. **Keep the progress.** Preserve account read state and tag choices so the
    next session builds on the last one.
 
-The seven-day unread view gives this loop a bounded default. Read, ignored,
-blacklisted, deleted, and keyword views provide ways to investigate outside that
-default. An empty filtered inbox is a useful outcome when the curator understands
-what was included and excluded.
+The seven-day unread view gives this loop a bounded default. In the SPA and agent
+API, read, ignored, and blacklisted views change the selection while retaining
+the active seven-day limit. Deleted and keyword views can query other locally
+retained posts, but cleanup removes posts outside the payout window and their
+associated read state. These views do not provide a durable historical archive.
+An empty filtered inbox is a useful outcome when the curator understands what
+was included and excluded.
 
 ## How the project got here
 
@@ -67,9 +70,10 @@ curation decisions.
 
 ## Principles to carry forward
 
-**Make progress durable and actions reversible where possible.** Read state,
-favorites, ignored tags, and mute controls are central product behavior. Moving
-quickly through the inbox should preserve the ability to revisit a decision.
+**Make progress durable and actions reversible where possible.** Read state for
+retained posts, favorites, ignored tags, and mute controls are central product
+behavior. Moving quickly through the inbox should preserve the ability to
+revisit a decision within the retention limits described above.
 
 **Keep the curator's choices visible.** Filters and rankings should be
 understandable. Payout, reputation, posting frequency, and tag use are evidence
@@ -98,6 +102,10 @@ account access; wallets handle transaction approval. Agent tokens permit the
 documented inbox operations and creation of vote links. They do not authorize
 server-side vote broadcasting. A wallet response and an observed chain result
 must remain distinguishable.
+
+The current discovery guide tells agents to mark posts read or change ignored
+tags only after the user asks. The open confirmation-policy question below does
+not expand that guidance or grant signing authority.
 
 **Treat freshness and recovery as product requirements.** Indexing delays,
 unavailable RPC nodes, failed previews, and stale wallet state affect the
@@ -157,6 +165,10 @@ for these; those remain to be chosen and collected.
 
 ## Decisions still open
 
+These questions require separate product decisions. Merging this document does
+not choose their answers, approve the proposed priorities, or authorize new
+agent actions.
+
 - How should discovery balance existing payout and reputation against newer or
   less-visible authors and the curator's explicit interests?
 - Which agent actions should require a per-action confirmation, and which can be
@@ -171,13 +183,17 @@ This draft uses `master` at `b288829` (2026-10-15), its reachable history, and
 the repository documents and implementation below. That baseline includes the
 heading links, agent vote-state fixes, browser tests, and malformed-vote
 validation described here. Commit references record the evidence used to prepare
-this draft.
+this draft. Review against `master` at `d73e449` (2026-10-17) found only a
+subsequent controller logger-test fix, with no change to the behavior described.
 
 - [SPA plan and status](docs/plan-spa.md), including its original version at
   `4d797db`, states the curation goal and migration intent.
 - [Curation query](app/services/post_curation_query.rb),
   [sorting](app/services/post_curation_sort.rb), and
   [signals](app/services/post_curation_signal.rb) define the current selection rules.
+- [Post scopes and associations](app/models/post.rb) and
+  [post cleanup](app/jobs/post_cleanup_job.rb) define the active window and
+  removal of expired posts and their read state.
 - [Agent service](app/services/hyperion_agent.rb) and
   [discovery contract](app/controllers/agent_discovery_controller.rb) define agent access;
   [vote lookup](app/services/post_chain_payload.rb) preserves unknown vote state.
