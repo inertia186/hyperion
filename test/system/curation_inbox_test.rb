@@ -114,11 +114,20 @@ class CurationInboxTest < ApplicationSystemTestCase
     end
 
     page.driver.with_playwright_page do |browser_page|
+      browser_page.viewport_size = {width: 768, height: 900}
+    end
+    find('button[aria-label="Account menu"]').click
+    click_on 'Open settings'
+    assert_selector '[role="dialog"][aria-label="Settings"]'
+    find('button[aria-label="Close settings"]').click
+    assert_no_selector '[role="dialog"][aria-label="Settings"]'
+
+    page.driver.with_playwright_page do |browser_page|
       browser_page.viewport_size = {width: 390, height: 844}
     end
-    select 'Keywords', from: 'Search form'
+    find('select[aria-label="Search form"]').select('Keywords')
     fill_in 'Search title or body keywords', with: 'Read Allowed'
-    click_on 'Search', exact: true
+    find('button[aria-label="Search"]').click
     assert_selector '[data-post-list-row]'
     click_on 'Read Allowed'
     assert_selector '[role="dialog"][aria-label="Post preview"] article.post-body', text: 'Mobile preview'
