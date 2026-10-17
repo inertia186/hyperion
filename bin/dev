@@ -34,7 +34,7 @@ echo "Vite:  http://0.0.0.0:3036"
 rbenv exec bundle exec rails server -b "$bind_host" -p "$rails_port" &
 pids="$pids $!"
 
-yarn vite:dev &
+npm run vite:dev &
 pids="$pids $!"
 
 while true; do
