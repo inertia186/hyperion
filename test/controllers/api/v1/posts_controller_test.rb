@@ -902,10 +902,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
   test 'chain stats proxy does not warn for invalid Hive parameters' do
-    logger = Minitest::Mock.new
-    logger.expect(:debug, nil, [String])
-
-    Rails.stub(:logger, logger) do
+    logged = capture_rails_logs do
       Account.stub(:api, InvalidParameterApi.new) do
         get :chain_stats, params: {id: posts(:allowed_unread).id}
       end
@@ -913,7 +910,11 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal 'unavailable', response_json.fetch('status')
-    logger.verify
+    error = Hive::ArgumentError.new('{"error":"Invalid parameters"}')
+    assert_equal [
+      ['DEBUG', "Unable to fetch chain stats for post #{posts(:allowed_unread).id}: Hive::ArgumentError: #{error.message}"]
+    ], logged.select { |_, message| message.to_s.start_with?('Unable to fetch ') }
+    assert_empty logged.select { |severity, _| severity == 'WARN' }
   end
 
   test 'payout proxy returns current payout without fetching full chain stats' do
@@ -942,10 +943,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
   end
 
   test 'payout proxy does not warn for Hive timeouts' do
-    logger = Minitest::Mock.new
-    logger.expect(:debug, nil, [String])
-
-    Rails.stub(:logger, logger) do
+    logged = capture_rails_logs do
       Account.stub(:api, TimeoutApi.new) do
         get :payout, params: {id: posts(:allowed_unread).id}
       end
@@ -953,10 +951,26 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_equal 'unavailable', response_json.fetch('status')
-    logger.verify
+    assert_equal [
+      ['DEBUG', "Unable to fetch payout for post #{posts(:allowed_unread).id}: Timeout::Error: execution expired"]
+    ], logged.select { |_, message| message.to_s.start_with?('Unable to fetch ') }
+    assert_empty logged.select { |severity, _| severity == 'WARN' }
   end
 
 private
+  def capture_rails_logs
+    logged = []
+    logger = Rails.logger
+    capture = ActiveSupport::Logger.new(StringIO.new)
+    capture.formatter = ->(severity, _, _, message) { logged << [severity, message]; '' }
+    # Keep the logger used by framework subscribers intact, including lazy loads.
+    logger.broadcast_to(capture)
+    yield
+    logged
+  ensure
+    logger.stop_broadcasting_to(capture)
+  end
+
   ChainStatsResult = Struct.new(:result, keyword_init: true)
 
   class ChainStatsApi

@@ -42,4 +42,68 @@ class CurationInboxTest < ApplicationSystemTestCase
     end
     assert_equal '16px', page.evaluate_script('getComputedStyle(document.querySelector("[aria-label=\"Sort posts\"]")).fontSize')
   end
+
+  test "keyboard focus remains visible with normal and forced colors" do
+    sign_in_as_social
+
+    page.driver.with_playwright_page do |browser_page|
+      reset = browser_page.locator('button[title="Reset"]')
+      reset.focus
+      reset.press('Tab')
+      browser_page.keyboard.press('Shift+Tab')
+    end
+    assert_equal 'Reset', page.evaluate_script('document.activeElement.title')
+    assert_not_equal 'none', page.evaluate_script('getComputedStyle(document.activeElement).boxShadow')
+
+    page.driver.with_playwright_page do |browser_page|
+      browser_page.emulate_media(forcedColors: 'active')
+    end
+    assert page.evaluate_script('matchMedia("(forced-colors: active)").matches')
+    assert_equal 'solid', page.evaluate_script('getComputedStyle(document.activeElement).outlineStyle')
+    assert_operator page.evaluate_script('parseFloat(getComputedStyle(document.activeElement).outlineWidth)'), :>=, 2
+    assert_not_equal page.evaluate_script('getComputedStyle(document.activeElement).backgroundColor'),
+      page.evaluate_script('getComputedStyle(document.activeElement).outlineColor')
+  end
+
+  test "toolbar controls fit mobile tablet and desktop widths" do
+    posts(:read_allowed).update!(body: 'Mobile preview')
+    sign_in_as_social
+
+    [320, 390, 768, 1400].each do |width|
+      page.driver.with_playwright_page do |browser_page|
+        browser_page.viewport_size = {width: width, height: 900}
+      end
+      assert_selector 'button[aria-label="Search"]'
+      geometry = page.evaluate_script(<<~JS)
+        (() => {
+          const search = document.querySelector('button[aria-label="Search"]').getBoundingClientRect();
+          const sort = document.querySelector('select[aria-label="Sort posts"]');
+          const control = sort.closest('label').getBoundingClientRect();
+          return {
+            viewport: innerWidth, content: document.documentElement.scrollWidth,
+            searchHeight: search.height, searchWidth: search.width,
+            controlHeight: control.height, controlLeft: control.left, controlRight: control.right,
+            fontSize: getComputedStyle(sort).fontSize
+          };
+        })()
+      JS
+      assert_operator geometry.fetch('content'), :<=, geometry.fetch('viewport'), "Horizontal overflow at #{width}px"
+      assert_operator geometry.fetch('searchHeight'), :>=, 44
+      assert_operator geometry.fetch('searchWidth'), :>=, 44
+      assert_operator geometry.fetch('controlHeight'), :>=, 44
+      assert_operator geometry.fetch('controlLeft'), :>=, 0
+      assert_operator geometry.fetch('controlRight'), :<=, geometry.fetch('viewport')
+      assert_equal width < 768 ? '16px' : '14px', geometry.fetch('fontSize')
+    end
+
+    page.driver.with_playwright_page do |browser_page|
+      browser_page.viewport_size = {width: 390, height: 844}
+    end
+    select 'Keywords', from: 'Search form'
+    fill_in 'Search title or body keywords', with: 'Read Allowed'
+    click_on 'Search', exact: true
+    assert_selector '[data-post-list-row]'
+    click_on 'Read Allowed'
+    assert_selector '[role="dialog"][aria-label="Post preview"] article.post-body', text: 'Mobile preview'
+  end
 end

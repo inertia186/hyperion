@@ -2,6 +2,20 @@
 
 The backend for hyperion.zone.
 
+See [the project vision](VISION.md) for Hyperion's purpose, history, and proposed
+direction.
+
+## Browser requirements
+
+The React inbox uses Tailwind CSS 4 and requires Safari 16.4+, Chrome 111+,
+or Firefox 128+ (including equivalent Chromium-based browsers). Older browsers
+and wallet apps with older embedded browser engines are not supported by this
+CSS build. See [Tailwind's browser requirements](https://tailwindcss.com/docs/upgrade-guide#browser-requirements).
+
+Automated system tests run in Chromium. Safari, Firefox, and real wallet/mobile
+flows still need the checks in [browser wallets](docs/wallets.md); passing the
+Chromium suite does not establish compatibility with those environments.
+
 # Setup
 
 ```
