@@ -2,6 +2,9 @@
 
 The backend for hyperion.zone.
 
+See [the project vision](VISION.md) for Hyperion's purpose, history, and proposed
+direction.
+
 # Setup
 
 ```
