@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-10-26T22:44:28Z",
+  "ruby": "ruby 3.3.11 (2026-03-26 revision 1f2d15125a) [arm64-darwin25]",
+  "rails": "8.1.4",
+  "harness_sha256": "a1cb2e79f4e941ced7a86509366738d8c2f13ea4c242cc73a89de785bf11ac9d",
+  "source_sha256": "8f426a7ea4433c52f46982c2d82bf762476bae2c25f24cebee2bf42317768031",
+  "production_config_sha256": "e589b8b2fe5fdda4b4daf850b7ce6bcc7725fea6ffe021649b212ba2f810e927",
+  "framework_default_store": "file_store",
+  "scope": "Isolated FileStore directories; separate cache/service instances; no database persistence or live deployment",
+  "samples_per_case": 20,
+  "content_delay_ms": 30,
+  "other_rpc_delay_ms": 5
+}

@@ -16,23 +16,37 @@ class HafsqlPostIndexer
 
     state = IndexerState.fetch!(STATE_NAME)
     sweep = sweep_due?(state)
+    window_start = 7.days.ago.utc
+    upper_bound = latest_row(window_start)
+    last_id = state.last_id
+    last_indexed_at = state.last_indexed_at
+    after = nil
 
-    Post.transaction do
-      rows = fetch_rows(state, false)
-      author_reputations = author_reputations_for(rows)
-      rows.each { |row| upsert_post(row, author_reputations) }
+    while upper_bound
+      rows = fetch_rows(
+        window_start: window_start,
+        last_indexed_at: sweep ? nil : state.last_indexed_at,
+        upper_bound: upper_bound,
+        after: after
+      )
+      break if rows.empty?
 
-      if sweep && state.last_indexed_at.present?
-        sweep_rows = fetch_rows(state, true)
-        sweep_author_reputations = author_reputations_for(sweep_rows)
-        sweep_rows.each { |row| upsert_post(row, sweep_author_reputations) }
-        state.last_sweep_at = Time.current
-      else
-        sweep_rows = []
+      Post.transaction(requires_new: true) do
+        author_reputations = author_reputations_for(rows)
+        rows.each { |row| upsert_post(row, author_reputations) }
       end
 
-      state.last_id = [state.last_id, rows.map(&:id).compact.max, sweep_rows.map(&:id).compact.max].compact.max
-      state.last_indexed_at = [state.last_indexed_at, rows.map(&:updated_at).compact.max].compact.max
+      last_id = [last_id, rows.map(&:id).max].compact.max
+      last_indexed_at = [last_indexed_at, rows.last.updated_at].compact.max
+      after = rows.last
+      break if rows.size < BATCH_SIZE
+    end
+
+    # Failed passes replay committed pages; only a complete pass advances the checkpoint.
+    state.with_lock do
+      state.last_id = [state.last_id, last_id].compact.max
+      state.last_indexed_at = [state.last_indexed_at, last_indexed_at].compact.max
+      state.last_sweep_at = Time.current if sweep
       state.save!
 
       PostCleanupJob.perform_later if sweep
@@ -55,15 +69,42 @@ class HafsqlPostIndexer
   end
 
 private
-  def fetch_rows(state, sweep)
-    predicates = ["#{quote_column(parent_author_column)} = ''", "#{quote_column(created_column)} >= $1"]
+  def latest_row(window_start)
+    result = HafsqlRecord.connection.exec_query(
+      <<~SQL.squish,
+        SELECT #{quote_column(id_column)} AS id, #{updated_expression} AS updated_at
+        FROM #{quoted_relation}
+        WHERE #{quote_column(parent_author_column)} = '' AND #{quote_column(created_column)} >= $1
+        ORDER BY #{updated_expression} DESC, #{quote_column(id_column)} DESC
+        LIMIT 1
+      SQL
+      'HafSQL index boundary',
+      [ActiveRecord::Relation::QueryAttribute.new('window_start', window_start, ActiveRecord::Type::DateTime.new)]
+    )
+    build_row(result.first) if result.any?
+  end
+
+  def fetch_rows(window_start:, last_indexed_at:, upper_bound:, after:)
+    order_key = "(#{updated_expression}, #{quote_column(id_column)})"
+    predicates = [
+      "#{quote_column(parent_author_column)} = ''", "#{quote_column(created_column)} >= $1",
+      "#{order_key} <= ($2, $3)"
+    ]
     binds = [
-      ActiveRecord::Relation::QueryAttribute.new('window_start', 7.days.ago.utc, ActiveRecord::Type::DateTime.new)
+      ActiveRecord::Relation::QueryAttribute.new('window_start', window_start, ActiveRecord::Type::DateTime.new),
+      ActiveRecord::Relation::QueryAttribute.new('upper_updated_at', upper_bound.updated_at, ActiveRecord::Type::DateTime.new),
+      ActiveRecord::Relation::QueryAttribute.new('upper_id', upper_bound.id, ActiveRecord::Type::Integer.new(limit: 8))
     ]
 
-    unless sweep || state.last_indexed_at.nil?
-      predicates << "#{updated_expression} >= $2"
-      binds << ActiveRecord::Relation::QueryAttribute.new('last_indexed_at', state.last_indexed_at.utc - 5.minutes, ActiveRecord::Type::DateTime.new)
+    if last_indexed_at
+      predicates << "#{updated_expression} >= $4"
+      binds << ActiveRecord::Relation::QueryAttribute.new('last_indexed_at', last_indexed_at.utc - 5.minutes, ActiveRecord::Type::DateTime.new)
+    end
+
+    if after
+      predicates << "#{order_key} > ($#{binds.size + 1}, $#{binds.size + 2})"
+      binds << ActiveRecord::Relation::QueryAttribute.new('after_updated_at', after.updated_at, ActiveRecord::Type::DateTime.new)
+      binds << ActiveRecord::Relation::QueryAttribute.new('after_id', after.id, ActiveRecord::Type::Integer.new(limit: 8))
     end
 
     result = HafsqlRecord.connection.exec_query(
@@ -84,7 +125,7 @@ private
           #{select_expr(net_rshares_column, 'net_rshares')}
         FROM #{quoted_relation}
         WHERE #{predicates.join(' AND ')}
-        ORDER BY #{updated_expression} ASC
+        ORDER BY #{updated_expression} ASC, #{quote_column(id_column)} ASC
         LIMIT #{BATCH_SIZE}
       SQL
       'HafSQL post index',

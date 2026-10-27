@@ -1,0 +1,165 @@
+{
+  "content_reuse": {
+    "stats_then_payout": {
+      "content_calls": [
+        2,
+        1
+      ],
+      "total_rpc_calls": [
+        4,
+        3
+      ],
+      "p95_ms": [
+        32.62499999254942,
+        25.774000212550163
+      ],
+      "p95_reduction_percent": 20.999233046938915,
+      "median_allocations": [
+        656.0,
+        691.0
+      ]
+    },
+    "payout_then_stats": {
+      "content_calls": [
+        2,
+        1
+      ],
+      "total_rpc_calls": [
+        4,
+        3
+      ],
+      "p95_ms": [
+        33.58599985949695,
+        26.948000071570277
+      ],
+      "p95_reduction_percent": 19.764186910307746,
+      "median_allocations": [
+        656.0,
+        691.0
+      ]
+    },
+    "warm_revisit": {
+      "content_calls": [
+        0,
+        0
+      ],
+      "total_rpc_calls": [
+        0,
+        0
+      ],
+      "p95_ms": [
+        2.0370001439005136,
+        2.0099999383091927
+      ],
+      "p95_reduction_percent": 1.3254886442776614,
+      "median_allocations": [
+        574.0,
+        617.0
+      ]
+    },
+    "expired": {
+      "content_calls": [
+        2,
+        1
+      ],
+      "total_rpc_calls": [
+        4,
+        3
+      ],
+      "p95_ms": [
+        35.03199992701411,
+        27.568000135943294
+      ],
+      "p95_reduction_percent": 21.30623374806281,
+      "median_allocations": [
+        875.0,
+        900.0
+      ]
+    },
+    "forced_refresh": {
+      "content_calls": [
+        1,
+        1
+      ],
+      "total_rpc_calls": [
+        3,
+        3
+      ],
+      "p95_ms": [
+        28.402999974787235,
+        26.962999952957034
+      ],
+      "p95_reduction_percent": 5.069887065128542,
+      "median_allocations": [
+        864.0,
+        813.0
+      ]
+    },
+    "different_identity": {
+      "content_calls": [
+        4,
+        2
+      ],
+      "total_rpc_calls": [
+        8,
+        6
+      ],
+      "p95_ms": [
+        67.82899983227253,
+        51.99100007303059
+      ],
+      "p95_reduction_percent": 23.349894290651672,
+      "median_allocations": [
+        1308.0,
+        1378.0
+      ]
+    },
+    "different_account": {
+      "content_calls": [
+        0,
+        0
+      ],
+      "total_rpc_calls": [
+        0,
+        0
+      ],
+      "p95_ms": [
+        2.0879998337477446,
+        2.069000154733658
+      ],
+      "p95_reduction_percent": 0.9099463853876055,
+      "median_allocations": [
+        572.0,
+        615.0
+      ]
+    }
+  },
+  "file_store": {
+    "sequential": {
+      "content_calls": [
+        2,
+        1
+      ],
+      "p95_ms": [
+        100.71299993433058,
+        59.403999941423535
+      ]
+    },
+    "concurrent": {
+      "content_calls": [
+        2,
+        2
+      ],
+      "p95_ms": [
+        60.157999861985445,
+        58.51500015705824
+      ]
+    }
+  },
+  "peak_process_rss_mib": [
+    147.90625,
+    148.359375
+  ],
+  "target_met": true,
+  "concurrent_cold_misses_coalesced": false
+}

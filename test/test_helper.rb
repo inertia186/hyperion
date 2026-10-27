@@ -1,5 +1,7 @@
 ENV['RAILS_ENV'] ||= 'test'
+require_relative 'coverage' if ENV['COVERAGE'] == '1'
 require_relative '../config/environment'
+Rails.application.eager_load! if ENV['COVERAGE'] == '1'
 require 'rails/test_help'
 require 'minitest/mock'
 require_relative 'support/fake_hive'

@@ -61,6 +61,7 @@ group :development do
 end
 
 group :test do
+  gem 'simplecov', '~> 0.22.0', require: false
   # Capybara system tests run in Chromium through Playwright.
   gem 'capybara', '>= 2.15'
   gem 'minitest-mock'

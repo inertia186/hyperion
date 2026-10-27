@@ -1,0 +1,5 @@
+"needle": 769 matches; median ms {:before=>214.85, :after=>89.914}
+"needle curation": 769 matches; median ms {:before=>431.877, :after=>309.383}
+"Post": 10000 matches; median ms {:before=>49.285, :after=>51.905}
+"p": 10000 matches; median ms {:before=>59.83, :after=>56.013}
+"zzzxxyy": 0 matches; median ms {:before=>218.231, :after=>95.058}

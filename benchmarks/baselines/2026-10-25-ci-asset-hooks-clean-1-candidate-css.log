@@ -1,0 +1,4 @@
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+

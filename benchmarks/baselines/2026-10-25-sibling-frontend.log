@@ -1,0 +1,18 @@
+
+> hyperion@2.35.0 test:frontend
+> vitest run
+
+
+ RUN  v5.0.3 /Users/anthony/Projects/hive/hyperion/app/frontend
+
+Sourcemap for "/Users/anthony/Projects/hive/hyperion/vendor/hive-content-renderer/dist/index.js" points to missing source files
+
+ Test Files  40 passed (40)
+      Tests  325 passed (325)
+   Start at  19:46:21
+   Duration  15.15s (environment 45%, tests 41%, setup 6%, import 4%, transform 4%)
+
+Environment  jsdom was created 40 times · 19.82s total, 45% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

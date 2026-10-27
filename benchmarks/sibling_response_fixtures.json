@@ -1,0 +1,345 @@
+{
+  "scope": "HAFBE HTTP JSON boundary; condenser decoded-result boundary after hive-ruby envelope handling",
+  "cases": [
+    {
+      "id": "hafbe_empty",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "valid",
+      "code": "200",
+      "wire": "[]"
+    },
+    {
+      "id": "hafbe_wrapped",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "valid",
+      "code": "200",
+      "wire": "{\"operations\": []}"
+    },
+    {
+      "id": "hafbe_nested",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "valid",
+      "code": "200",
+      "wire": "{\"result\": {\"operations\": []}}"
+    },
+    {
+      "id": "hafbe_extra_fields",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "valid",
+      "code": "200",
+      "wire": "{\"operations\": [], \"future\": true}"
+    },
+    {
+      "id": "hafbe_null",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "null"
+    },
+    {
+      "id": "hafbe_number",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "7"
+    },
+    {
+      "id": "hafbe_string",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "\"oops\""
+    },
+    {
+      "id": "hafbe_missing_collection",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "{}"
+    },
+    {
+      "id": "hafbe_string_collection",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "{\"operations\": \"oops\"}"
+    },
+    {
+      "id": "hafbe_object_collection",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "{\"operations\": {\"unexpected\": []}}"
+    },
+    {
+      "id": "hafbe_scalar_entry",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "{\"operations\": [7]}"
+    },
+    {
+      "id": "hafbe_invalid_json",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "malformed",
+      "code": "200",
+      "wire": "{"
+    },
+    {
+      "id": "hafbe_http_error",
+      "component": "hafbe",
+      "method": "comment_history",
+      "kind": "error",
+      "code": "503",
+      "wire": "[]"
+    },
+    {
+      "id": "rpc_votes_empty",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "valid",
+      "result": [],
+      "error": null
+    },
+    {
+      "id": "rpc_votes_one",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "valid",
+      "result": [
+        {
+          "voter": "sibling-curator",
+          "percent": 4200
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_votes_extra",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "valid",
+      "result": [
+        {
+          "voter": "sibling-curator",
+          "percent": 0,
+          "future": true
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_votes_null",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": null,
+      "error": null
+    },
+    {
+      "id": "rpc_votes_string",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": "none",
+      "error": null
+    },
+    {
+      "id": "rpc_votes_object",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": {},
+      "error": null
+    },
+    {
+      "id": "rpc_votes_null_entry",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": [
+        null
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_votes_string_percent",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": [
+        {
+          "voter": "sibling-curator",
+          "percent": "4200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_votes_array_voter",
+      "component": "condenser",
+      "method": "get_active_votes",
+      "kind": "malformed",
+      "result": [
+        {
+          "voter": [],
+          "percent": 4200
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_replies_empty",
+      "component": "condenser",
+      "method": "get_content_replies",
+      "kind": "valid",
+      "result": [],
+      "error": null
+    },
+    {
+      "id": "rpc_replies_one",
+      "component": "condenser",
+      "method": "get_content_replies",
+      "kind": "valid",
+      "result": [
+        {
+          "author": "alice",
+          "permlink": "reply"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "rpc_replies_null",
+      "component": "condenser",
+      "method": "get_content_replies",
+      "kind": "malformed",
+      "result": null,
+      "error": null
+    },
+    {
+      "id": "rpc_replies_string",
+      "component": "condenser",
+      "method": "get_content_replies",
+      "kind": "malformed",
+      "result": "none",
+      "error": null
+    },
+    {
+      "id": "rpc_replies_object",
+      "component": "condenser",
+      "method": "get_content_replies",
+      "kind": "malformed",
+      "result": {},
+      "error": null
+    },
+    {
+      "id": "rpc_content_null",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "valid",
+      "result": null,
+      "error": null
+    },
+    {
+      "id": "rpc_content_empty",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "valid",
+      "result": {},
+      "error": null
+    },
+    {
+      "id": "rpc_content_pending",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "valid",
+      "result": {
+        "cashout_time": "2026-10-26T12:00:00",
+        "pending_payout_value": "1.000 HBD",
+        "future": true
+      },
+      "error": null
+    },
+    {
+      "id": "rpc_content_paid",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "valid",
+      "result": {
+        "cashout_time": "1969-12-31T23:59:59",
+        "total_payout_value": "2.000 HBD"
+      },
+      "error": null
+    },
+    {
+      "id": "rpc_content_number",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "malformed",
+      "result": 7,
+      "error": null
+    },
+    {
+      "id": "rpc_content_string",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "malformed",
+      "result": "none",
+      "error": null
+    },
+    {
+      "id": "rpc_content_array",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "malformed",
+      "result": [],
+      "error": null
+    },
+    {
+      "id": "rpc_content_array_cashout",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "malformed",
+      "result": {
+        "cashout_time": [],
+        "pending_payout_value": "1.000 HBD"
+      },
+      "error": null
+    },
+    {
+      "id": "rpc_content_number_payout",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "malformed",
+      "result": {
+        "cashout_time": "2026-10-26T12:00:00",
+        "pending_payout_value": 1
+      },
+      "error": null
+    },
+    {
+      "id": "rpc_error",
+      "component": "condenser",
+      "method": "get_content",
+      "kind": "error",
+      "result": null,
+      "error": {
+        "code": -32000,
+        "message": "get_content unavailable"
+      }
+    }
+  ]
+}

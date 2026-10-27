@@ -29,7 +29,7 @@ export const api = {
   votingPower: () => request('/api/v1/session/voting_power'),
   posts: (params) => request(`/api/v1/posts?${params.toString()}`),
   postTimeline: (params = {}) => request(`/api/v1/posts/timeline?${new URLSearchParams(params).toString()}`),
-  post: (id) => request(`/api/v1/posts/${id}`),
+  post: (id, options = {}) => request(`/api/v1/posts/${id}`, options),
   postRevisions: (id) => request(`/api/v1/posts/${id}/revisions`),
   postPayout: (id, params = {}, options = {}) => request(`/api/v1/posts/${id}/payout?${new URLSearchParams(params).toString()}`, options),
   postChainStats: (id, params = {}, options = {}) => request(`/api/v1/posts/${id}/chain_stats?${new URLSearchParams(params).toString()}`, options),

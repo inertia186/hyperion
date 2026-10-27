@@ -1,0 +1,175 @@
+{
+  "hook_cases": {
+    "rapid": {
+      "peak_in_flight": [
+        10,
+        1
+      ],
+      "p95_ready_ms": [
+        300,
+        300
+      ]
+    },
+    "clear": {
+      "peak_in_flight": [
+        1,
+        1
+      ],
+      "p95_ready_ms": [
+        null,
+        null
+      ]
+    },
+    "unmount": {
+      "peak_in_flight": [
+        1,
+        1
+      ],
+      "p95_ready_ms": [
+        null,
+        null
+      ]
+    },
+    "error_recovery": {
+      "peak_in_flight": [
+        1,
+        1
+      ],
+      "p95_ready_ms": [
+        300,
+        300
+      ]
+    }
+  },
+  "obsolete_completions": [
+    220,
+    0
+  ],
+  "issued_requests": [
+    280,
+    280
+  ],
+  "aborted_requests": [
+    0,
+    220
+  ],
+  "browser_cases": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "rapid",
+      "disconnected": [
+        0,
+        9
+      ],
+      "peak_open_connections": [
+        6,
+        2
+      ],
+      "peak_simulated_backend_work": [
+        6,
+        10
+      ]
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "clear",
+      "disconnected": [
+        0,
+        1
+      ],
+      "peak_open_connections": [
+        1,
+        1
+      ],
+      "peak_simulated_backend_work": [
+        1,
+        1
+      ]
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "scenario": "unmount",
+      "disconnected": [
+        0,
+        1
+      ],
+      "peak_open_connections": [
+        1,
+        1
+      ],
+      "peak_simulated_backend_work": [
+        1,
+        1
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "rapid",
+      "disconnected": [
+        0,
+        9
+      ],
+      "peak_open_connections": [
+        6,
+        2
+      ],
+      "peak_simulated_backend_work": [
+        6,
+        10
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "clear",
+      "disconnected": [
+        0,
+        1
+      ],
+      "peak_open_connections": [
+        1,
+        1
+      ],
+      "peak_simulated_backend_work": [
+        1,
+        1
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scenario": "unmount",
+      "disconnected": [
+        0,
+        1
+      ],
+      "peak_open_connections": [
+        1,
+        1
+      ],
+      "peak_simulated_backend_work": [
+        1,
+        1
+      ]
+    }
+  ],
+  "hook_target_met": true,
+  "native_transport_guards_pass": true,
+  "production_backend_savings_measured": false
+}

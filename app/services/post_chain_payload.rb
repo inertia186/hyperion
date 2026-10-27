@@ -13,10 +13,12 @@ class PostChainPayload
   end
 
   def chain_stats(post, author, permlink, refresh: false)
-    payload = cached_chain_stats_payload(author, permlink, refresh: refresh)
+    payload, content = Timeout.timeout(timeout) do
+      [cached_chain_stats_payload(author, permlink, refresh: refresh),
+       cached_payout_content(author, permlink, refresh: refresh)]
+    end
     votes = payload.fetch(:votes)
     replies = payload.fetch(:replies)
-    content = payload.fetch(:content)
     payout = payout_value(content)
     persist_payout(post, payout)
 
@@ -135,30 +137,23 @@ private
   end
 
   def cached_chain_stats_payload(author, permlink, refresh:)
-    cache_key = ['chain-stats', author, permlink]
-    if refresh
-      payload = fetch_chain_stats_payload(author, permlink)
-      cache.write(cache_key, payload, expires_in: CACHE_TTL)
-      return payload
-    end
-
-    cache.fetch(cache_key, expires_in: CACHE_TTL, race_condition_ttl: 10.seconds) do
+    # This version stores only votes/replies; old workers still expect cached content.
+    cache.fetch(['chain-stats-v2', author, permlink], expires_in: CACHE_TTL,
+      race_condition_ttl: 10.seconds, force: refresh) do
       fetch_chain_stats_payload(author, permlink)
     end
   end
 
   def fetch_chain_stats_payload(author, permlink)
-    Timeout.timeout(timeout) do
-      {
-        votes: condenser_rpc(:get_active_votes, [author, permlink]),
-        replies: condenser_rpc(:get_content_replies, [author, permlink]),
-        content: condenser_rpc(:get_content, [author, permlink])
-      }
-    end
+    {
+      votes: condenser_rpc(:get_active_votes, [author, permlink]),
+      replies: condenser_rpc(:get_content_replies, [author, permlink])
+    }
   end
 
-  def cached_payout_content(author, permlink)
-    cache.fetch(['post-payout', author, permlink], expires_in: CACHE_TTL, race_condition_ttl: 10.seconds) do
+  def cached_payout_content(author, permlink, refresh: false)
+    cache.fetch(['post-payout', author, permlink], expires_in: CACHE_TTL,
+      race_condition_ttl: 10.seconds, force: refresh) do
       Timeout.timeout(timeout) do
         condenser_rpc(:get_content, [author, permlink])
       end
@@ -169,7 +164,27 @@ private
     response = api.rpc_client.rpc_execute(:condenser_api, method, args)
     raise Hive::UnknownError, response.error.inspect if response.respond_to?(:error) && response.error.present?
 
-    response.result
+    result = response.result
+    raise Hive::UnknownError, "Invalid #{method} result" unless valid_condenser_result?(method, result)
+
+    result
+  end
+
+  def valid_condenser_result?(method, result)
+    case method
+    when :get_active_votes
+      result.is_a?(Array) && result.all? do |vote|
+        vote.is_a?(Hash) && chain_value(vote, :voter).is_a?(String) &&
+          chain_value(vote, :voter).present? && chain_value(vote, :percent).is_a?(Integer)
+      end
+    when :get_content_replies
+      result.is_a?(Array) && result.all? { |reply| reply.is_a?(Hash) }
+    when :get_content
+      result.nil? || (result.is_a?(Hash) && %i(cashout_time pending_payout_value total_payout_value).all? do |field|
+        value = chain_value(result, field)
+        value.nil? || value.is_a?(String)
+      end)
+    end
   end
 
   def payout_value(content)

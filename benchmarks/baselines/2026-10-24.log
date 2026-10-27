@@ -1,0 +1,33 @@
+Seeding inbox: 10,000 posts, 500 authors
+Inbox round 1/2 complete
+Inbox round 2/2 complete
+Indexing iteration 0/10 complete (warmup)
+Indexing iteration 1/10 complete
+Indexing iteration 2/10 complete
+Indexing iteration 3/10 complete
+Indexing iteration 4/10 complete
+Indexing iteration 5/10 complete
+Indexing iteration 6/10 complete
+Indexing iteration 7/10 complete
+Indexing iteration 8/10 complete
+Indexing iteration 9/10 complete
+Indexing iteration 10/10 complete
+Results: tmp/hills-baseline.json; 2 failed correctness checks
+      216.49 real        86.71 user         5.88 sys
+           149389312  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               56338  page reclaims
+                 934  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+              491651  messages sent
+              496291  messages received
+                  11  signals received
+              497238  voluntary context switches
+               34779  involuntary context switches
+        543215859259  instructions retired
+        252587624381  cycles elapsed
+           145851088  peak memory footprint

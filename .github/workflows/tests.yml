@@ -55,10 +55,26 @@ jobs:
           npm run build:css
           bundle exec rails vite:build
       - name: Run Rails tests
+        env:
+          COVERAGE: '1'
+          PARALLEL_WORKERS: '1'
+          # Reuse the fresh bundles from the explicit asset-build step.
+          SKIP_JS_BUILD: '1'
+          SKIP_CSS_BUILD: '1'
         run: bundle exec rails test
+      - name: Upload Rails coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rails-coverage
+          path: coverage/rails/
+          if-no-files-found: error
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run system tests
+        env:
+          SKIP_JS_BUILD: '1'
+          SKIP_CSS_BUILD: '1'
         run: bundle exec rails test:system
       - name: Upload system test screenshots
         if: failure()

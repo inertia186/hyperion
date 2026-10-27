@@ -6,4 +6,5 @@ rescue LoadError => e
 end
 APP_PATH = File.expand_path('../config/application', __dir__)
 require_relative '../config/boot'
+require_relative '../test/coverage' if ENV['COVERAGE'] == '1'
 require 'rails/commands'

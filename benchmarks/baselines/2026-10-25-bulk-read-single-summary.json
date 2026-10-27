@@ -1,0 +1,98 @@
+[
+  {
+    "caller": "api",
+    "all_matching": false,
+    "before": {
+      "samples": 60,
+      "median_ms": 4.4024999951943755,
+      "p95_ms": 11.211000150069594,
+      "sql_calls": 8.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 3.3469999907538295,
+      "p95_ms": 4.449999891221523,
+      "sql_calls": 7.0
+    }
+  },
+  {
+    "caller": "api",
+    "all_matching": true,
+    "before": {
+      "samples": 60,
+      "median_ms": 78.00550002139062,
+      "p95_ms": 82.72099983878434,
+      "sql_calls": 30.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 75.95750002656132,
+      "p95_ms": 83.55300012044609,
+      "sql_calls": 28.0
+    }
+  },
+  {
+    "caller": "agent",
+    "all_matching": false,
+    "before": {
+      "samples": 60,
+      "median_ms": 3.4359999699518085,
+      "p95_ms": 4.393000155687332,
+      "sql_calls": 8.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 3.032500040717423,
+      "p95_ms": 4.175000125542283,
+      "sql_calls": 7.0
+    }
+  },
+  {
+    "caller": "agent",
+    "all_matching": true,
+    "before": {
+      "samples": 60,
+      "median_ms": 77.6629998581484,
+      "p95_ms": 88.31699984148145,
+      "sql_calls": 30.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 78.24049994815141,
+      "p95_ms": 85.64299996942282,
+      "sql_calls": 28.0
+    }
+  },
+  {
+    "caller": "legacy",
+    "all_matching": false,
+    "before": {
+      "samples": 60,
+      "median_ms": 3.3900000853464007,
+      "p95_ms": 4.296999890357256,
+      "sql_calls": 7.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 2.9704999178647995,
+      "p95_ms": 3.6280001513659954,
+      "sql_calls": 6.0
+    }
+  },
+  {
+    "caller": "legacy",
+    "all_matching": true,
+    "before": {
+      "samples": 60,
+      "median_ms": 4.464000114239752,
+      "p95_ms": 5.6299997959285975,
+      "sql_calls": 9.0
+    },
+    "after": {
+      "samples": 60,
+      "median_ms": 4.188499879091978,
+      "p95_ms": 5.174000049009919,
+      "sql_calls": 8.0
+    }
+  }
+]

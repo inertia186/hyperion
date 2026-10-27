@@ -40,20 +40,11 @@ private
   def high_prolific_author
     tags = [tag].flatten.compact.reject(&:empty?)
 
-    prolific_sql = if tags.none?
-      Post.send(:sanitize_sql_array, [
-        '(SELECT count(*) FROM posts distinct_author_posts WHERE distinct_author_posts.author = posts.author) >= ?',
-        AUTHOR_POST_THRESHOLD
-      ])
-    else
-      Post.send(:sanitize_sql_array, [
-        '(SELECT count(*) FROM posts distinct_author_posts INNER JOIN tags ON tags.post_id = distinct_author_posts.id WHERE distinct_author_posts.author = posts.author AND tags.tag IN (?)) >= ?',
-        tags,
-        AUTHOR_POST_THRESHOLD
-      ])
-    end
+    author_posts = Post.all
+    author_posts = author_posts.joins(:tags).where(tags: {tag: tags}) if tags.any?
+    prolific_authors = author_posts.group(:author).having('COUNT(*) >= ?', AUTHOR_POST_THRESHOLD).select(:author)
 
-    scope.where(Arel.sql(prolific_sql))
+    scope.where(author: prolific_authors)
   end
 
   def high_tag_utilization

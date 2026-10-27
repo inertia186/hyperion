@@ -1,0 +1,18 @@
+
+Run options: --seed 6604
+
+# Running:
+
+.............................................................................................................................................F
+
+Failure:
+PostPayoutRefreshTest#test_estimated_payout_clamps_negative_rshares_and_caps_max_accepted_payout [test/services/post_payout_refresh_test.rb:209]:
+Expected: "3.000 HBD"
+  Actual: "200.000 HBD"
+
+bin/rails test test/services/post_payout_refresh_test.rb:194
+
+.............................................................................................................................................................................................................................
+
+Finished in 8.203081s, 44.2517 runs/s, 320.7331 assertions/s.
+363 runs, 2631 assertions, 1 failures, 0 errors, 0 skips

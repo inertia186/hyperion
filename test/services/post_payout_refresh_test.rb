@@ -9,7 +9,7 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
     api = PayoutApi.new(
       cashout_infos: {
         [posts(:allowed_unread).author, posts(:allowed_unread).permlink] => {net_rshares: 2, reward_weight: 10_000, max_accepted_payout: hbd_asset('1000000.000')},
-        [posts(:muted_unread).author, posts(:muted_unread).permlink] => {net_rshares: 4, reward_weight: 10_000, max_accepted_payout: hbd_asset('1000000.000')}
+        [posts(:muted_unread).author, posts(:muted_unread).permlink] => {net_rshares: 4, reward_weight: 5_000, max_accepted_payout: hbd_asset('1000000.000')}
       }
     )
 
@@ -21,8 +21,8 @@ class PostPayoutRefreshTest < ActiveSupport::TestCase
     assert_equal 1, api.price_feed_calls
     assert_equal 1, result.checked
     assert_equal 1, result.updated
-    assert_equal '2.000 HBD', posts(:muted_unread).reload.payout
-    assert_equal BigDecimal('2.000'), posts(:muted_unread).payout_amount
+    assert_equal '1.000 HBD', posts(:muted_unread).reload.payout
+    assert_equal BigDecimal('1.000'), posts(:muted_unread).payout_amount
     assert_equal 'HBD', posts(:muted_unread).payout_currency
     assert_equal 'estimated', posts(:muted_unread).payout_source
     assert_equal BigDecimal('4'), posts(:muted_unread).net_rshares

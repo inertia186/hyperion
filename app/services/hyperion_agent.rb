@@ -72,24 +72,16 @@ class HyperionAgent
     if truthy?(normalized_params[:all_matching])
       query_params = normalize_query_params(normalized_params[:query] || {}).merge(page: 1)
       result = PostCurationQuery.new(account: account, params: query_params, session: session, track_past_tags: false).call
-      marked_count = 0
-
-      result.all_posts.find_each do |post|
-        account.mark_post_as_read!(post.id)
-        marked_count += 1
-      end
+      marked_count = account.mark_posts_as_read!(result.all_posts)
 
       return {all_matching: true, marked_count: marked_count, read: true, read_posts_count: account.read_posts.count}
     end
 
     post_ids = normalize_post_ids(normalized_params)
-    marked_count = 0
+    marked_count = post_ids.size
     warnings = []
 
-    post_ids.each do |post_id|
-      account.mark_post_as_read!(post_id)
-      marked_count += 1
-    end
+    account.mark_posts_as_read!(Post.where(id: post_ids))
 
     warnings << 'No usable post ids were provided.' if post_ids.empty?
 

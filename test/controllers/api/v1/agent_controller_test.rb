@@ -207,6 +207,17 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
     assert_includes response_json.fetch('warnings'), 'No usable post ids were provided.'
   end
 
+  test 'bulk read keeps the agents attempted count for missing ids and retries' do
+    id = posts(:allowed_unread).id
+    2.times do
+      post :mark_read, params: {post_ids: [id, id, 'invalid', -1]}
+      assert_response :success
+      assert_equal [id, -1], response_json.fetch('post_ids')
+      assert_equal 2, response_json.fetch('marked_count')
+      assert_equal 2, response_json.fetch('read_posts_count')
+    end
+  end
+
   test 'mark read can apply to all posts matching a query' do
     post :mark_read, params: {all_matching: true, query: {tag: 'haf', limit: 1, page: 1}}
 

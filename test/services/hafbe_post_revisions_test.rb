@@ -8,6 +8,7 @@ class HafbePostRevisionsTest < ActiveSupport::TestCase
         comment_op(post, body: "Hello world\nBye", title: 'Original', block: 20, timestamp: '2026-01-02T00:00:00', json_metadata: '{"tags":["hive"]}', parent_permlink: 'hive'),
         {'op' => {'type' => 'vote_operation', 'value' => {'author' => post.author, 'permlink' => post.permlink}}, 'block' => 21},
         comment_op(post, body: 'Wrong author', author: 'bob', block: 22),
+        comment_op(post, body: 'Wrong post', permlink: 'another-post', block: 22),
         comment_op(post, body: "Earlier body", title: 'Earlier', block: 10, timestamp: '2026-01-01T00:00:00', json_metadata: '{', parent_permlink: 'old'),
         comment_op(post, body: "@@ -1,15 +1,21 @@\n Hello \n+brave \n world%0ABye\n", title: 'Patched', block: 23, timestamp: '2026-01-03T00:00:00')
       ]
@@ -111,15 +112,62 @@ class HafbePostRevisionsTest < ActiveSupport::TestCase
     end
   end
 
+  test 'reuses raw responses by full identity without sharing mutable parsed histories' do
+    service = HafbePostRevisions.new(base_url: 'https://hafbe.example')
+    calls = []
+    posts = [Post.new(author: 'alice', permlink: 'one'), Post.new(author: 'alice', permlink: 'two'),
+             Post.new(author: 'bob', permlink: 'one'), Post.new(author: 'alice', permlink: 'empty')]
+    fetch = lambda do |uri|
+      calls << uri.path
+      post = posts.find { |p| uri.path.end_with?("/#{p.author}/operations/comments/#{p.permlink}") }
+      hafbe_response('operations' => post.permlink == 'empty' ? [] : [comment_op(post, body: post.permlink)])
+    end
+
+    Net::HTTP.stub(:get_response, fetch) do
+      posts.each do |post|
+        first = service.revisions_for(post)
+        first.first[:body].replace('Changed by caller') if first.any?
+        rendered = service.call(post: post, local_body: 'Local fallback', render_body: ->(body) { body })
+        assert_equal 'Local fallback', rendered.last.fetch(:body)
+        expected = post.permlink == 'empty' ? [] : [post.permlink]
+        assert_equal expected, service.revisions_for(post).pluck(:body)
+      end
+    end
+
+    assert_equal 4, calls.size
+    assert_equal 4, calls.uniq.size
+  end
+
+  test 'reuses a timeout within one service while a new instance can recover' do
+    post = Post.new(author: 'alice', permlink: 'retry')
+    calls = 0
+    fetch = lambda do |_uri|
+      calls += 1
+      raise Timeout::Error, 'fixed timeout' if calls == 1
+      hafbe_response('operations' => [])
+    end
+
+    Net::HTTP.stub(:get_response, fetch) do
+      service = HafbePostRevisions.new(base_url: 'https://hafbe.example')
+      2.times do
+        error = assert_raises(HafbePostRevisions::FetchError) { service.revisions_for(post) }
+        assert_includes error.message, 'fixed timeout'
+      end
+      assert_equal 1, calls
+      assert_empty HafbePostRevisions.new(base_url: 'https://hafbe.example').revisions_for(post)
+      assert_equal 2, calls
+    end
+  end
+
 private
   def hafbe_response(payload)
     Struct.new(:code, :body).new('200', payload.to_json)
   end
 
-  def comment_op(post, body:, title: nil, author: post.author, block: 1, timestamp: '2026-01-01T00:00:00', json_metadata: nil, parent_permlink: nil)
+  def comment_op(post, body:, title: nil, author: post.author, permlink: post.permlink, block: 1, timestamp: '2026-01-01T00:00:00', json_metadata: nil, parent_permlink: nil)
     value = {
       'author' => author,
-      'permlink' => post.permlink,
+      'permlink' => permlink,
       'body' => body,
       'title' => title,
       'json_metadata' => json_metadata,

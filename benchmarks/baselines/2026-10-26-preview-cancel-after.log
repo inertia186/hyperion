@@ -1,0 +1,13 @@
+
+> hyperion@2.35.0 test:frontend
+> vitest run --config benchmarks/sibling_preview.config.mjs
+
+
+ RUN  v5.0.3 /Users/anthony/Projects/hive/hyperion
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  15:05:06
+   Duration  749ms (environment 71%, import 14%, tests 11%, transform 4%)
+

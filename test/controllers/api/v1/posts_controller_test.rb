@@ -117,6 +117,37 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal Post.count, response_json.fetch('mode_counts').fetch('keyword')
   end
 
+  test 'keyword search requires every term and treats wildcard characters and quotes literally' do
+    posts(:allowed_unread).update!(title: '100% Genuine', body: "under_score by O'Reilly")
+    posts(:read_allowed).update!(title: '1000 Genuine', body: "underXscore by O'Reilly")
+
+    get :index, params: {only_keyword: true, query: "100% under_score O'Reilly", limit: 30}
+
+    assert_response :success
+    assert_equal [posts(:allowed_unread).id], response_json.fetch('posts').map { |post| post.fetch('id') }
+    assert_equal 1, response_json.dig('mode_counts', 'keyword')
+    assert_equal 1, response_json.dig('pagination', 'total_count')
+  end
+
+  test 'marking all keyword matches includes results beyond the first page' do
+    matches = [posts(:allowed_unread), posts(:muted_unread), posts(:ignored_unread)]
+    matches.each { |post| post.update!(body: 'Shared search needle') }
+
+    patch :mark_many_read, params: {all_matching: true, query: {only_keyword: true, query: 'needle', limit: 1}}
+
+    assert_response :success
+    assert_equal 3, response_json.fetch('marked_count')
+    matches.each { |post| assert accounts(:curated).post_read?(post.id) }
+  end
+
+  test 'keyword search with only mention punctuation has no text restriction' do
+    get :index, params: {only_keyword: true, query: '@@', limit: 30}
+
+    assert_response :success
+    assert_equal Post.count, response_json.dig('mode_counts', 'keyword')
+    assert_equal Post.count, response_json.dig('pagination', 'total_count')
+  end
+
   test 'signal filter returns high tag utilization posts and counts all signal options' do
     tagged = create_post_with_tag(author: 'tag-heavy', permlink: 'tag-heavy-post', title: 'Tag Heavy Post', tag: 'haf', author_reputation: 35)
     7.times do |index|
@@ -403,7 +434,7 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     post = posts(:allowed_unread)
     post.update!(
       body: 'This is a cross post of [@alice/original](/hive-1/@alice/original) by @bob.<br><br>Actual image https://example.com/cross.png',
-      metadata: {tags: %w(cross-post)}
+      metadata: {}
     )
     post.tags.find_or_create_by!(tag: 'cross-post', category: false)
 
@@ -562,6 +593,18 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert accounts(:curated).post_read?(posts(:allowed_unread).id)
     assert accounts(:curated).post_read?(posts(:muted_unread).id)
     assert_not accounts(:curated).post_read?(posts(:ignored_unread).id)
+  end
+
+  test 'bulk read responses preserve duplicate and invalid ids while storing only existing posts' do
+    id = posts(:allowed_unread).id
+    ids = [id, id, 'invalid', -1]
+    2.times do
+      patch :mark_many_read, params: {post_ids: ids}
+      assert_response :success
+      assert_equal [id, id, 0, -1], response_json.fetch('post_ids')
+      assert_equal 2, response_json.fetch('read_posts_count')
+      assert_equal [posts(:read_allowed).id, id].sort, accounts(:curated).read_posts.order(:post_id).pluck(:post_id)
+    end
   end
 
   test 'preview lazy loads missing body' do
@@ -764,14 +807,16 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
       ]
     }
     response = Struct.new(:code, :body).new('200', payload.to_json)
+    calls = 0
 
     with_env('HAFBE_BASE_URL' => 'https://hafbe.example') do
-      Net::HTTP.stub(:get_response, response) do
+      Net::HTTP.stub(:get_response, ->(_uri) { calls += 1; response }) do
         get :revisions, params: {id: post.id}
       end
     end
 
     assert_response :success
+    assert_equal 1, calls
     revisions = response_json.fetch('revisions')
     assert_equal 3, revisions.size
     assert_equal ['Revision 1', 'Revision 2', 'Revision 3'], revisions.map { |revision| revision.fetch('label') }
@@ -783,6 +828,68 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_equal 'New body', post.reload.body
     assert_equal post.author, response_json.fetch('author')
     assert_equal post.permlink, response_json.fetch('permlink')
+  end
+
+  test 'revisions retries upstream failures only on a new request' do
+    post = posts(:allowed_unread)
+    post.update!(body: 'Existing body')
+    calls = 0
+    response = Struct.new(:code, :body).new('503', '{}')
+
+    with_env('HAFBE_BASE_URL' => 'https://hafbe.example') do
+      Net::HTTP.stub(:get_response, ->(_uri) { calls += 1; response }) do
+        get :revisions, params: {id: post.id}
+        assert_response :bad_gateway
+        assert_equal 1, calls
+        assert_includes response_json.fetch('error'), '503'
+
+        response = hafbe_response('operations' => [hafbe_comment_op(post, body: 'Recovered body',
+          title: post.title, block: post.block_num + 1, timestamp: '2026-10-25T12:00:00',
+          json_metadata: post.metadata.to_json, parent_permlink: post.category)])
+        get :revisions, params: {id: post.id}
+        assert_response :success
+        assert_equal 2, calls
+        assert_equal 'Recovered body', response_json.fetch('revisions').last.fetch('body')
+      end
+    end
+  end
+
+  test 'revisions loads a missing local body from HafSQL before rendering empty history' do
+    post = posts(:allowed_unread)
+    post.update!(body: nil)
+    fetches = []
+    source = Object.new
+    source.define_singleton_method(:fetch_body) { |*identity| fetches << identity; 'Cold source body' }
+
+    HafsqlPostIndexer.stub(:new, source) do
+      get :revisions, params: {id: post.id}
+    end
+
+    assert_response :success
+    assert_equal [[post.author, post.permlink]], fetches
+    assert_equal 'Cold source body', post.reload.body
+    assert_equal 'Cold source body', response_json.fetch('revisions').last.fetch('body')
+  end
+
+  test 'revisions retains Hive body fallback after a HafSQL miss' do
+    post = posts(:allowed_unread)
+    post.update!(body: nil)
+    source = Object.new
+    source.define_singleton_method(:fetch_body) { |*_identity| nil }
+    fallbacks = 0
+
+    Post.stub(:find, post) do
+      HafsqlPostIndexer.stub(:new, source) do
+        post.stub(:fetch_latest, -> { fallbacks += 1; post.body = 'Hive fallback body' }) do
+          get :revisions, params: {id: post.id}
+        end
+      end
+    end
+
+    assert_response :success
+    assert_equal 1, fallbacks
+    assert_equal 'Hive fallback body', post.reload.body
+    assert_equal 'Hive fallback body', response_json.fetch('revisions').last.fetch('body')
   end
 
   test 'revisions uses the default HAFBE URL when not configured' do
@@ -899,6 +1006,85 @@ class Api::V1::PostsControllerTest < ActionController::TestCase
     assert_nil response_json.fetch('replies')
     assert_nil response_json.fetch('payout')
     assert_nil response_json.fetch('current_vote')
+  end
+
+  test 'malformed chain stats stay unavailable without poisoning cache or persisted payout' do
+    post = posts(:allowed_unread)
+    post.capture_payout!('4.000 HBD')
+    cached_payout = post.attributes.slice('payout', 'payout_amount', 'payout_fetched_at', 'payout_source')
+    responses = {get_active_votes: [{voter: accounts(:curated).name, percent: 4200}],
+      get_content_replies: 'malformed',
+      get_content: {cashout_time: '2026-10-27T12:00:00', pending_payout_value: '1.000 HBD'}}
+    api = ChainStatsApi.new(responses)
+    cache = ActiveSupport::Cache::MemoryStore.new
+
+    Rails.stub(:cache, cache) do
+      Account.stub(:api, api) do
+        get :chain_stats, params: {id: post.id}
+        assert_response :success
+        assert_equal 'unavailable', response_json.fetch('status')
+        assert_nil response_json.fetch('votes')
+        assert_nil response_json.fetch('current_vote')
+        assert_equal cached_payout, post.reload.attributes.slice(*cached_payout.keys)
+        assert_nil cache.read(['chain-stats-v2', post.author, post.permlink])
+
+        responses[:get_content_replies] = []
+        get :chain_stats, params: {id: post.id}
+        assert_equal 'ready', response_json.fetch('status')
+        assert_equal 4200, response_json.fetch('current_vote')
+        assert_equal '1.000 HBD', post.reload.payout
+      end
+    end
+    assert_equal %i(get_active_votes get_content_replies get_active_votes get_content_replies get_content), api.calls
+  end
+
+  test 'malformed payout content is not persisted or cached and a later request recovers' do
+    post = posts(:allowed_unread)
+    post.capture_payout!('4.000 HBD')
+    cached_payout = post.attributes.slice('payout', 'payout_amount', 'payout_fetched_at', 'payout_source')
+    responses = {get_content: {cashout_time: [], pending_payout_value: 99}}
+    api = ChainStatsApi.new(responses)
+    cache = ActiveSupport::Cache::MemoryStore.new
+
+    Rails.stub(:cache, cache) do
+      Account.stub(:api, api) do
+        get :payout, params: {id: post.id}
+        assert_response :success
+        assert_equal 'unavailable', response_json.fetch('status')
+        assert_nil response_json.fetch('payout')
+        assert_equal cached_payout, post.reload.attributes.slice(*cached_payout.keys)
+        assert_nil cache.read(['post-payout', post.author, post.permlink])
+
+        responses[:get_content] = {cashout_time: '2026-10-27T12:00:00', pending_payout_value: '1.000 HBD'}
+        get :payout, params: {id: post.id}
+        assert_equal 'ready', response_json.fetch('status')
+        assert_equal '1.000 HBD', post.reload.payout
+      end
+    end
+    assert_equal [:get_content, :get_content], api.calls
+  end
+
+  test 'malformed HAFBE history returns a controlled error and the next request can recover' do
+    post = posts(:allowed_unread)
+    post.update!(body: 'Existing body')
+    calls = 0
+    upstream = hafbe_response('operations' => [7])
+
+    with_env('HAFBE_BASE_URL' => 'https://hafbe.example') do
+      Net::HTTP.stub(:get_response, ->(_uri) { calls += 1; upstream }) do
+        get :revisions, params: {id: post.id}
+        assert_response :bad_gateway
+        assert_includes response_json.fetch('error'), 'HAFBE'
+        assert_equal 'Existing body', post.reload.body
+        assert_equal 1, calls
+
+        upstream = hafbe_response('operations' => [{'author' => post.author, 'permlink' => post.permlink, 'body' => 'Recovered body'}])
+        get :revisions, params: {id: post.id}
+        assert_response :success
+        assert_equal 'Recovered body', response_json.fetch('revisions').last.fetch('body')
+        assert_equal 2, calls
+      end
+    end
   end
 
   test 'chain stats proxy does not warn for invalid Hive parameters' do

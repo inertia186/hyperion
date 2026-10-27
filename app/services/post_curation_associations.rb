@@ -19,7 +19,8 @@ class PostCurationAssociations
 
   def call
     @read_post_ids = account.read_posts.where(post_id: post_ids).pluck(:post_id)
-    @post_tags = Tag.where(post_id: post_ids).order(:id).pluck(:post_id, :tag, :category).group_by(&:first)
+    ActiveRecord::Associations::Preloader.new(records: posts, associations: :tags, scope: Tag.order(:id)).call
+    @post_tags = posts.flat_map { |post| post.tags.map { |tag| [tag.post_id, tag.tag, tag.category] } }.group_by(&:first)
     @post_bodies = Post.where(id: post_ids).pluck(:id, :body).to_h
     @post_communities = communities_by_name(post_community_names)
     @related_authors = all_posts.distinct.limit(1000).order(:author).pluck(:author)

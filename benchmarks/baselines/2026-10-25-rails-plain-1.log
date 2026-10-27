@@ -1,0 +1,39 @@
+
+> hyperion@2.35.0 build
+> esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets
+
+
+  app/assets/builds/application.js  1.3mb ⚠️
+
+⚡ Done in 48ms
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+
+
+Run options: --seed 6604
+
+# Running:
+
+.............................................................................................................................................................................................................................................................................................................................................................
+
+Finished in 6.959765s, 50.1454 runs/s, 363.2307 assertions/s.
+349 runs, 2528 assertions, 0 failures, 0 errors, 0 skips
+        9.25 real         5.01 user         1.11 sys
+           342147072  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               63358  page reclaims
+                1743  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                9304  messages sent
+                9301  messages received
+                  21  signals received
+               15948  voluntary context switches
+               14432  involuntary context switches
+         46613162365  instructions retired
+         16216883612  cycles elapsed
+           309887840  peak memory footprint

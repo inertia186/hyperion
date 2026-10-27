@@ -376,13 +376,7 @@ describe('App', () => {
     wallet.vote.mockImplementation(async (args) => args.provider === 'hivesigner'
       ? {status: 'approval_required', url: hivesignerVoteUrl(args)}
       : {status: 'submitted', transactionId: 'tx'})
-    window.hive = {
-      api: {
-        getActiveVotes: vi.fn((_author, _permlink, callback) => callback(null, [{voter: 'fixture-curator', percent: 10000}, {voter: 'other-curator', percent: 5000}])),
-        getContentReplies: vi.fn((_author, _permlink, callback) => callback(null, [{id: 1}, {id: 2}])),
-        getContent: vi.fn((_author, _permlink, callback) => callback(null, {cashout_time: '2026-05-30T00:00:00', pending_payout_value: '1.234 HBD', total_payout_value: '0.000 HBD'}))
-      }
-    }
+    delete window.hive
 
     global.fetch = vi.fn((url, options = {}) => {
       if (url === '/api/v1/session') {
@@ -604,6 +598,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getAllByText('First Post').length).toBeGreaterThan(0))
     expect(screen.getByText('Preview 1')).toBeInTheDocument()
+    expect(window.hive).toBeUndefined()
     expect(screen.queryByRole('link', {name: 'Legacy inbox'})).not.toBeInTheDocument()
   })
 

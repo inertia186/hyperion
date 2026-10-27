@@ -1,0 +1,153 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "limits": {
+    "cleanup_interval_seconds": 60,
+    "logical_bytes": 16777216,
+    "allocated_file_bytes": 134217728
+  },
+  "sizes": [
+    {
+      "initial_entries": 100,
+      "before": {
+        "hit_samples": 360,
+        "p50_ms": 1.8415000522509217,
+        "p95_ms": 12.642000103369355,
+        "p99_ms": 17.03700004145503,
+        "max_ms": 22.26100000552833,
+        "metadata_reads_median": 14.0,
+        "allocations_median": 1321.0,
+        "miss_p95_ms": 13.251999858766794,
+        "max_logical_bytes": 118280,
+        "max_allocated_file_bytes": 819200,
+        "rounds": [
+          {
+            "p95_ms": 12.445000000298023,
+            "max_ms": 21.880000131204724
+          },
+          {
+            "p95_ms": 12.679999927058816,
+            "max_ms": 22.26100000552833
+          }
+        ]
+      },
+      "after": {
+        "hit_samples": 360,
+        "p50_ms": 0.25299994740635157,
+        "p95_ms": 0.36399997770786285,
+        "p99_ms": 12.061999877914786,
+        "max_ms": 22.311000153422356,
+        "metadata_reads_median": 1.0,
+        "allocations_median": 521.0,
+        "miss_p95_ms": 0.9039998985826969,
+        "max_logical_bytes": 125448,
+        "max_allocated_file_bytes": 872448,
+        "rounds": [
+          {
+            "p95_ms": 0.4129998851567507,
+            "max_ms": 22.06099987961352
+          },
+          {
+            "p95_ms": 0.32500014640390873,
+            "max_ms": 22.311000153422356
+          }
+        ]
+      }
+    },
+    {
+      "initial_entries": 1000,
+      "before": {
+        "hit_samples": 360,
+        "p50_ms": 106.08100006356835,
+        "p95_ms": 122.56099982187152,
+        "p99_ms": 131.35799998417497,
+        "max_ms": 141.109999967739,
+        "metadata_reads_median": 913.0,
+        "allocations_median": 57958.0,
+        "miss_p95_ms": 125.42199995368719,
+        "max_logical_bytes": 1184780,
+        "max_allocated_file_bytes": 8192000,
+        "rounds": [
+          {
+            "p95_ms": 119.84399985522032,
+            "max_ms": 141.109999967739
+          },
+          {
+            "p95_ms": 123.96999984048307,
+            "max_ms": 133.10800003819168
+          }
+        ]
+      },
+      "after": {
+        "hit_samples": 360,
+        "p50_ms": 0.2579998690634966,
+        "p95_ms": 0.3750000614672899,
+        "p99_ms": 119.47100004181266,
+        "max_ms": 130.86399994790554,
+        "metadata_reads_median": 1.0,
+        "allocations_median": 521.0,
+        "miss_p95_ms": 0.9769999887794256,
+        "max_logical_bytes": 1191948,
+        "max_allocated_file_bytes": 8245248,
+        "rounds": [
+          {
+            "p95_ms": 0.3440000582486391,
+            "max_ms": 130.86399994790554
+          },
+          {
+            "p95_ms": 0.38700015284121037,
+            "max_ms": 128.65699990652502
+          }
+        ]
+      }
+    },
+    {
+      "initial_entries": 10000,
+      "before": {
+        "hit_samples": 360,
+        "p50_ms": 1193.0919999722391,
+        "p95_ms": 1349.3870000820607,
+        "p99_ms": 1463.7329999823123,
+        "max_ms": 1750.670999987051,
+        "metadata_reads_median": 9913.0,
+        "allocations_median": 624959.0,
+        "miss_p95_ms": 1339.2199999652803,
+        "max_logical_bytes": 11867780,
+        "max_allocated_file_bytes": 81920000,
+        "rounds": [
+          {
+            "p95_ms": 1291.761999949813,
+            "max_ms": 1527.5729999411851
+          },
+          {
+            "p95_ms": 1364.63399999775,
+            "max_ms": 1750.670999987051
+          }
+        ]
+      },
+      "after": {
+        "hit_samples": 360,
+        "p50_ms": 0.2709999680519104,
+        "p95_ms": 0.40099979378283024,
+        "p99_ms": 1275.6809999700636,
+        "max_ms": 1405.10299988091,
+        "metadata_reads_median": 1.0,
+        "allocations_median": 521.0,
+        "miss_p95_ms": 1.2020000722259283,
+        "max_logical_bytes": 11874948,
+        "max_allocated_file_bytes": 81973248,
+        "rounds": [
+          {
+            "p95_ms": 0.3169998526573181,
+            "max_ms": 1405.10299988091
+          },
+          {
+            "p95_ms": 0.4100000951439142,
+            "max_ms": 1275.6809999700636
+          }
+        ]
+      }
+    }
+  ],
+  "large_cache_reduction_percent": 99.97028281777143,
+  "candidate_size_growth_ratio": 1.101647852584932
+}

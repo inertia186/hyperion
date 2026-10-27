@@ -1,0 +1,146 @@
+[
+  {
+    "initial_entries": 100,
+    "scenario": "expired_requested",
+    "before": {
+      "median_ms": 18.739999970421195,
+      "max_ms": 21.810000063851476
+    },
+    "after": {
+      "median_ms": 0.9060001466423273,
+      "max_ms": 1.078000059351325
+    }
+  },
+  {
+    "initial_entries": 100,
+    "scenario": "corrupt_requested",
+    "before": {
+      "median_ms": 14.945000177249312,
+      "max_ms": 19.898999948054552
+    },
+    "after": {
+      "median_ms": 1.1320000048726797,
+      "max_ms": 1.613000174984336
+    }
+  },
+  {
+    "initial_entries": 100,
+    "scenario": "concurrent_hits",
+    "before": {
+      "median_ms": 35.657999804243445,
+      "max_ms": 42.94199985451996
+    },
+    "after": {
+      "median_ms": 1.6759999562054873,
+      "max_ms": 1.858999952673912
+    }
+  },
+  {
+    "initial_entries": 100,
+    "scenario": "concurrent_misses",
+    "before": {
+      "median_ms": 26.968999998643994,
+      "max_ms": 31.894000014290214
+    },
+    "after": {
+      "median_ms": 2.340999897569418,
+      "max_ms": 2.943999832496047
+    }
+  },
+  {
+    "initial_entries": 1000,
+    "scenario": "expired_requested",
+    "before": {
+      "median_ms": 145.41899994947016,
+      "max_ms": 156.17300011217594
+    },
+    "after": {
+      "median_ms": 0.9439999703317881,
+      "max_ms": 1.1100000701844692
+    }
+  },
+  {
+    "initial_entries": 1000,
+    "scenario": "corrupt_requested",
+    "before": {
+      "median_ms": 139.84300009906292,
+      "max_ms": 153.67099991999567
+    },
+    "after": {
+      "median_ms": 0.8410001173615456,
+      "max_ms": 1.0289999190717936
+    }
+  },
+  {
+    "initial_entries": 1000,
+    "scenario": "concurrent_hits",
+    "before": {
+      "median_ms": 248.07299999520183,
+      "max_ms": 250.83799986168742
+    },
+    "after": {
+      "median_ms": 0.6460000295192003,
+      "max_ms": 0.6639999337494373
+    }
+  },
+  {
+    "initial_entries": 1000,
+    "scenario": "concurrent_misses",
+    "before": {
+      "median_ms": 277.31100004166365,
+      "max_ms": 279.5829998794943
+    },
+    "after": {
+      "median_ms": 1.1350000277161598,
+      "max_ms": 1.2439999263733625
+    }
+  },
+  {
+    "initial_entries": 10000,
+    "scenario": "expired_requested",
+    "before": {
+      "median_ms": 1427.4599999189377,
+      "max_ms": 1491.419999860227
+    },
+    "after": {
+      "median_ms": 0.9899998549371958,
+      "max_ms": 1.2020000722259283
+    }
+  },
+  {
+    "initial_entries": 10000,
+    "scenario": "corrupt_requested",
+    "before": {
+      "median_ms": 1318.3150000404567,
+      "max_ms": 1337.5880001112819
+    },
+    "after": {
+      "median_ms": 0.8620000444352627,
+      "max_ms": 1.1060000397264957
+    }
+  },
+  {
+    "initial_entries": 10000,
+    "scenario": "concurrent_hits",
+    "before": {
+      "median_ms": 2446.0390000604093,
+      "max_ms": 2454.3880000710487
+    },
+    "after": {
+      "median_ms": 0.6770000327378511,
+      "max_ms": 0.6869998760521412
+    }
+  },
+  {
+    "initial_entries": 10000,
+    "scenario": "concurrent_misses",
+    "before": {
+      "median_ms": 2393.913999898359,
+      "max_ms": 2424.9730000738055
+    },
+    "after": {
+      "median_ms": 1.2600000482052565,
+      "max_ms": 1.3280001003295183
+    }
+  }
+]

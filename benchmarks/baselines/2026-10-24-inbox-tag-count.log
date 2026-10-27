@@ -1,0 +1,22 @@
+Seeding inbox: 10,000 posts, 500 authors
+Inbox round 1/2 complete
+Inbox round 2/2 complete
+Results: tmp/hills-inbox-tag-count.json; 0 failed correctness checks
+      103.67 real        20.47 user         2.75 sys
+           139460608  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               39952  page reclaims
+                 987  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+               30314  messages sent
+               34093  messages received
+                   5  signals received
+               34750  voluntary context switches
+               13749  involuntary context switches
+        120429473087  instructions retired
+         53939010531  cycles elapsed
+           143180472  peak memory footprint

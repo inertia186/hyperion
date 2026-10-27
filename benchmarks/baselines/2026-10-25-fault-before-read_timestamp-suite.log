@@ -1,0 +1,30 @@
+
+Run options: --seed 6604
+
+# Running:
+
+......................................................................................................................................................................................................................................................................................................................................................................F
+
+Failure:
+BulkReadTest#test_bulk_reads_preserve_timestamps_and_validate_post_existence_and_account_isolation [test/models/bulk_read_test.rb:32]:
+--- expected
++++ actual
+@@ -1 +1 @@
+-2026-10-24 18:06:42.000000000 UTC +00:00
++2026-10-25 18:06:42.890155000 UTC +00:00
+
+
+bin/rails test test/models/bulk_read_test.rb:23
+
+.F
+
+Failure:
+BulkReadTest#test_interrupted_batches_retain_completed_work_and_retries_finish_without_duplicates [test/models/bulk_read_test.rb:49]:
+RuntimeError expected but nothing was raised.
+
+bin/rails test test/models/bulk_read_test.rb:38
+
+..
+
+Finished in 13.843680s, 26.2214 runs/s, 189.6172 assertions/s.
+363 runs, 2625 assertions, 2 failures, 0 errors, 0 skips

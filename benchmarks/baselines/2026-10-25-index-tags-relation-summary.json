@@ -1,0 +1,88 @@
+{
+  "limits": {
+    "peak_rss_mib": 256,
+    "measured_transaction_seconds": 10
+  },
+  "cases": {
+    "insert": {
+      "median_ms": [
+        2779.582,
+        6067.736
+      ],
+      "observed_max_ms": [
+        7039.416,
+        7574.603
+      ],
+      "sql_calls": [
+        16008,
+        13008
+      ],
+      "median_allocations": [
+        2673124,
+        2229120
+      ],
+      "median_time_reduction_percent": -118.29670792227031,
+      "median_posts_per_second": [
+        354.011,
+        161.938
+      ],
+      "throughput_ratio": 0.4574377632333458
+    },
+    "edit_delete": {
+      "median_ms": [
+        5248.586,
+        5745.358
+      ],
+      "observed_max_ms": [
+        6853.503,
+        6343.563
+      ],
+      "sql_calls": [
+        12008,
+        10008
+      ],
+      "median_allocations": [
+        2026208,
+        1691298
+      ],
+      "median_time_reduction_percent": -9.464873015322596,
+      "median_posts_per_second": [
+        180.678,
+        171.142
+      ],
+      "throughput_ratio": 0.9472210230354553
+    },
+    "replay": {
+      "median_ms": [
+        329.228,
+        285.109
+      ],
+      "observed_max_ms": [
+        570.678,
+        469.812
+      ],
+      "sql_calls": [
+        1511,
+        608
+      ],
+      "median_allocations": [
+        486036,
+        331656
+      ],
+      "median_time_reduction_percent": 13.400743557656103
+    }
+  },
+  "before": {
+    "peak_rss_mib": 133.90625,
+    "max_measured_transaction_seconds": 7.013819999992847
+  },
+  "after": {
+    "peak_rss_mib": 135.296875,
+    "max_measured_transaction_seconds": 7.544735000003129
+  },
+  "doubling_target_met": false,
+  "timing_guard_violations": [
+    "insert: median did not improve",
+    "edit_delete: median did not improve"
+  ]
+}

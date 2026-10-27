@@ -1,0 +1,49 @@
+{
+  "undetected_before": [
+    "revision_identity",
+    "revision_failed_patch",
+    "payout_weight",
+    "read_unread_owner"
+  ],
+  "undetected_after": [
+    "revision_failed_patch",
+    "read_unread_owner"
+  ],
+  "runtime_median_seconds": [
+    11.36151933297515,
+    11.836907583056018
+  ],
+  "runtime_change_percent": 4.184196111000071,
+  "tests": [
+    363,
+    363
+  ],
+  "coverage": [
+    {
+      "files": 71,
+      "lines": {
+        "covered": 3122,
+        "total": 3683
+      },
+      "branches": {
+        "covered": 734,
+        "total": 1169
+      }
+    },
+    {
+      "files": 71,
+      "lines": {
+        "covered": 3122,
+        "total": 3683
+      },
+      "branches": {
+        "covered": 734,
+        "total": 1169
+      }
+    }
+  ],
+  "lost_lines": 0,
+  "lost_branches": 0,
+  "detection_target_met": true,
+  "test_count_target_met": false
+}

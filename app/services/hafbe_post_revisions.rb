@@ -12,6 +12,7 @@ class HafbePostRevisions
   def initialize(base_url: ENV.fetch('HAFBE_BASE_URL', DEFAULT_BASE_URL), timeout: DEFAULT_TIMEOUT)
     @base_url = base_url.to_s.strip
     @timeout = timeout
+    @responses = {}
   end
 
   def call(post:, local_body:, render_body:)
@@ -57,12 +58,23 @@ private
   attr_reader :timeout
 
   def fetch_operations(author, permlink)
-    response = Timeout.timeout(timeout) do
-      Net::HTTP.get_response(revisions_uri(author, permlink))
+    # Reuse the fetch, including failures, but parse independent histories for callers.
+    key = [author, permlink]
+    response = @responses.fetch(key) do
+      @responses[key] = Timeout.timeout(timeout) do
+        Net::HTTP.get_response(revisions_uri(author, permlink))
+      end
+    rescue StandardError => e
+      @responses[key] = e
     end
+    raise response if response.is_a?(StandardError)
     raise FetchError, "HAFBE returned #{response.code}" unless response.code.to_i.between?(200, 299)
 
-    JSON.parse(response.body)
+    payload = JSON.parse(response.body)
+    unless collection(payload).all? { |operation| operation.is_a?(Hash) }
+      raise FetchError, 'HAFBE returned invalid history entries'
+    end
+    payload
   rescue JSON::ParserError => e
     raise FetchError, "HAFBE returned invalid JSON: #{e.message}"
   rescue FetchError
@@ -101,7 +113,7 @@ private
     return payload if payload.is_a?(Array)
     return collection(payload) if payload.is_a?(Hash)
 
-    []
+    raise FetchError, 'HAFBE returned invalid history collection'
   end
 
   def revision_from_operation(operation, post, sequence)

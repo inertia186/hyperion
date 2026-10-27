@@ -1,0 +1,30 @@
+Indexing iteration 0/10 complete (warmup)
+Indexing iteration 1/10 complete
+Indexing iteration 2/10 complete
+Indexing iteration 3/10 complete
+Indexing iteration 4/10 complete
+Indexing iteration 5/10 complete
+Indexing iteration 6/10 complete
+Indexing iteration 7/10 complete
+Indexing iteration 8/10 complete
+Indexing iteration 9/10 complete
+Indexing iteration 10/10 complete
+Results: benchmarks/baselines/2026-10-25-index-tags-repeat-before.json; 0 failed correctness checks
+      134.23 real        75.05 user         4.19 sys
+           141393920  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               45167  page reclaims
+                 934  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+              451717  messages sent
+              452708  messages received
+                   5  signals received
+              456293  voluntary context switches
+               17290  involuntary context switches
+        443757392675  instructions retired
+        204488910645  cycles elapsed
+           129303224  peak memory footprint

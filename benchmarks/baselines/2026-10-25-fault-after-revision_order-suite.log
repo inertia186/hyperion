@@ -1,0 +1,93 @@
+
+Run options: --seed 6604
+
+# Running:
+
+......................F
+
+Failure:
+HafbePostRevisionsTest#test_recognizes_diff_match_patch_headers_with_omitted_lengths [test/services/hafbe_post_revisions_test.rb:92]:
+--- expected
++++ actual
+@@ -1,3 +1,2 @@
+ ["Hello
+-", "Hello
+-Again"]
++"]
+
+
+bin/rails test test/services/hafbe_post_revisions_test.rb:80
+
+F
+
+Failure:
+HafbePostRevisionsTest#test_applies_diff_match_patch_hunks_with_minor_whitespace_drift [test/services/hafbe_post_revisions_test.rb:108]:
+--- expected
++++ actual
+@@ -1 +1 @@
+-["Why I have created the[  2.0 Version](https://example.com)?", "Why I have created the[2.0 Version](https://example.com)?"]
++["Why I have created the[  2.0 Version](https://example.com)?"]
+
+
+bin/rails test test/services/hafbe_post_revisions_test.rb:96
+
+.F
+
+Failure:
+HafbePostRevisionsTest#test_latest_revision_can_be_a_deleted_placeholder_with_blank_parent_permlink [test/services/hafbe_post_revisions_test.rb:41]:
+--- expected
++++ actual
+@@ -1 +1 @@
+-"\\[DELETED\\] accidental repost"
++"Original long body"
+
+
+bin/rails test test/services/hafbe_post_revisions_test.rb:29
+
+F
+
+Failure:
+HafbePostRevisionsTest#test_normalizes_comment_revisions_and_reconstructs_diff_match_patch_bodies [test/services/hafbe_post_revisions_test.rb:20]:
+--- expected
++++ actual
+@@ -1,3 +1,2 @@
+-["Earlier body", "Hello world
+-Bye", "Hello brave world
+-Bye"]
++["Hello world
++Bye", "Earlier body"]
+
+
+bin/rails test test/services/hafbe_post_revisions_test.rb:4
+
+.........................................................................................................................................................................................F
+
+Failure:
+Api::V1::PostsControllerTest#test_preview_persists_linked_post_deleted_placeholder_revision_without_erasing_category [test/controllers/api/v1/posts_controller_test.rb:673]:
+Expected: "[DELETED] accidental repost"
+  Actual: "HIVE all time low"
+
+bin/rails test test/controllers/api/v1/posts_controller_test.rb:651
+
+......................F
+
+Failure:
+Api::V1::PostsControllerTest#test_revisions_returns_rendered_HAFBE_revisions_after_refreshing_local_body [test/controllers/api/v1/posts_controller_test.rb:819]:
+Expected: 3
+  Actual: 2
+
+bin/rails test test/controllers/api/v1/posts_controller_test.rb:796
+
+.......F
+
+Failure:
+Api::V1::PostsControllerTest#test_preview_persists_newer_HAFBE_revision_for_non_diff_local_body [test/controllers/api/v1/posts_controller_test.rb:644]:
+Expected: "New body"
+  Actual: "Old body"
+
+bin/rails test test/controllers/api/v1/posts_controller_test.rb:629
+
+.......................................................................................................................
+
+Finished in 9.873261s, 36.7660 runs/s, 264.0465 assertions/s.
+363 runs, 2607 assertions, 7 failures, 0 errors, 0 skips
