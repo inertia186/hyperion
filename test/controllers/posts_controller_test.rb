@@ -33,6 +33,21 @@ class PostsControllerTest < ActionController::TestCase
     assert_includes response.body, 'Diff'
     assert_includes response.body, 'file-diff'
     assert_not_includes response.body, 'scribe.hivekings.com'
+    assert_select 'script[src="https://cdn.jsdelivr.net/npm/@hiveio/hive-js/dist/hive.min.js"]', count: 1
+    assert_select 'meta[name="hive-api-url"]', count: 1
+  end
+
+  test 'legacy bulk reads retain explicit ids and tag exclusions on retries' do
+    id = posts(:ignored_unread).id
+    2.times do
+      patch :mark_all_as_read, params: {post_ids: [id, id, 'invalid', -1], mark_tag_read: ['haf']}
+      assert_response :redirect
+      assert accounts(:curated).post_read?(id)
+      assert accounts(:curated).post_read?(posts(:allowed_unread).id)
+      assert_not accounts(:curated).post_read?(posts(:muted_unread).id)
+      assert_not accounts(:curated).post_read?(posts(:old_allowed).id)
+      assert_not accounts(:curated).post_read?(posts(:deleted_allowed).id)
+    end
   end
 
   test 'content sandbox accepts dark theme parameter' do

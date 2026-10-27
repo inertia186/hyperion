@@ -43,7 +43,7 @@ class Api::V1::PostsController < Api::V1::BaseController
     post = Post.find(params[:id])
     display_post = refresh_post_for_display(post)
 
-    revisions = HafbePostRevisions.new.call(
+    revisions = post_revisions_service.call(
       post: display_post,
       local_body: display_post.display_body,
       render_body: ->(body) { render_post_body(display_post, body) }
@@ -122,19 +122,14 @@ class Api::V1::PostsController < Api::V1::BaseController
     if truthy?(params[:all_matching])
       query_params = params[:query].presence || {}
       result = PostCurationQuery.new(account: current_account, params: query_params.merge(page: 1), session: session, track_past_tags: false).call
-      marked_count = 0
-
-      result.all_posts.find_each do |post|
-        current_account.mark_post_as_read!(post.id)
-        marked_count += 1
-      end
+      marked_count = current_account.mark_posts_as_read!(result.all_posts)
 
       render json: {all_matching: true, marked_count: marked_count, read: true, read_posts_count: current_account.read_posts.count}
       return
     end
 
     post_ids = [params[:post_ids]].flatten.compact
-    post_ids.each { |id| current_account.mark_post_as_read!(id) }
+    current_account.mark_posts_as_read!(Post.where(id: post_ids))
 
     render json: {post_ids: post_ids.map(&:to_i), read: true, read_posts_count: current_account.read_posts.count}
   end
@@ -145,10 +140,14 @@ private
   end
 
   def refresh_post_for_display(post)
-    post.refresh_latest_revision!
+    post.refresh_latest_revision!(revisions_service: post_revisions_service)
     display_post = post.display_post
-    display_post.refresh_latest_revision! if display_post.persisted? && display_post != post
+    display_post.refresh_latest_revision!(revisions_service: post_revisions_service) if display_post.persisted? && display_post != post
     display_post
+  end
+
+  def post_revisions_service
+    @post_revisions_service ||= HafbePostRevisions.new
   end
 
   def chain_identity(post, allow_override: true)

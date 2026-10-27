@@ -1,0 +1,40 @@
+
+> hyperion@2.35.0 build
+> esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets
+
+
+  app/assets/builds/application.js  1.3mb ⚠️
+
+⚡ Done in 37ms
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+
+
+Run options: --seed 6604
+
+# Running:
+
+.............................................................................................................................................................................................................................................................................................................................................................
+
+Finished in 8.898335s, 39.2208 runs/s, 284.0981 assertions/s.
+349 runs, 2528 assertions, 0 failures, 0 errors, 0 skips
+Coverage report generated for Rails to /Users/anthony/Projects/hive/hyperion/coverage/rails. 3098 / 3675 LOC (84.3%) covered.
+       11.84 real         6.77 user         1.05 sys
+           399360000  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               70567  page reclaims
+                 926  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                9304  messages sent
+                9301  messages received
+                  19  signals received
+               13625  voluntary context switches
+               20259  involuntary context switches
+         67469927383  instructions retired
+         20764923237  cycles elapsed
+           343524408  peak memory footprint

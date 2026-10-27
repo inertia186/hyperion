@@ -40,4 +40,31 @@ class PostCurationAssociationsTest < ActiveSupport::TestCase
     assert_equal community.title, past_tag.fetch(:name)
     assert past_tag.fetch(:image_url).present?
   end
+
+  test 'loaded tags preserve response order and resolve cross posts without per-post queries' do
+    metadata_cross_post = posts(:allowed_unread)
+    metadata_cross_post.update!(metadata: {'tags' => ['cross-post']})
+    tagged_cross_post = posts(:read_allowed)
+    tagged_cross_post.update!(metadata: {})
+    tagged_cross_post.tags.create!(tag: 'cross-post')
+    untagged_post = posts(:muted_unread)
+    untagged_post.update!(metadata: {})
+    untagged_post.tags.destroy_all
+    ids = [metadata_cross_post.id, tagged_cross_post.id, untagged_post.id]
+    page = Post.where(id: ids).select(Post::LIST_COLUMNS).to_a
+    expected_tags = Tag.where(post_id: ids).order(:id).pluck(:post_id, :tag, :category).group_by(&:first)
+
+    result = PostCurationAssociations.new(
+      account: accounts(:curated), posts: page, post_ids: ids,
+      all_posts: Post.where(id: ids), tag: '', author: nil
+    ).call
+
+    assert_equal expected_tags, result.post_tags
+    assert_no_queries do
+      assert_equal(
+        {metadata_cross_post.id => true, tagged_cross_post.id => true, untagged_post.id => false},
+        page.to_h { |post| [post.id, post.cross_post?] }
+      )
+    end
+  end
 end

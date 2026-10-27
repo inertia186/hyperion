@@ -1,0 +1,30 @@
+Indexing iteration 0/10 complete (warmup)
+Indexing iteration 1/10 complete
+Indexing iteration 2/10 complete
+Indexing iteration 3/10 complete
+Indexing iteration 4/10 complete
+Indexing iteration 5/10 complete
+Indexing iteration 6/10 complete
+Indexing iteration 7/10 complete
+Indexing iteration 8/10 complete
+Indexing iteration 9/10 complete
+Indexing iteration 10/10 complete
+Results: benchmarks/baselines/2026-10-25-index-tags-relation-after.json; 0 failed correctness checks
+      201.13 real       104.75 user         5.71 sys
+           141869056  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               36974  page reclaims
+                 236  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+              345371  messages sent
+              346359  messages received
+                   5  signals received
+              348730  voluntary context switches
+               41086  involuntary context switches
+        369219066173  instructions retired
+        215141835829  cycles elapsed
+           130663096  peak memory footprint

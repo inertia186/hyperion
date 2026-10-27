@@ -1,0 +1,22 @@
+Seeding inbox: 10,000 posts, 500 authors
+Inbox round 1/2 complete
+Inbox round 2/2 complete
+Results: tmp/hills-keyword-rows-1.json; 0 failed correctness checks
+       58.63 real        17.03 user         2.43 sys
+           151764992  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               28694  page reclaims
+                 946  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+               28802  messages sent
+               32581  messages received
+                   5  signals received
+               33762  voluntary context switches
+                9999  involuntary context switches
+        118876588714  instructions retired
+         49098658327  cycles elapsed
+           143295136  peak memory footprint

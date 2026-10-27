@@ -156,14 +156,10 @@ class PostsController < ApplicationController
     post_ids = [params[:post_ids]].flatten
     mark_tag_read = [params[:mark_tag_read]].flatten.compact
     
-    post_ids.each do |id|
-      current_account.mark_post_as_read!(id)
-    end
+    current_account.mark_posts_as_read!(Post.where(id: post_ids))
     
     if mark_tag_read.size > 0
-      Post.active.tagged_any(mark_tag_read).unread(by: current_account).find_each do |post|
-        ReadPost.find_or_create_by(account: current_account, post: post)
-      end
+      current_account.mark_posts_as_read!(Post.active.tagged_any(mark_tag_read).unread(by: current_account))
     end
     
     redirect_to posts_url(sort: @sort, limit: @limit, tag: @tag_pattern)

@@ -1,0 +1,90 @@
+{
+  "cases": {
+    "full": {
+      "requests": [
+        2,
+        1
+      ],
+      "p95_ms": [
+        42.6320000551641,
+        23.858999833464622
+      ],
+      "p95_reduction_percent": 44.03499764826414,
+      "median_allocations": [
+        3810,
+        3745
+      ]
+    },
+    "patch": {
+      "requests": [
+        2,
+        1
+      ],
+      "p95_ms": [
+        47.310000052675605,
+        25.889000156894326
+      ],
+      "p95_reduction_percent": 45.27795365024486,
+      "median_allocations": [
+        4560,
+        4510
+      ]
+    },
+    "empty_history": {
+      "requests": [
+        2,
+        1
+      ],
+      "p95_ms": [
+        49.060000106692314,
+        23.101000115275383
+      ],
+      "p95_reduction_percent": 52.91275975328797,
+      "median_allocations": [
+        3333,
+        3283
+      ]
+    },
+    "cross_post": {
+      "requests": [
+        3,
+        2
+      ],
+      "p95_ms": [
+        61.369000002741814,
+        50.002000061795115
+      ],
+      "p95_reduction_percent": 18.522380909643054,
+      "median_allocations": [
+        3778,
+        3726
+      ]
+    },
+    "upstream_error": {
+      "requests": [
+        2,
+        1
+      ],
+      "p95_ms": [
+        45.418000081554055,
+        25.019000051543117
+      ],
+      "p95_reduction_percent": 44.91391076969885,
+      "median_allocations": [
+        2649,
+        2599
+      ]
+    }
+  },
+  "harness_unchanged": true,
+  "payloads_unchanged": true,
+  "total_measured_hafbe_fetches": [
+    220,
+    120
+  ],
+  "peak_process_rss_mib": [
+    145.078125,
+    143.4375
+  ],
+  "target_met": true
+}

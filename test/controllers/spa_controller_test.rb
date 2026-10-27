@@ -16,5 +16,7 @@ class SpaControllerTest < ActionController::TestCase
 
     assert_response :success
     assert_select '#root', count: 1
+    assert_select 'script[src="https://cdn.jsdelivr.net/npm/@hiveio/hive-js/dist/hive.min.js"]', count: 0
+    assert_select 'meta[name="hive-api-url"]', count: 0
   end
 end

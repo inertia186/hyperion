@@ -57,6 +57,18 @@ class Account < ApplicationRecord
   def mark_post_as_read!(id)
     read_posts.find_or_create_by(post_id: id)
   end
+
+  def mark_posts_as_read!(posts)
+    marked_count = 0
+    posts.in_batches(of: 1000) do |batch|
+      ids = batch.order(:id).pluck(:id)
+      # The post scope checks existence; the unique index protects retries and concurrent inserts.
+      read_posts.insert_all(ids.map { |id| {post_id: id, created_at: Time.current} },
+        unique_by: :index_read_posts_account_id_post_id)
+      marked_count += ids.size
+    end
+    marked_count
+  end
   
   def mark_post_as_unread!(id)
     read_post = read_posts.find_by(post_id: id)

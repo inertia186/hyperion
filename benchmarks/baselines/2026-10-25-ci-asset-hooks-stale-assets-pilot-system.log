@@ -1,0 +1,79 @@
+
+> hyperion@2.35.0 build
+> esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets
+
+
+  app/assets/builds/application.js  1.3mb ⚠️
+
+⚡ Done in 39ms
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+
+
+Run options: --seed 6604
+
+# Running:
+
+Capybara starting Puma...
+* Version 8.0.2, codename: Into the Arena
+* Min threads: 0, max threads: 4
+* Listening on http://127.0.0.1:49899
+[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_legacy_posts_page_sets_up_tag_search_and_opens_a_preview.png 
+F
+
+Failure:
+LegacyPostsTest#test_legacy_posts_page_sets_up_tag_search_and_opens_a_preview [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/legacy_posts_test.rb:4
+
+[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_social_signs_in_with_Keychain_and_sees_the_curation_inbox.png 
+F
+
+Failure:
+LoginTest#test_social_signs_in_with_Keychain_and_sees_the_curation_inbox [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/login_test.rb:12
+
+.[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_toolbar_controls_fit_mobile_tablet_and_desktop_widths.png 
+F
+
+Failure:
+CurationInboxTest#test_toolbar_controls_fit_mobile_tablet_and_desktop_widths [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/curation_inbox_test.rb:85
+
+[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_keyboard_focus_remains_visible_with_normal_and_forced_colors.png 
+F
+
+Failure:
+CurationInboxTest#test_keyboard_focus_remains_visible_with_normal_and_forced_colors [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/curation_inbox_test.rb:46
+
+[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_compiled_styles_preserve_themes_and_responsive_controls.png 
+F
+
+Failure:
+CurationInboxTest#test_compiled_styles_preserve_themes_and_responsive_controls [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/curation_inbox_test.rb:16
+
+[Screenshot Image]: /Users/anthony/Projects/hive/hyperion/tmp/screenshots/failures_test_selecting_a_post_renders_its_body_in_the_preview.png 
+F
+
+Failure:
+CurationInboxTest#test_selecting_a_post_renders_its_body_in_the_preview [test/application_system_test_case.rb:44]:
+expected "/sessions" to equal "/"
+
+bin/rails test test/system/curation_inbox_test.rb:4
+
+
+
+Finished in 26.510265s, 0.2640 runs/s, 1.3580 assertions/s.
+7 runs, 36 assertions, 6 failures, 0 errors, 0 skips

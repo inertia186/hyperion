@@ -1,0 +1,12 @@
+100 expired_requested complete
+100 corrupt_requested complete
+100 concurrent_hits complete
+100 concurrent_misses complete
+1000 expired_requested complete
+1000 corrupt_requested complete
+1000 concurrent_hits complete
+1000 concurrent_misses complete
+10000 expired_requested complete
+10000 corrupt_requested complete
+10000 concurrent_hits complete
+10000 concurrent_misses complete

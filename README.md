@@ -26,6 +26,27 @@ rake db:create
 rake db:seed
 ```
 
+# Tests
+
+Use the Ruby version in `.ruby-version`, Node version in `.nvmrc` (Node 26), and
+PostgreSQL 16 to match CI.
+Start the system PostgreSQL service before preparing the test database. On macOS
+with Homebrew PostgreSQL 16 installed, this starts it now and at login:
+
+```sh
+brew services start postgresql@16
+```
+
+Rails connects through the local PostgreSQL socket as your operating-system user,
+using `hyperion_development` for development and `hyperion_test` for tests.
+Use `DATABASE_URL` to override the connection.
+
+```sh
+nvm use
+RAILS_ENV=test bundle exec rails db:create db:schema:load
+bundle exec rake test
+```
+
 # Post heading links
 
 Rendered headings have generated fragment IDs in API HTML and both preview

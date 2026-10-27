@@ -11,6 +11,7 @@ require 'uri'
 class ImageProxy
   CACHE_ROOT = Rails.root.join('tmp/cache/images')
   CACHE_TTL = 7.days
+  CLEANUP_INTERVAL = 1.minute
   MAX_BYTES = 5.megabytes
   OPEN_TIMEOUT = 2
   READ_TIMEOUT = 5
@@ -52,6 +53,9 @@ class ImageProxy
       FileUtils.rm_f(cache_root.join("#{basename}.bin"))
     rescue ArgumentError, KeyError, JSON::ParserError
       FileUtils.rm_f(metadata_path)
+      FileUtils.rm_f(metadata_path.sub_ext('.bin'))
+    rescue Errno::ENOENT
+      next
     end
   end
 
@@ -76,7 +80,16 @@ class ImageProxy
   end
 
   def cleanup_expired!
-    self.class.cleanup_expired!(cache_root: @cache_root)
+    FileUtils.mkdir_p(@cache_root)
+    File.open(@cache_root.join('.cleanup.lock'), File::RDWR | File::CREAT, 0o600) do |checkpoint|
+      return unless checkpoint.flock(File::LOCK_EX | File::LOCK_NB)
+      return if checkpoint.read.to_f > CLEANUP_INTERVAL.ago.to_f
+
+      self.class.cleanup_expired!(cache_root: @cache_root)
+      checkpoint.rewind
+      checkpoint.write(Time.current.to_f.to_s)
+      checkpoint.truncate(checkpoint.pos)
+    end
   end
 
 private
@@ -138,9 +151,11 @@ private
     end
 
     Result.new(body: body_path.binread, content_type: metadata.fetch('content_type'), cache_key: cache_key)
-  rescue ArgumentError, KeyError
+  rescue ArgumentError, KeyError, JSON::ParserError
     FileUtils.rm_f(metadata_path)
     FileUtils.rm_f(body_path)
+    nil
+  rescue Errno::ENOENT
     nil
   end
 

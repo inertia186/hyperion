@@ -1,0 +1,168 @@
+{
+  "commit": "ff12a97379f6eb475ffea44f2827325aa6f982a1",
+  "revisions": {
+    "full": {
+      "requests": 2,
+      "p95_ms": 45.54200009442866
+    },
+    "patch": {
+      "requests": 2,
+      "p95_ms": 46.193000162020326
+    },
+    "empty_history": {
+      "requests": 2,
+      "p95_ms": 46.267000027000904
+    },
+    "cross_post": {
+      "requests": 3,
+      "p95_ms": 72.33599992468953
+    },
+    "upstream_error": {
+      "requests": 2,
+      "p95_ms": 43.32099994644523
+    }
+  },
+  "content_reuse": {
+    "stats_then_payout": {
+      "rpc_calls": 4,
+      "content_calls": 2,
+      "p95_ms": 36.37199988588691,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "payout_then_stats": {
+      "rpc_calls": 4,
+      "content_calls": 2,
+      "p95_ms": 32.52599993720651,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "warm_revisit": {
+      "rpc_calls": 0,
+      "content_calls": 0,
+      "p95_ms": 2.0699999295175076,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "expired": {
+      "rpc_calls": 4,
+      "content_calls": 2,
+      "p95_ms": 35.98699998110533,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "forced_refresh": {
+      "rpc_calls": 3,
+      "content_calls": 1,
+      "p95_ms": 29.43199989385903,
+      "payout_values": [
+        "2.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "different_identity": {
+      "rpc_calls": 8,
+      "content_calls": 4,
+      "p95_ms": 72.308000177145,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD",
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    },
+    "different_account": {
+      "rpc_calls": 0,
+      "content_calls": 0,
+      "p95_ms": 2.529999939724803,
+      "payout_values": [
+        "1.000 HBD",
+        "1.000 HBD"
+      ]
+    }
+  },
+  "preview": {
+    "rapid": {
+      "issued_per_trace": [
+        10
+      ],
+      "obsolete_completions_per_trace": [
+        9
+      ],
+      "aborts_per_trace": [
+        0
+      ],
+      "peak_in_flight": 10,
+      "p95_latest_ready_ms": 300
+    },
+    "clear": {
+      "issued_per_trace": [
+        1
+      ],
+      "obsolete_completions_per_trace": [
+        1
+      ],
+      "aborts_per_trace": [
+        0
+      ],
+      "peak_in_flight": 1,
+      "p95_latest_ready_ms": null
+    },
+    "unmount": {
+      "issued_per_trace": [
+        1
+      ],
+      "obsolete_completions_per_trace": [
+        1
+      ],
+      "aborts_per_trace": [
+        0
+      ],
+      "peak_in_flight": 1,
+      "p95_latest_ready_ms": null
+    },
+    "error_recovery": {
+      "issued_per_trace": [
+        2
+      ],
+      "obsolete_completions_per_trace": [
+        0
+      ],
+      "aborts_per_trace": [
+        0
+      ],
+      "peak_in_flight": 1,
+      "p95_latest_ready_ms": 300
+    }
+  },
+  "response_validation": {
+    "scope": "HAFBE HTTP JSON boundary; condenser decoded-result boundary after hive-ruby envelope handling",
+    "malformed": 22,
+    "rejected_malformed": 1,
+    "valid_accepted": 13,
+    "large_valid_boundary_p95_ms": {
+      "hafbe_5000": 4.735999973490834,
+      "get_active_votes": 0.00100000761449337,
+      "get_content_replies": 0.00100000761449337,
+      "get_content": 0.00100000761449337
+    },
+    "components": {
+      "hafbe": {
+        "malformed": 8,
+        "rejected": 1
+      },
+      "condenser": {
+        "malformed": 14,
+        "rejected": 0
+      }
+    }
+  }
+}

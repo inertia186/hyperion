@@ -1,0 +1,25 @@
+
+Run options: --seed 6604
+
+# Running:
+
+............................................................................................................................................F
+
+Failure:
+PostPayoutRefreshTest#test_batch_preflight_timeout_does_not_permanently_mark_posts_unavailable [test/services/post_payout_refresh_test.rb:156]:
+Expected 2026-10-25 18:09:17.350625000 UTC +00:00 to be nil.
+
+bin/rails test test/services/post_payout_refresh_test.rb:145
+
+......F
+
+Failure:
+PostPayoutRefreshTest#test_counts_invalid_Hive_parameters_as_unavailable_instead_of_failed [test/services/post_payout_refresh_test.rb:122]:
+Expected 2026-10-25 18:09:17.397929000 UTC +00:00 to be nil.
+
+bin/rails test test/services/post_payout_refresh_test.rb:111
+
+.......................................................................................................................................................................................................................
+
+Finished in 9.982977s, 36.3619 runs/s, 263.8492 assertions/s.
+363 runs, 2634 assertions, 2 failures, 0 errors, 0 skips

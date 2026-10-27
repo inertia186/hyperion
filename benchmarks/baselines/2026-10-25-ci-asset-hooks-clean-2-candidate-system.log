@@ -1,0 +1,13 @@
+
+Run options: --seed 20261025
+
+# Running:
+
+Capybara starting Puma...
+* Version 8.0.2, codename: Into the Arena
+* Min threads: 0, max threads: 4
+* Listening on http://127.0.0.1:50928
+.......
+
+Finished in 8.477809s, 0.8257 runs/s, 21.8217 assertions/s.
+7 runs, 185 assertions, 0 failures, 0 errors, 0 skips

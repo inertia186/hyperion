@@ -1,4 +1,6 @@
 class PostCurationQuery
+  MODES = %i(unread keyword read ignored deleted blacklisted).freeze
+
   attr_reader :account, :params, :session, :query_state, :relation, :all_posts,
     :posts, :post_ids, :read_post_ids, :post_tags, :post_communities,
     :post_bodies, :related_tags, :related_authors, :related_communities, :past_tags,
@@ -68,32 +70,51 @@ private
   end
 
   def build_relation
-    @mode_counts = build_mode_counts
-    @muted_posts_count = build_muted_posts_count
-    @signal_counts = build_signal_counts
+    if keyword_terms.any?
+      build_keyword_counts
+    else
+      @mode_counts = build_mode_counts
+      @muted_posts_count = muted_posts_relation.count
+      @signal_counts = build_signal_counts
+    end
     @all_posts = apply_signal(relation_for_mode(selected_mode))
     @relation = apply_sort(@all_posts.select(Post::LIST_COLUMNS))
   end
 
   def build_mode_counts
-    {
-      unread: relation_for_mode(:unread).count,
-      keyword: relation_for_mode(:keyword).count,
-      read: relation_for_mode(:read).count,
-      ignored: relation_for_mode(:ignored).count,
-      deleted: relation_for_mode(:deleted).count,
-      blacklisted: relation_for_mode(:blacklisted).count
-    }
+    MODES.index_with { |mode| relation_for_mode(mode).count }
   end
 
-  def build_muted_posts_count
-    relation = base_filter_relation(apply_muted_filter: false).
+  def build_keyword_counts
+    search_scope = Post.from('keyword_posts AS posts')
+    scopes = MODES.index_with { |mode| relation_for_mode(mode, search_scope: search_scope) }
+    scopes[:muted_posts] = muted_posts_relation(search_scope: search_scope)
+    PostCurationSignal::SIGNALS.each do |signal|
+      relation = signal_count_relation(signal, search_scope: search_scope)
+      scopes[signal] = PostCurationSignal.apply(relation, signal: signal, tag: @tag, account: account)
+    end
+
+    connection = Post.connection
+    count_sql = scopes.map do |name, scope|
+      "(#{scope.reselect('COUNT(*)').to_sql}) AS #{connection.quote_column_name(name)}"
+    end.join(', ')
+    # All count variants reuse the same text-search scan within this statement.
+    counts = connection.select_one(<<~SQL.squish, 'Keyword curation counts')
+      WITH keyword_posts AS MATERIALIZED (#{search_posts.select(Post::LIST_COLUMNS).to_sql})
+      SELECT #{count_sql}
+    SQL
+    @mode_counts = MODES.index_with { |mode| counts.fetch(mode.to_s) }
+    @muted_posts_count = counts.fetch('muted_posts')
+    @signal_counts = PostCurationSignal::SIGNALS.index_with { |signal| counts.fetch(signal) }
+  end
+
+  def muted_posts_relation(search_scope: search_posts)
+    relation = base_filter_relation(apply_muted_filter: false, search_scope: search_scope).
       active.
       unread(by: account, include_muted: true)
 
     without_low_reputation(without_blacklist_sources(relation)).
-      where(author: account.reload.muted_authors).
-      count
+      where(author: account.reload.muted_authors)
   end
 
   def build_signal_counts
@@ -112,14 +133,14 @@ private
     :unread
   end
 
-  def relation_for_mode(mode, include_poisoned_authors: @signal == PostCurationSignal::POISONED_PILLS)
-    relation = base_filter_relation(apply_keyword_filter: mode != :keyword)
+  def relation_for_mode(mode, include_poisoned_authors: @signal == PostCurationSignal::POISONED_PILLS, search_scope: search_posts)
+    relation = base_filter_relation(search_scope: search_scope)
 
     case mode
     when :read
       without_blacklist_sources(relation.active).where(id: account.read_posts.select(:post_id))
     when :keyword
-      @query.present? ? keyword_filter(Post.all) : Post.all
+      search_scope
     when :ignored
       ignored_relation = without_blacklist_sources(relation.active)
       ignored_relation.where(id: Tag.where(tag: ignored_tags).select(:post_id)).
@@ -140,10 +161,11 @@ private
     PostCurationSignal.apply(relation, signal: @signal, tag: @tag, account: account)
   end
 
-  def signal_count_relation(signal)
+  def signal_count_relation(signal, search_scope: search_posts)
     relation_for_mode(
       selected_mode,
-      include_poisoned_authors: selected_mode == :unread && signal == PostCurationSignal::POISONED_PILLS
+      include_poisoned_authors: selected_mode == :unread && signal == PostCurationSignal::POISONED_PILLS,
+      search_scope: search_scope
     )
   end
 
@@ -171,8 +193,8 @@ private
     "EXISTS (SELECT 1 FROM json_array_elements(posts.blacklist_reasons) AS blacklist_reason WHERE blacklist_reason->>'account' IN (?))"
   end
 
-  def base_filter_relation(apply_muted_filter: true, apply_keyword_filter: true)
-    relation = Post.tagged_any(@tag)
+  def base_filter_relation(apply_muted_filter: true, search_scope: search_posts)
+    relation = search_scope.tagged_any(@tag)
     relation = relation.tagged_all(@other_tags) if @other_tags.any?
     relation = relation.where.not(id: Tag.where(tag: @without_tags).select(:post_id)) if @without_tags.any?
     relation = relation.author(@author) if @author
@@ -185,15 +207,14 @@ private
       end
     end
 
-    relation = keyword_filter(relation) if apply_keyword_filter && @query
     relation = relation.where.not(author: account.reload.muted_authors) if apply_muted_filter && muted_authors_enabled?
     relation = relation.where(id: Tag.where(tag: account.favorite_tags.select(:tag)).select(:post_id)) if only_favorite_tags?
 
     relation
   end
 
-  def keyword_filter(relation, query = @query)
-    PostKeywordSearch.new(query).apply(relation)
+  def search_posts
+    keyword_search.apply(Post.all)
   end
 
   def keyword_terms
@@ -201,7 +222,7 @@ private
   end
 
   def load_page
-    @total_count = @all_posts.count
+    @total_count = @signal.present? ? signal_counts.fetch(@signal) : mode_counts.fetch(selected_mode)
     @posts = @relation.offset((page - 1) * limit).limit(limit).to_a
     @post_ids = @posts.map(&:id)
   end

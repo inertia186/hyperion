@@ -1,0 +1,44 @@
+{
+  "malformed_rejected": [
+    1,
+    22
+  ],
+  "malformed_total": 22,
+  "valid_preserved": 13,
+  "error_controls_preserved": 2,
+  "large_valid_cost": {
+    "hafbe_5000": {
+      "p95_ms": [
+        4.990999819710851,
+        5.367000121623278
+      ],
+      "added_p95_ms": 0.37600030191242695
+    },
+    "get_active_votes": {
+      "p95_ms": [
+        0.00100000761449337,
+        13.642000034451485
+      ],
+      "added_p95_ms": 13.641000026836991
+    },
+    "get_content_replies": {
+      "p95_ms": [
+        0.00100000761449337,
+        0.16499985940754414
+      ],
+      "added_p95_ms": 0.16399985179305077
+    },
+    "get_content": {
+      "p95_ms": [
+        0.00100000761449337,
+        0.00100000761449337
+      ],
+      "added_p95_ms": 0.0
+    }
+  },
+  "peak_process_rss_mib": [
+    144.109375,
+    148.96875
+  ],
+  "target_met": true
+}

@@ -1,0 +1,207 @@
+{
+  "recorded_at": "2026-10-25T16:56:15.415994+00:00",
+  "commit": "ff12a97379f6eb475ffea44f2827325aa6f982a1",
+  "working_tree": [
+    " M .github/workflows/tests.yml",
+    " M Gemfile",
+    " M Gemfile.lock",
+    " M README.md",
+    " M app/controllers/api/v1/posts_controller.rb",
+    " M app/controllers/posts_controller.rb",
+    " M app/frontend/entrypoints/application.jsx",
+    " M app/frontend/src/App.test.jsx",
+    " M app/models/account.rb",
+    " M app/services/hafsql_post_indexer.rb",
+    " M app/services/hyperion_agent.rb",
+    " M app/services/image_proxy.rb",
+    " M app/services/post_curation_associations.rb",
+    " M app/services/post_curation_query.rb",
+    " M app/services/post_curation_signal.rb",
+    " M app/views/layouts/spa.html.haml",
+    " M bin/rails",
+    " M config/database.yml",
+    " M test/controllers/api/v1/agent_controller_test.rb",
+    " M test/controllers/api/v1/posts_controller_test.rb",
+    " M test/controllers/posts_controller_test.rb",
+    " M test/controllers/spa_controller_test.rb",
+    " M test/services/hafsql_post_indexer_test.rb",
+    " M test/services/image_proxy_test.rb",
+    " M test/services/post_curation_associations_test.rb",
+    " M test/test_helper.rb",
+    "?? HILLS.md",
+    "?? benchmarks/",
+    "?? test/coverage.rb",
+    "?? test/models/bulk_read_test.rb",
+    "?? test/services/post_curation_query_test.rb",
+    "?? test/services/post_curation_signal_test.rb"
+  ],
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "browser": "151.0.7872.0",
+  "groups": [
+    {
+      "profile": "desktop",
+      "cache": "cold",
+      "before": {
+        "samples": 20,
+        "p50_ms": 962.25,
+        "p95_ms": 985.7999999523163,
+        "js_compressed_bytes": 423420,
+        "cpu_median_ms": {
+          "ScriptDuration": 102.1135,
+          "V8CompileDuration": 0.245,
+          "TaskDuration": 158.10399999999998,
+          "RecalcStyleDuration": 7.390499999999999,
+          "LayoutDuration": 12.964500000000001
+        }
+      },
+      "after": {
+        "samples": 20,
+        "p50_ms": 753.8500000238419,
+        "p95_ms": 810.7000000476837,
+        "js_compressed_bytes": 266709,
+        "cpu_median_ms": {
+          "ScriptDuration": 66.656,
+          "V8CompileDuration": 0.1855,
+          "TaskDuration": 120.4735,
+          "RecalcStyleDuration": 7.2475000000000005,
+          "LayoutDuration": 13.077
+        }
+      },
+      "p95_reduction_percent": 17.762223565946666
+    },
+    {
+      "profile": "desktop",
+      "cache": "revisit",
+      "before": {
+        "samples": 20,
+        "p50_ms": 295.75,
+        "p95_ms": 296.90000009536743,
+        "js_compressed_bytes": 0,
+        "cpu_median_ms": {
+          "ScriptDuration": 29.194,
+          "V8CompileDuration": 0.032,
+          "TaskDuration": 75.031,
+          "RecalcStyleDuration": 6.250500000000001,
+          "LayoutDuration": 2.448
+        },
+        "first_action_p95_ms": {
+          "preview": 81.5,
+          "settings": 17.200000047683716,
+          "timeline": 101.59999990463257,
+          "revision": 101,
+          "walletApproval": 101.69999980926514
+        }
+      },
+      "after": {
+        "samples": 20,
+        "p50_ms": 284.40000009536743,
+        "p95_ms": 295.7000000476837,
+        "js_compressed_bytes": 0,
+        "cpu_median_ms": {
+          "ScriptDuration": 24.853,
+          "V8CompileDuration": 0.009500000000000001,
+          "TaskDuration": 66.0295,
+          "RecalcStyleDuration": 6.4115,
+          "LayoutDuration": 2.4785
+        },
+        "first_action_p95_ms": {
+          "preview": 82.10000014305115,
+          "settings": 16.799999952316284,
+          "timeline": 101.20000004768372,
+          "revision": 101.39999985694885,
+          "walletApproval": 100.79999995231628
+        }
+      },
+      "p95_reduction_percent": 0.4041765063315106
+    },
+    {
+      "profile": "mobile",
+      "cache": "cold",
+      "before": {
+        "samples": 20,
+        "p50_ms": 3011.1999999284744,
+        "p95_ms": 3028.9000000953674,
+        "js_compressed_bytes": 423420,
+        "cpu_median_ms": {
+          "ScriptDuration": 312.8975,
+          "V8CompileDuration": 0.9325,
+          "TaskDuration": 490.057,
+          "RecalcStyleDuration": 18.073999999999998,
+          "LayoutDuration": 39.703
+        }
+      },
+      "after": {
+        "samples": 20,
+        "p50_ms": 2248.6999999284744,
+        "p95_ms": 2269.7000000476837,
+        "js_compressed_bytes": 266709,
+        "cpu_median_ms": {
+          "ScriptDuration": 226.7655,
+          "V8CompileDuration": 0.579,
+          "TaskDuration": 403.43100000000004,
+          "RecalcStyleDuration": 18.9555,
+          "LayoutDuration": 40.3985
+        }
+      },
+      "p95_reduction_percent": 25.065205190788063
+    },
+    {
+      "profile": "mobile",
+      "cache": "revisit",
+      "before": {
+        "samples": 20,
+        "p50_ms": 655.4000000953674,
+        "p95_ms": 677.5,
+        "js_compressed_bytes": 0,
+        "cpu_median_ms": {
+          "ScriptDuration": 95.714,
+          "V8CompileDuration": 0.0315,
+          "TaskDuration": 242.406,
+          "RecalcStyleDuration": 16.584,
+          "LayoutDuration": 5.7825
+        },
+        "first_action_p95_ms": {
+          "preview": 147,
+          "settings": 39.299999952316284,
+          "timeline": 208.29999995231628,
+          "revision": 151.39999985694885,
+          "walletApproval": 151.90000009536743
+        }
+      },
+      "after": {
+        "samples": 20,
+        "p50_ms": 623.8999999761581,
+        "p95_ms": 646.5,
+        "js_compressed_bytes": 0,
+        "cpu_median_ms": {
+          "ScriptDuration": 79.5265,
+          "V8CompileDuration": 0.01,
+          "TaskDuration": 211.437,
+          "RecalcStyleDuration": 16.8655,
+          "LayoutDuration": 6.182
+        },
+        "first_action_p95_ms": {
+          "preview": 146.59999990463257,
+          "settings": 39.799999952316284,
+          "timeline": 205.60000014305115,
+          "revision": 151.89999985694885,
+          "walletApproval": 150.79999995231628
+        }
+      },
+      "p95_reduction_percent": 4.575645756457569
+    }
+  ],
+  "byte_reduction_percent": 37.01076944877427,
+  "desktop_latency_target_met": false,
+  "mobile_latency_target_met": true,
+  "source_sha256": {
+    "before": {
+      "entrypoint": "86d9f7f75ba57e5f49b16e9c3f1ccea5e40c9c3054e6035b60622d7bb56ef1c7",
+      "layout": "ec638bc7787598c730c7abf8ae811cf44a5bfe546d49f6b43c234c5fae3d3be4"
+    },
+    "after": {
+      "entrypoint": "8ad306a2d462b7684d8d1acdb5da10084e5648f3e0975ca654f1f7a2c0b01940",
+      "layout": "19da4127f26534e0942fca2b5c0fa5d6af2615af11c75f3cf02fb93411709ec1"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+Indexing iteration 0/10 complete (warmup)
+Indexing iteration 1/10 complete
+Indexing iteration 2/10 complete
+Indexing iteration 3/10 complete
+Indexing iteration 4/10 complete
+Indexing iteration 5/10 complete
+Indexing iteration 6/10 complete
+Indexing iteration 7/10 complete
+Indexing iteration 8/10 complete
+Indexing iteration 9/10 complete
+Indexing iteration 10/10 complete
+Results: benchmarks/baselines/2026-10-25-index-tags-scope-after.json; 0 failed correctness checks
+      114.06 real        66.95 user         3.69 sys
+           143917056  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               32869  page reclaims
+                 914  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+              345370  messages sent
+              346359  messages received
+                   5  signals received
+              348777  voluntary context switches
+               19348  involuntary context switches
+        364358165255  instructions retired
+        177700293673  cycles elapsed
+           131187384  peak memory footprint

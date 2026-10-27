@@ -13,6 +13,10 @@ development:
 test:
   <<: *default
   database: hyperion_test
+<% if RUBY_PLATFORM.include?('darwin') %>
+  # Avoid libpq's macOS GSS crash when parallel test workers reconnect after fork.
+  gssencmode: disable
+<% end %>
 
 production:
   <<: *default

@@ -1,0 +1,18 @@
+
+Run options: --seed 6604
+
+# Running:
+
+...........................................................................................................................................F
+
+Failure:
+PostPayoutRefreshTest#test_refreshes_payouts_for_recent_posts_up_to_the_limit [test/services/post_payout_refresh_test.rb:24]:
+Expected: "1.000 HBD"
+  Actual: "2.000 HBD"
+
+bin/rails test test/services/post_payout_refresh_test.rb:4
+
+...............................................................................................................................................................................................................................
+
+Finished in 9.406161s, 38.5917 runs/s, 279.3913 assertions/s.
+363 runs, 2628 assertions, 1 failures, 0 errors, 0 skips

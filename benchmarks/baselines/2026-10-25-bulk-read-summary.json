@@ -1,0 +1,540 @@
+{
+  "samples_per_version": 140,
+  "responses_equal": true,
+  "changed_sources": [
+    "app/controllers/api/v1/posts_controller.rb",
+    "app/controllers/posts_controller.rb",
+    "app/models/account.rb",
+    "app/services/hyperion_agent.rb"
+  ],
+  "groups": [
+    {
+      "caller": "api",
+      "all_matching": false,
+      "size": 1,
+      "before": {
+        "sql_calls": 15.0,
+        "wall_ms": 7.625999976880848,
+        "allocations": 5726.0,
+        "sql_ms": 2.481000032275915,
+        "transaction_ms": 2.9349999967962503,
+        "p95_ms": 10.322999907657504
+      },
+      "samples": 20,
+      "after": {
+        "sql_calls": 7.0,
+        "wall_ms": 4.139500088058412,
+        "allocations": 3064.0,
+        "sql_ms": 1.0634998325258493,
+        "transaction_ms": 0.42750011198222637,
+        "p95_ms": 5.0760000012815
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": false,
+      "size": 100,
+      "before": {
+        "sql_calls": 381,
+        "wall_ms": 138.1330001167953,
+        "allocations": 108200,
+        "sql_ms": 54.652998223900795,
+        "transaction_ms": 88.80499913357198,
+        "p95_ms": 154.75500002503395
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 7,
+        "wall_ms": 7.116999942809343,
+        "allocations": 8793,
+        "sql_ms": 1.2080003507435322,
+        "transaction_ms": 0.26299990713596344,
+        "p95_ms": 7.813999895006418
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": false,
+      "size": 1000,
+      "before": {
+        "sql_calls": 3711.0,
+        "wall_ms": 1488.7159999925643,
+        "allocations": 1046065.0,
+        "sql_ms": 621.2594936368987,
+        "transaction_ms": 1003.4650050802156,
+        "p95_ms": 1616.3800000213087
+      },
+      "samples": 20,
+      "after": {
+        "sql_calls": 8.0,
+        "wall_ms": 64.40599996130913,
+        "allocations": 68129.0,
+        "sql_ms": 33.64299994427711,
+        "transaction_ms": 0.6419999990612268,
+        "p95_ms": 68.71999986469746
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": false,
+      "size": 10000,
+      "before": {
+        "sql_calls": 37011,
+        "wall_ms": 14552.964000031352,
+        "allocations": 10418780,
+        "sql_ms": 6003.084959229454,
+        "transaction_ms": 9774.02000874281,
+        "p95_ms": 14657.141000032425
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 35,
+        "wall_ms": 743.8370001036674,
+        "allocations": 1287784,
+        "sql_ms": 330.2010011393577,
+        "transaction_ms": 0.7090000435709953,
+        "p95_ms": 749.5900001376867
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": true,
+      "size": 1,
+      "before": {
+        "sql_calls": 30.0,
+        "wall_ms": 76.41900016460568,
+        "allocations": 19937.0,
+        "sql_ms": 42.37550066318363,
+        "transaction_ms": 2.2624999983236194,
+        "p95_ms": 81.32300013676286
+      },
+      "samples": 20,
+      "after": {
+        "sql_calls": 28.0,
+        "wall_ms": 75.24950010702014,
+        "allocations": 19316.0,
+        "sql_ms": 43.64249994978309,
+        "transaction_ms": 0.4789999220520258,
+        "p95_ms": 83.40199990198016
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": true,
+      "size": 100,
+      "before": {
+        "sql_calls": 386,
+        "wall_ms": 140.58999996632338,
+        "allocations": 121928,
+        "sql_ms": 60.47600205056369,
+        "transaction_ms": 52.86199948750436,
+        "p95_ms": 149.15399998426437
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 28,
+        "wall_ms": 82.59500004351139,
+        "allocations": 23684,
+        "sql_ms": 47.22100030630827,
+        "transaction_ms": 0.4759998992085457,
+        "p95_ms": 88.56000006198883
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": true,
+      "size": 1000,
+      "before": {
+        "sql_calls": 3626.0,
+        "wall_ms": 955.8614999987185,
+        "allocations": 1050196.0,
+        "sql_ms": 240.07050320506096,
+        "transaction_ms": 531.571501516737,
+        "p95_ms": 1189.5119999535382
+      },
+      "samples": 20,
+      "after": {
+        "sql_calls": 28.0,
+        "wall_ms": 94.15500005707145,
+        "allocations": 63376.0,
+        "sql_ms": 51.27000028733164,
+        "transaction_ms": 0.27950003277510405,
+        "p95_ms": 104.26699998788536
+      }
+    },
+    {
+      "caller": "api",
+      "all_matching": true,
+      "size": 10000,
+      "before": {
+        "sql_calls": 36034,
+        "wall_ms": 14460.785999894142,
+        "allocations": 10336033,
+        "sql_ms": 5970.306954579428,
+        "transaction_ms": 9583.664004225284,
+        "p95_ms": 14476.917000021785
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 52,
+        "wall_ms": 515.053000068292,
+        "allocations": 467616,
+        "sql_ms": 282.43599995039403,
+        "transaction_ms": 0.565999886021018,
+        "p95_ms": 546.5379999950528
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": false,
+      "size": 1,
+      "before": {
+        "sql_calls": 11,
+        "wall_ms": 4.466000013053417,
+        "allocations": 4517,
+        "sql_ms": 0.5609993822872639,
+        "transaction_ms": 1.2070001102983952,
+        "p95_ms": 4.557000007480383
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 7,
+        "wall_ms": 4.335000179708004,
+        "allocations": 3138,
+        "sql_ms": 0.7030002307146788,
+        "transaction_ms": 0.2759997732937336,
+        "p95_ms": 4.548000171780586
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": false,
+      "size": 100,
+      "before": {
+        "sql_calls": 377,
+        "wall_ms": 98.1799999717623,
+        "allocations": 107336,
+        "sql_ms": 20.15500096604228,
+        "transaction_ms": 56.277999421581626,
+        "p95_ms": 98.37000002153218
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 7,
+        "wall_ms": 8.180000120773911,
+        "allocations": 8966,
+        "sql_ms": 1.4400002546608448,
+        "transaction_ms": 0.2649999223649502,
+        "p95_ms": 9.034999879077077
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": false,
+      "size": 1000,
+      "before": {
+        "sql_calls": 3707,
+        "wall_ms": 889.1270000021905,
+        "allocations": 1042804,
+        "sql_ms": 185.64200378023088,
+        "transaction_ms": 530.2790012210608,
+        "p95_ms": 895.069999853149
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 8,
+        "wall_ms": 63.16499994136393,
+        "allocations": 69195,
+        "sql_ms": 35.49000038765371,
+        "transaction_ms": 0.493000028654933,
+        "p95_ms": 67.99099990166724
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": false,
+      "size": 10000,
+      "before": {
+        "sql_calls": 37007,
+        "wall_ms": 14610.510000027716,
+        "allocations": 10397496,
+        "sql_ms": 6082.503969082609,
+        "transaction_ms": 9797.358001349494,
+        "p95_ms": 14814.44099987857
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 35,
+        "wall_ms": 895.5580000765622,
+        "allocations": 1297815,
+        "sql_ms": 448.16099968738854,
+        "transaction_ms": 0.7509998977184296,
+        "p95_ms": 934.3719999305904
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": true,
+      "size": 1,
+      "before": {
+        "sql_calls": 30,
+        "wall_ms": 54.52900007367134,
+        "allocations": 20054,
+        "sql_ms": 41.320000076666474,
+        "transaction_ms": 1.1100000701844692,
+        "p95_ms": 69.19399998150766
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 28,
+        "wall_ms": 82.7409999910742,
+        "allocations": 19472,
+        "sql_ms": 50.07200036197901,
+        "transaction_ms": 0.45499997213482857,
+        "p95_ms": 87.7470001578331
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": true,
+      "size": 100,
+      "before": {
+        "sql_calls": 386,
+        "wall_ms": 144.58000008016825,
+        "allocations": 121782,
+        "sql_ms": 59.011997655034065,
+        "transaction_ms": 54.35600085183978,
+        "p95_ms": 153.42600014992058
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 28,
+        "wall_ms": 94.1079999320209,
+        "allocations": 23840,
+        "sql_ms": 52.70400014705956,
+        "transaction_ms": 0.4889999981969595,
+        "p95_ms": 101.09799983911216
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": true,
+      "size": 1000,
+      "before": {
+        "sql_calls": 3626,
+        "wall_ms": 963.1740001495928,
+        "allocations": 1047617,
+        "sql_ms": 241.00600508973002,
+        "transaction_ms": 533.4800009150058,
+        "p95_ms": 980.9579998254776
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 28,
+        "wall_ms": 110.20100000314415,
+        "allocations": 63531,
+        "sql_ms": 65.9850004594773,
+        "transaction_ms": 0.30899979174137115,
+        "p95_ms": 122.98099999316037
+      }
+    },
+    {
+      "caller": "agent",
+      "all_matching": true,
+      "size": 10000,
+      "before": {
+        "sql_calls": 36034,
+        "wall_ms": 14488.39999991469,
+        "allocations": 10309148,
+        "sql_ms": 5975.719960639253,
+        "transaction_ms": 9555.667991284281,
+        "p95_ms": 14779.160999925807
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 52,
+        "wall_ms": 556.6990000661463,
+        "allocations": 467733,
+        "sql_ms": 318.875000346452,
+        "transaction_ms": 0.599999912083149,
+        "p95_ms": 778.080000076443
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": false,
+      "size": 1,
+      "before": {
+        "sql_calls": 14,
+        "wall_ms": 5.8280001394450665,
+        "allocations": 5676,
+        "sql_ms": 0.7340002339333296,
+        "transaction_ms": 1.6360001172870398,
+        "p95_ms": 6.21100002899766
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 6,
+        "wall_ms": 4.378000041469932,
+        "allocations": 2947,
+        "sql_ms": 0.5060001276433468,
+        "transaction_ms": 0.3029999788850546,
+        "p95_ms": 4.958000034093857
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": false,
+      "size": 100,
+      "before": {
+        "sql_calls": 380,
+        "wall_ms": 94.92299985140562,
+        "allocations": 108689,
+        "sql_ms": 19.41499672830105,
+        "transaction_ms": 52.624000469222665,
+        "p95_ms": 95.63599992543459
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 6,
+        "wall_ms": 6.74000009894371,
+        "allocations": 8676,
+        "sql_ms": 1.1629997752606869,
+        "transaction_ms": 0.33900002017617226,
+        "p95_ms": 7.683000061661005
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": false,
+      "size": 1000,
+      "before": {
+        "sql_calls": 3710,
+        "wall_ms": 908.1430002115667,
+        "allocations": 1045965,
+        "sql_ms": 189.29899740032852,
+        "transaction_ms": 530.175001360476,
+        "p95_ms": 1129.456999944523
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 7,
+        "wall_ms": 81.31799986585975,
+        "allocations": 68010,
+        "sql_ms": 40.777000365778804,
+        "transaction_ms": 0.7760000880807638,
+        "p95_ms": 100.43100011534989
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": false,
+      "size": 10000,
+      "before": {
+        "sql_calls": 37010,
+        "wall_ms": 13654.129999922588,
+        "allocations": 10418730,
+        "sql_ms": 5356.747990008444,
+        "transaction_ms": 9019.99801560305,
+        "p95_ms": 13931.656999979168
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 34,
+        "wall_ms": 803.396999835968,
+        "allocations": 1287692,
+        "sql_ms": 378.6830003373325,
+        "transaction_ms": 0.6580001208931208,
+        "p95_ms": 825.2189999911934
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": true,
+      "size": 1,
+      "before": {
+        "sql_calls": 9,
+        "wall_ms": 4.730999935418367,
+        "allocations": 4630,
+        "sql_ms": 0.7909999694675207,
+        "transaction_ms": 0.5489999894052744,
+        "p95_ms": 5.721000023186207
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 8,
+        "wall_ms": 4.610999953001738,
+        "allocations": 4459,
+        "sql_ms": 1.1640004813671112,
+        "transaction_ms": 0.22699986584484577,
+        "p95_ms": 5.8570001274347305
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": true,
+      "size": 100,
+      "before": {
+        "sql_calls": 276,
+        "wall_ms": 66.30199984647334,
+        "allocations": 80634,
+        "sql_ms": 12.78200140222907,
+        "transaction_ms": 28.797997860237956,
+        "p95_ms": 70.57300000451505
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 8,
+        "wall_ms": 12.09399988874793,
+        "allocations": 8823,
+        "sql_ms": 4.384000087156892,
+        "transaction_ms": 0.3799998667091131,
+        "p95_ms": 12.127000140026212
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": true,
+      "size": 1000,
+      "before": {
+        "sql_calls": 2706,
+        "wall_ms": 865.1839999947697,
+        "allocations": 772375,
+        "sql_ms": 285.9000025782734,
+        "transaction_ms": 470.0709977187216,
+        "p95_ms": 903.7659999448806
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 8,
+        "wall_ms": 43.57900004833937,
+        "allocations": 48515,
+        "sql_ms": 17.319999868050218,
+        "transaction_ms": 0.38499990478157997,
+        "p95_ms": 43.809999944642186
+      }
+    },
+    {
+      "caller": "legacy",
+      "all_matching": true,
+      "size": 10000,
+      "before": {
+        "sql_calls": 27015,
+        "wall_ms": 10698.250000132248,
+        "allocations": 7692390,
+        "sql_ms": 4499.315991066396,
+        "transaction_ms": 6323.713007150218,
+        "p95_ms": 10828.231000108644
+      },
+      "samples": 3,
+      "after": {
+        "sql_calls": 33,
+        "wall_ms": 469.70100002363324,
+        "allocations": 451169,
+        "sql_ms": 260.1119994651526,
+        "transaction_ms": 0.5510000046342611,
+        "p95_ms": 501.6959998756647
+      }
+    }
+  ]
+}

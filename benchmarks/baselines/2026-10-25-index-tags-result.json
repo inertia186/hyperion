@@ -1,0 +1,22 @@
+{
+  "status": "no performance change retained",
+  "attempts": 3,
+  "consecutive_unsuccessful_attempts": 3,
+  "source_restored_sha256": "a5712bc93fdfde4fb52dd89c6940448b939ae1bacaa72724eda88de79b806519",
+  "doubling_target_met": false,
+  "checks_per_run": 95,
+  "runs": [
+    "2026-10-25-index-tags-before.json.gz",
+    "2026-10-25-index-tags-after.json.gz",
+    "2026-10-25-index-tags-repeat-before.json.gz",
+    "2026-10-25-index-tags-repeat-after.json.gz",
+    "2026-10-25-index-tags-scope-after.json.gz",
+    "2026-10-25-index-tags-relation-after.json.gz"
+  ],
+  "comparisons": [
+    "2026-10-25-index-tags-loaded-summary.json",
+    "2026-10-25-index-tags-repeat-summary.json",
+    "2026-10-25-index-tags-scope-summary.json",
+    "2026-10-25-index-tags-relation-summary.json"
+  ]
+}

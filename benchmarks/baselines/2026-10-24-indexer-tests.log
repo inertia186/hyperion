@@ -1,0 +1,21 @@
+
+> hyperion@2.35.0 build
+> esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets
+
+
+  app/assets/builds/application.js  1.3mb ⚠️
+
+⚡ Done in 50ms
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+
+
+Run options: --seed 44136
+
+# Running:
+
+...................................................................................................................................................................................................................................................................................................................................................
+
+Finished in 6.695856s, 50.6283 runs/s, 362.6123 assertions/s.
+339 runs, 2428 assertions, 0 failures, 0 errors, 0 skips

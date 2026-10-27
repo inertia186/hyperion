@@ -1,0 +1,26 @@
+
+> hyperion@2.35.0 build
+> esbuild app/javascript/application.js --bundle --outdir=app/assets/builds --public-path=/assets
+
+
+  app/assets/builds/application.js  1.3mb ⚠️
+
+⚡ Done in 60ms
+
+> hyperion@2.35.0 build:css
+> sass ./app/assets/stylesheets/application.scss:./app/assets/builds/application.css --load-path=node_modules --no-source-map --quiet-deps --silence-deprecation=import
+
+Skipping vite build. Watched files have not changed since the last build at 2026-10-17 15:23:43
+
+Run options: --seed 6604
+
+# Running:
+
+Capybara starting Puma...
+* Version 8.0.2, codename: Into the Arena
+* Min threads: 0, max threads: 4
+* Listening on http://127.0.0.1:53454
+.......
+
+Finished in 8.000096s, 0.8750 runs/s, 23.1247 assertions/s.
+7 runs, 185 assertions, 0 failures, 0 errors, 0 skips

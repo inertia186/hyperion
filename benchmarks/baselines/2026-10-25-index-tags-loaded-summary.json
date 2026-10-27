@@ -1,0 +1,87 @@
+{
+  "limits": {
+    "peak_rss_mib": 256,
+    "measured_transaction_seconds": 10
+  },
+  "cases": {
+    "insert": {
+      "median_ms": [
+        2779.582,
+        2250.028
+      ],
+      "observed_max_ms": [
+        7039.416,
+        4607.486
+      ],
+      "sql_calls": [
+        16008,
+        13008
+      ],
+      "median_allocations": [
+        2673124,
+        2154116
+      ],
+      "median_time_reduction_percent": 19.0515696244975,
+      "median_posts_per_second": [
+        354.011,
+        439.419
+      ],
+      "throughput_ratio": 1.2412580400044064
+    },
+    "edit_delete": {
+      "median_ms": [
+        5248.586,
+        5328.476
+      ],
+      "observed_max_ms": [
+        6853.503,
+        6037.885
+      ],
+      "sql_calls": [
+        12008,
+        10008
+      ],
+      "median_allocations": [
+        2026208,
+        1630280
+      ],
+      "median_time_reduction_percent": -1.5221242445107919,
+      "median_posts_per_second": [
+        180.678,
+        183.73
+      ],
+      "throughput_ratio": 1.0168919292885685
+    },
+    "replay": {
+      "median_ms": [
+        329.228,
+        202.461
+      ],
+      "observed_max_ms": [
+        570.678,
+        253.571
+      ],
+      "sql_calls": [
+        1511,
+        608
+      ],
+      "median_allocations": [
+        486036,
+        318109
+      ],
+      "median_time_reduction_percent": 38.50431919520818
+    }
+  },
+  "before": {
+    "peak_rss_mib": 133.90625,
+    "max_measured_transaction_seconds": 7.013819999992847
+  },
+  "after": {
+    "peak_rss_mib": 134.734375,
+    "max_measured_transaction_seconds": 6.018917999928817
+  },
+  "doubling_target_met": false,
+  "timing_guard_violations": [
+    "edit_delete: median did not improve"
+  ]
+}

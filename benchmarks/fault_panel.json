@@ -1,0 +1,50 @@
+[
+  {
+    "id": "revision_identity",
+    "path": "app/services/hafbe_post_revisions.rb",
+    "old": "value['author'].to_s == post.author && value['permlink'].to_s == post.permlink",
+    "new": "value['author'].to_s == post.author"
+  },
+  {
+    "id": "revision_failed_patch",
+    "path": "app/services/hafbe_post_revisions.rb",
+    "old": "return nil unless match_index",
+    "new": "return replacement unless match_index"
+  },
+  {
+    "id": "revision_order",
+    "path": "app/services/hafbe_post_revisions.rb",
+    "old": ".each_with_object([]) do |revision, unique_revisions|",
+    "new": ".reverse.each_with_object([]) do |revision, unique_revisions|"
+  },
+  {
+    "id": "payout_timeout",
+    "path": "app/services/post_payout_refresh.rb",
+    "old": "result.unavailable += batch.size",
+    "new": "batch.each(&:mark_payout_unavailable!)\n          result.unavailable += batch.size"
+  },
+  {
+    "id": "payout_weight",
+    "path": "app/services/post_payout_refresh.rb",
+    "old": "reward_weight = BigDecimal(chain_value(cashout_info, :reward_weight).presence || '10000') / 10_000",
+    "new": "reward_weight = BigDecimal('1')"
+  },
+  {
+    "id": "payout_cap",
+    "path": "app/services/post_payout_refresh.rb",
+    "old": "estimate = [estimate, max_payout].min if max_payout",
+    "new": "estimate = estimate"
+  },
+  {
+    "id": "read_unread_owner",
+    "path": "app/models/account.rb",
+    "old": "read_post = read_posts.find_by(post_id: id)",
+    "new": "read_post = ReadPost.find_by(post_id: id)"
+  },
+  {
+    "id": "read_timestamp",
+    "path": "app/models/account.rb",
+    "old": "read_posts.insert_all(ids.map",
+    "new": "read_posts.upsert_all(ids.map"
+  }
+]
