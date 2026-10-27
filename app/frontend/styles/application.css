@@ -2283,7 +2283,7 @@ body.mobile-preview-open {
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .curation-desktop-layout {
     grid-template-columns: minmax(0, 1fr) 12px minmax(420px, var(--desktop-preview-width, 65%));
   }

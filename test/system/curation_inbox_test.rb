@@ -1,6 +1,40 @@
 require "application_system_test_case"
 
 class CurationInboxTest < ApplicationSystemTestCase
+  test "laptop widths keep the list beside the preview and narrower screens use the drawer" do
+    posts(:read_allowed).update!(body: 'Split view content')
+    page.driver.with_playwright_page { |browser_page| browser_page.viewport_size = {width: 1237, height: 900} }
+    sign_in_as_social
+    click_on 'Read Allowed'
+
+    [1237, 1024, 1280, 1400].each do |width|
+      page.driver.with_playwright_page { |browser_page| browser_page.viewport_size = {width: width, height: 900} }
+      assert_selector 'aside article.post-body', text: 'Split view content'
+      assert_selector '[role="separator"][aria-label="Resize list and post view"]'
+      assert_no_selector '[role="dialog"][aria-label="Post preview"]'
+      geometry = page.evaluate_script(<<~JS)
+        (() => {
+          const list = document.querySelector('.post-list-shell').getBoundingClientRect();
+          const preview = document.querySelector('aside').getBoundingClientRect();
+          return {listRight: list.right, previewLeft: preview.left, previewRight: preview.right,
+            previewWidth: preview.width, viewport: innerWidth, content: document.documentElement.scrollWidth};
+        })()
+      JS
+      assert_operator geometry.fetch('listRight'), :<=, geometry.fetch('previewLeft'), "List and preview overlap at #{width}px"
+      assert_operator geometry.fetch('previewWidth'), :>=, 420
+      assert_operator geometry.fetch('previewRight'), :<=, geometry.fetch('viewport')
+      assert_operator geometry.fetch('content'), :<=, geometry.fetch('viewport'), "Horizontal overflow at #{width}px"
+    end
+
+    page.driver.with_playwright_page { |browser_page| browser_page.viewport_size = {width: 1023, height: 900} }
+    click_on 'Read Allowed'
+    assert_selector '[role="dialog"][aria-label="Post preview"] article.post-body', text: 'Split view content'
+    assert_no_selector 'aside'
+    find('button[aria-label="Close preview"]').click
+    assert_no_selector '[role="dialog"][aria-label="Post preview"]'
+    assert_selector '.post-list-shell'
+  end
+
   test "selecting a post renders its body in the preview" do
     posts(:read_allowed).update!(body: "## Field notes\n\nReplicated **twice** on mainnet.")
     sign_in_as_social

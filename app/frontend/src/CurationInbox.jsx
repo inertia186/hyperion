@@ -25,7 +25,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
   const desktopLayoutRef = useRef(null)
   const desktopPreviewScrollRef = useRef(null)
   const mobilePreviewScrollRef = useRef(null)
-  const isMobilePreviewLayout = useMediaQuery('(max-width: 1279px)')
+  const isMobilePreviewLayout = useMediaQuery('(max-width: 1023px)')
   const {desktopLayoutStyle, desktopPreviewPercent, startDesktopResize} = useDesktopPreviewResize(desktopLayoutRef)
   const {
     selectedId,
@@ -311,7 +311,7 @@ const CurationInbox = forwardRef(function CurationInbox({session, refreshKey = 0
         </section>
 
         {!isMobilePreviewLayout && (
-          <div className="desktop-resize-handle hidden xl:flex" role="separator" aria-label="Resize list and post view" aria-orientation="vertical" tabIndex={0} onPointerDown={startDesktopResize}>
+          <div className="desktop-resize-handle hidden lg:flex" role="separator" aria-label="Resize list and post view" aria-orientation="vertical" tabIndex={0} onPointerDown={startDesktopResize}>
             <span />
           </div>
         )}

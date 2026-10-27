@@ -24,7 +24,7 @@ export default function MobilePreviewDrawer({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950/30 xl:hidden" role="dialog" aria-modal="true" aria-label="Post preview" onClick={closeOnBackdropClick(onClose)}>
+    <div className="fixed inset-0 z-40 bg-slate-950/30 lg:hidden" role="dialog" aria-modal="true" aria-label="Post preview" onClick={closeOnBackdropClick(onClose)}>
       <div className="safe-area-shell safe-area-top mobile-preview-sheet flex flex-col bg-white">
         <div className="min-h-0 flex-1 overflow-hidden">
           <PreviewPane
