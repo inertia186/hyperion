@@ -24,7 +24,7 @@ export default function CurationPreviewPanels({
 }) {
   return (
     <>
-      <aside className="hidden min-w-0 xl:sticky xl:top-4 xl:flex xl:h-[calc(100vh-2rem)] xl:h-[calc(100dvh-2rem)] xl:flex-col xl:gap-3">
+      <aside className="hidden min-w-0 lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:h-[calc(100dvh-2rem)] lg:flex-col lg:gap-3">
         <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-slate-200 bg-white">
           <PreviewPane
             post={selectedPost}
