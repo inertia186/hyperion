@@ -36,10 +36,10 @@ class ActiveSupport::TestCase
       'HAFSQL_DATABASE_URL' => 'postgres://hafsql.example/hafsql',
       'HAFSQL_COMMENTS_RELATION' => 'hafsql.comments'
     ) do
-      HafsqlRecord.stub(:configured?, true) do
-        HafsqlRecord.stub(:connection, connection) do
-          yield
-        end
+      # configured? is already true outside system tests. Stubbing it would
+      # restore FakeHive's prepended wrapper onto the class and recurse on super.
+      HafsqlRecord.stub(:connection, connection) do
+        yield
       end
     end
   end
