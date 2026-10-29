@@ -64,6 +64,7 @@ jobs:
             bundle exec ruby -Itest -r./test/controllers/api/v1/posts_controller_test -e 'ActiveSupport::TestCase.new("scope_probe").with_hafsql(Object.new) {}' -- --name '/test_revisions_(loads_a_missing_local_body|retains_Hive_body)/'
           }
           cp test/test_helper.rb "$RUNNER_TEMP/fixed-test-helper.rb"
+          git fetch --depth=1 origin 7ded45741efb0ccd1b21fe0a7230db74e772a010
           git show 7ded45741efb0ccd1b21fe0a7230db74e772a010:test/test_helper.rb > test/test_helper.rb
           set +e
           run_fallbacks > "$RUNNER_TEMP/fallbacks-before.log" 2>&1
