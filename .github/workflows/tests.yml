@@ -54,6 +54,27 @@ jobs:
           npm run build
           npm run build:css
           bundle exec rails vite:build
+      - name: Verify missing-body regressions before and after the helper fix
+        env:
+          PARALLEL_WORKERS: '1'
+          SKIP_JS_BUILD: '1'
+          SKIP_CSS_BUILD: '1'
+        run: |
+          run_fallbacks() {
+            bundle exec ruby -Itest -r./test/controllers/api/v1/posts_controller_test -e 'ActiveSupport::TestCase.new("scope_probe").with_hafsql(Object.new) {}' -- --name '/test_revisions_(loads_a_missing_local_body|retains_Hive_body)/'
+          }
+          cp test/test_helper.rb "$RUNNER_TEMP/fixed-test-helper.rb"
+          git show 7ded45741efb0ccd1b21fe0a7230db74e772a010:test/test_helper.rb > test/test_helper.rb
+          set +e
+          run_fallbacks > "$RUNNER_TEMP/fallbacks-before.log" 2>&1
+          before_status=$?
+          set -e
+          cp "$RUNNER_TEMP/fixed-test-helper.rb" test/test_helper.rb
+          cat "$RUNNER_TEMP/fallbacks-before.log"
+          test "$before_status" -eq 1
+          grep -Eq '2 runs, .*0 failures, 2 errors, 0 skips' "$RUNNER_TEMP/fallbacks-before.log"
+          run_fallbacks
+          bundle exec rails test test/hafsql_test_helper_test.rb
       - name: Run Rails tests
         env:
           COVERAGE: '1'
