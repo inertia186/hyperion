@@ -38,7 +38,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
 
   test 'digest returns interesting unread posts with agent fields and vote links' do
     posts(:allowed_unread).update!(
-      body: 'Useful post body about curation and HAF indexing.',
+      body: %q{<p>It's a &quot;useful&quot; post about curation &amp; HAF indexing.</p>},
       payout: '2.000 HBD',
       payout_amount: 2,
       payout_currency: 'HBD',
@@ -65,7 +65,7 @@ class Api::V1::AgentControllerTest < ActionController::TestCase
 
     post = response_json.fetch('posts').find { |candidate| candidate.fetch('title') == 'Allowed Unread' }
     assert_equal 'visible-author', post.fetch('author')
-    assert_includes post.fetch('excerpt'), 'Useful post body'
+    assert_equal %q{It's a "useful" post about curation & HAF indexing.}, post.fetch('excerpt')
     assert_equal false, post.fetch('read')
     assert_nil post.fetch('current_vote')
     assert_equal 'ready', post.fetch('current_vote_status')
