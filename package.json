@@ -1,6 +1,9 @@
 {
   "name": "hyperion",
   "private": true,
+  "workspaces": [
+    "vendor/hive-content-renderer"
+  ],
   "engines": {
     "node": "26.x"
   },
