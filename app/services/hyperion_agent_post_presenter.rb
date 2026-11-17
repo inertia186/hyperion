@@ -116,9 +116,9 @@ private
   end
 
   def excerpt(body, fallback: '')
-    text = ActionController::Base.helpers.strip_tags(body.to_s)
+    text = CGI.unescapeHTML(ActionController::Base.helpers.strip_tags(body.to_s))
     text = text.gsub(/\s+/, ' ').strip
     text = fallback.to_s if text.blank?
-    ActionController::Base.helpers.truncate(text, length: EXCERPT_LENGTH, separator: ' ')
+    ActionController::Base.helpers.truncate(text, length: EXCERPT_LENGTH, separator: ' ', escape: false)
   end
 end
